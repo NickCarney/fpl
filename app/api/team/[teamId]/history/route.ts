@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { teamId: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { teamId } = params;
+    // Extract 'teamId' param from the URL
+    const url = request.nextUrl;
+    const segments = url.pathname.split("/");
+    const teamId = segments[segments.length - 2]; // teamId is before 'history'
 
     const response = await fetch(
       `https://fantasy.premierleague.com/api/entry/${teamId}/history/`

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { leagueId: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { leagueId } = params;
+    // Extract 'leagueId' param from the URL
+    const url = request.nextUrl;
+    const segments = url.pathname.split("/");
+    const leagueId = segments[segments.length - 2]; // leagueId is before 'standings'
+    
     const { searchParams } = new URL(request.url);
     const page = searchParams.get("page") || "1";
 
