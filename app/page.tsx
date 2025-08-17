@@ -165,7 +165,7 @@ export default function Home() {
 
       {/* Navigation */}
       <nav className="w-full px-[10%]">
-        <div className="flex w-full justify-between gap-[10%] text-nowrap">
+        <div className="flex w-full justify-between gap-[10%] text-nowrap flex-col sm:flex-row pt-2 gap-y-2">
           <button
             onClick={() => setActiveTab("squad")}
             className={`py-1 border-b-2 font-medium text-sm w-full ${

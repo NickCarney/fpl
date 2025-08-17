@@ -246,17 +246,17 @@ export default function PlayerDetailPopup({
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2">GW</th>
-                        <th className="text-left py-2">Opponent</th>
-                        <th className="text-left py-2">Venue</th>
-                        <th className="text-right py-2">Pts</th>
-                        <th className="text-right py-2">Min</th>
-                        <th className="text-right py-2">Goals</th>
-                        <th className="text-right py-2">Assists</th>
-                        <th className="text-right py-2">CS</th>
-                        <th className="text-right py-2">Bonus</th>
-                        <th className="text-right py-2">BPS</th>
+                      <tr className="border-b w-fit">
+                        <th className="text-left py-2 px-4">GW</th>
+                        <th className="text-left py-2 px-4">Opponent</th>
+                        <th className="text-left py-2 px-4">Venue</th>
+                        <th className="text-right py-2 px-4">Pts</th>
+                        <th className="text-right py-2 px-4">Min</th>
+                        <th className="text-right py-2 px-4">Goals</th>
+                        <th className="text-right py-2 px-4">Assists</th>
+                        <th className="text-right py-2 px-4">CS</th>
+                        <th className="text-right py-2 px-4">Bonus</th>
+                        <th className="text-right py-2 px-4">BPS</th>
                       </tr>
                     </thead>
                     <tbody>

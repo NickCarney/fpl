@@ -204,23 +204,25 @@ export default function CurrentSquad({
     <div className=" p-6 rounded-lg">
       <div className="flex items-center mb-6 justify-center flex-col">
         <h2 className="text-2xl font-bold">Current Squad</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-col pt-2">
           {/* View Toggle */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm ">View:</span>
+          <div className="flex items-center justify-center gap-2 w-full">
+            {/* <span className="text-sm ">View:</span> */}
             <button
-              onClick={() => setIsFormationView(!isFormationView)}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                isFormationView ? "text-white bg-green-600" : "  hover:"
+              onClick={() => setIsFormationView(true)}
+              className={`flex-1 min-w-[120px] max-w-[160px] py-1 rounded-md text-sm font-medium transition-colors text-center ${
+                isFormationView ? "text-white bg-green-600" : ""
               }`}
+              style={{ marginRight: 4 }}
             >
               Formation
             </button>
             <button
-              onClick={() => setIsFormationView(!isFormationView)}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                !isFormationView ? " text-white bg-green-600" : "  hover:"
+              onClick={() => setIsFormationView(false)}
+              className={`flex-1 min-w-[120px] max-w-[160px] py-1 rounded-md text-sm font-medium transition-colors text-center ${
+                !isFormationView ? " text-white bg-green-600" : ""
               }`}
+              style={{ marginLeft: 4 }}
             >
               List
             </button>
@@ -275,7 +277,7 @@ export default function CurrentSquad({
               </div>
 
               {/* Formation Layout */}
-              <div className="relative z-10 space-y-8">
+              <div className="relative z-10 space-y-12">
                 {/* Forwards */}
                 {forwards.length > 0 && (
                   <div className="flex justify-center">
