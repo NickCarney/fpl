@@ -215,7 +215,7 @@ export default function TransferSuggestions({
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <h3 className="text-xl font-bold flex items-center gap-2">
-          🔄 AI Transfer Suggestions
+          Transfer Suggestions
           {isFallback && (
             <span className="text-xs text-yellow-800 px-2 py-1 rounded">
               Basic Mode

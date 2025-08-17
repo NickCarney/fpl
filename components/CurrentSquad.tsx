@@ -92,7 +92,7 @@ export default function CurrentSquad({
         <div
           key={pick.element}
           onClick={() => handlePlayerClick(pick)}
-          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer min-h-[120px] ${
+          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto ${
             pick.is_captain
               ? "border-yellow-400"
               : pick.is_vice_captain
@@ -201,8 +201,8 @@ export default function CurrentSquad({
   }, 0);
 
   return (
-    <div className=" p-6 rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-6">
+    <div className=" p-6 rounded-lg">
+      <div className="flex items-center mb-6 justify-center flex-col">
         <h2 className="text-2xl font-bold">Current Squad</h2>
         <div className="flex items-center gap-4">
           {/* View Toggle */}
@@ -235,7 +235,7 @@ export default function CurrentSquad({
       </div>
 
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">
+        <h3 className="text-lg font-semibold mb-3 text-center">
           {isFormationView ? "Starting XI - Formation View" : "Starting XI"}
         </h3>
 
@@ -243,6 +243,29 @@ export default function CurrentSquad({
           <>
             {/* Football Pitch Background */}
             <div className="bg-gradient-to-b from-green-400 to-green-500 p-6 rounded-lg relative overflow-hidden">
+              {/* Vertical Stripes - Center 60% only */}
+              <div className="absolute inset-0">
+                <div className="flex h-full">
+                  {/* Left 20% - no stripes */}
+                  <div className="w-1/5 bg-[#4ade80]"></div>
+
+                  {/* Center 60% - with stripes */}
+                  <div className="w-3/5 flex">
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                  </div>
+
+                  {/* Right 20% - no stripes */}
+                  <div className="w-1/5 bg-[#4ade80]"></div>
+                </div>
+              </div>
+
               {/* Pitch Lines */}
               <div className="absolute inset-0 opacity-20">
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-16 border-2 border-white rounded-b-lg"></div>
@@ -256,15 +279,7 @@ export default function CurrentSquad({
                 {/* Forwards */}
                 {forwards.length > 0 && (
                   <div className="flex justify-center">
-                    <div
-                      className={`grid gap-4 ${
-                        forwards.length === 1
-                          ? "grid-cols-1"
-                          : forwards.length === 2
-                          ? "grid-cols-2"
-                          : "grid-cols-3"
-                      }`}
-                    >
+                    <div className="flex gap-4 justify-center">
                       {forwards.map((pick) => renderPlayer(pick, false, true))}
                     </div>
                   </div>
@@ -273,19 +288,7 @@ export default function CurrentSquad({
                 {/* Midfielders */}
                 {midfielders.length > 0 && (
                   <div className="flex justify-center">
-                    <div
-                      className={`grid gap-4 ${
-                        midfielders.length === 1
-                          ? "grid-cols-1"
-                          : midfielders.length === 2
-                          ? "grid-cols-2"
-                          : midfielders.length === 3
-                          ? "grid-cols-3"
-                          : midfielders.length === 4
-                          ? "grid-cols-4"
-                          : "grid-cols-5"
-                      }`}
-                    >
+                    <div className="flex gap-4 justify-center flex-wrap">
                       {midfielders.map((pick) =>
                         renderPlayer(pick, false, true)
                       )}
@@ -296,19 +299,7 @@ export default function CurrentSquad({
                 {/* Defenders */}
                 {defenders.length > 0 && (
                   <div className="flex justify-center">
-                    <div
-                      className={`grid gap-4 ${
-                        defenders.length === 1
-                          ? "grid-cols-1"
-                          : defenders.length === 2
-                          ? "grid-cols-2"
-                          : defenders.length === 3
-                          ? "grid-cols-3"
-                          : defenders.length === 4
-                          ? "grid-cols-4"
-                          : "grid-cols-5"
-                      }`}
-                    >
+                    <div className="flex gap-4 justify-center flex-wrap">
                       {defenders.map((pick) => renderPlayer(pick, false, true))}
                     </div>
                   </div>
@@ -317,7 +308,7 @@ export default function CurrentSquad({
                 {/* Goalkeeper */}
                 {goalkeepers.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="grid grid-cols-1">
+                    <div className="flex justify-center">
                       {goalkeepers.map((pick) =>
                         renderPlayer(pick, false, true)
                       )}

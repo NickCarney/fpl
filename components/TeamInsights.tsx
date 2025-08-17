@@ -27,7 +27,7 @@ export default function TeamInsights({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -145,7 +145,7 @@ export default function TeamInsights({
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <h3 className="text-xl font-bold flex items-center gap-2">
-          🧠 Team Insights
+          Team Insights
           {isFallback && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
               Basic Analysis

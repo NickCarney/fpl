@@ -146,16 +146,16 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className=" shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+      <header className="">
+        <div className="flex justify-center">
+          <div className="flex justify-between items-center py-4 flex-col">
             <div>
               <h1 className="text-2xl font-bold ">⚽ FPL Dashboard</h1>
-              <p className="">Team ID: {teamId}</p>
+              <p className="text-center">Team ID: {teamId}</p>
             </div>
             <button
               onClick={() => setTeamId(null)}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-blue-600 hover:text-blue-800 !border-none"
             >
               Change Team
             </button>
@@ -164,50 +164,48 @@ export default function Home() {
       </header>
 
       {/* Navigation */}
-      <nav className="border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab("squad")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "squad"
-                  ? "border-blue-500 text-blue-600 bg-green-600"
-                  : "border-transparent  hover:"
-              }`}
-            >
-              Current Squad
-            </button>
-            <button
-              onClick={() => setActiveTab("stats")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "stats"
-                  ? "border-blue-500 text-blue-600 bg-green-600"
-                  : "border-transparent  hover:"
-              }`}
-            >
-              Player Stats
-            </button>
-            <button
-              onClick={() => setActiveTab("league")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "league"
-                  ? "border-blue-500 text-blue-600 bg-green-600"
-                  : "border-transparent  hover:"
-              }`}
-            >
-              League
-            </button>
-            <button
-              onClick={() => setActiveTab("history")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "history"
-                  ? "border-blue-500 text-blue-600 bg-green-600"
-                  : "border-transparent  hover:"
-              }`}
-            >
-              Season History
-            </button>
-          </div>
+      <nav className="w-full px-[10%]">
+        <div className="flex w-full justify-between gap-[10%] text-nowrap">
+          <button
+            onClick={() => setActiveTab("squad")}
+            className={`py-1 border-b-2 font-medium text-sm w-full ${
+              activeTab === "squad"
+                ? "border-blue-500 text-blue-600 bg-green-600"
+                : "border-transparent  hover:"
+            }`}
+          >
+            Current Squad
+          </button>
+          <button
+            onClick={() => setActiveTab("stats")}
+            className={`py-1 border-b-2 font-medium text-sm  w-full ${
+              activeTab === "stats"
+                ? "border-blue-500 text-blue-600 bg-green-600"
+                : "border-transparent  hover:"
+            }`}
+          >
+            Player Stats
+          </button>
+          <button
+            onClick={() => setActiveTab("league")}
+            className={`py-1 border-b-2 font-medium text-sm  w-full ${
+              activeTab === "league"
+                ? "border-blue-500 text-blue-600 bg-green-600"
+                : "border-transparent  hover:"
+            }`}
+          >
+            League
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`py-1 border-b-2 font-medium text-sm  w-full ${
+              activeTab === "history"
+                ? "border-blue-500 text-blue-600 bg-green-600"
+                : "border-transparent  hover:"
+            }`}
+          >
+            Season History
+          </button>
         </div>
       </nav>
 
