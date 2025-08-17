@@ -8,10 +8,13 @@ The FPL API is undocumented but public and widely used by the community.
 ## Features
 
 - View your **current squad** and points for each gameweek.
+- **Formation view** with tactical layout on a football pitch.
+- **Player detail popups** with comprehensive stats and game-by-game performance.
 - Track **live scores** as matches update.
 - Display **mini-league standings** for Classic or Head-to-Head leagues.
 - Explore **player stats** (form, price, ICT index, upcoming fixtures).
 - Visualize your **season history** (rank, points, chip usage).
+- **AI-powered team insights** analyzing your squad's strengths and weaknesses.
 
 ---
 
@@ -49,3 +52,26 @@ Some key endpoints:
    git clone https://github.com/yourusername/fpl-dashboard.git
    cd fpl-dashboard
    ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables (optional)**
+   ```bash
+   cp .env.example .env.local
+   ```
+   Add your OpenAI API key to enable AI-powered team insights:
+   ```
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+   *Note: Team insights will work with basic analysis even without an API key*
+
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser**
+   Navigate to `http://localhost:3000` and enter your FPL Team ID

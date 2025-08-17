@@ -62,3 +62,31 @@ export async function getPlayerGameweeks(playerId: number): Promise<PlayerGamewe
   }
   return response.json();
 }
+
+export async function generateTeamInsights(
+  teamData: any, 
+  squadData: any, 
+  currentGameweek: number, 
+  gameweekFinished: boolean = false, 
+  fixtures: any[] = []
+): Promise<{ insights: string; fallback?: boolean }> {
+  const response = await fetch('/api/team-insights', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      teamData,
+      squadData,
+      currentGameweek,
+      gameweekFinished,
+      fixtures,
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to generate team insights');
+  }
+  
+  return response.json();
+}

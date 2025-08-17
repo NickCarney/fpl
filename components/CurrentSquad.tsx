@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Element, Pick, Team, ElementType } from "@/types/fpl";
+import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
 import PlayerDetailPopup from "./PlayerDetailPopup";
+import TeamInsights from "./TeamInsights";
 
 interface CurrentSquadProps {
   picks: Pick[];
@@ -10,6 +11,7 @@ interface CurrentSquadProps {
   teams: Team[];
   elementTypes: ElementType[];
   currentEvent: number;
+  events: Event[];
 }
 
 export default function CurrentSquad({
@@ -18,6 +20,7 @@ export default function CurrentSquad({
   teams,
   elementTypes,
   currentEvent,
+  events,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState<{
@@ -350,6 +353,19 @@ export default function CurrentSquad({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {bench.map((pick) => renderPlayer(pick, true))}
         </div>
+      </div>
+
+      {/* Team Insights */}
+      <div className="mt-6">
+        <TeamInsights
+          picks={picks}
+          elements={elements}
+          teams={teams}
+          elementTypes={elementTypes}
+          currentEvent={currentEvent}
+          totalPoints={totalPoints}
+          events={events}
+        />
       </div>
 
       {/* Player Detail Popup */}
