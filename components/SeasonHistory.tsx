@@ -42,34 +42,32 @@ export default function SeasonHistory({ history, chips }: SeasonHistoryProps) {
   );
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
+    <div className=" p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6">Season History</h2>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-blue-50 p-4 rounded-lg text-center">
-          <div className="text-2xl font-bold text-blue-600">{totalPoints}</div>
-          <div className="text-sm text-gray-600">Total Points</div>
+        <div className=" p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold">{totalPoints}</div>
+          <div className="text-sm ">Total Points</div>
         </div>
-        <div className="bg-green-50 p-4 rounded-lg text-center">
-          <div className="text-2xl font-bold text-green-600">
+        <div className=" p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold">
             {currentRank.toLocaleString()}
           </div>
-          <div className="text-sm text-gray-600">Overall Rank</div>
+          <div className="text-sm ">Overall Rank</div>
         </div>
-        <div className="bg-purple-50 p-4 rounded-lg text-center">
-          <div className="text-2xl font-bold text-purple-600">
-            {averagePoints}
-          </div>
-          <div className="text-sm text-gray-600">Avg Points/GW</div>
+        <div className=" p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold">{averagePoints}</div>
+          <div className="text-sm ">Avg Points/GW</div>
         </div>
-        <div className="bg-orange-50 p-4 rounded-lg text-center">
-          <div className="text-2xl font-bold text-orange-600">{highestGW}</div>
-          <div className="text-sm text-gray-600">Highest GW</div>
+        <div className=" p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold">{highestGW}</div>
+          <div className="text-sm ">Highest GW</div>
         </div>
-        <div className="bg-red-50 p-4 rounded-lg text-center">
-          <div className="text-2xl font-bold text-red-600">{lowestGW}</div>
-          <div className="text-sm text-gray-600">Lowest GW</div>
+        <div className=" p-4 rounded-lg text-center">
+          <div className="text-2xl font-bold">{lowestGW}</div>
+          <div className="text-sm ">Lowest GW</div>
         </div>
       </div>
 
@@ -155,16 +153,14 @@ export default function SeasonHistory({ history, chips }: SeasonHistoryProps) {
         {chipsUsed.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {chipsUsed.map((chip) => (
-              <div key={chip.event} className="bg-gray-50 p-3 rounded-lg">
+              <div key={chip.event} className=" p-3 rounded-lg">
                 <div className="font-semibold">{chip.name}</div>
-                <div className="text-sm text-gray-600">
-                  Gameweek {chip.event}
-                </div>
+                <div className="text-sm ">Gameweek {chip.event}</div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-gray-500">No chips used yet this season</p>
+          <p className="">No chips used yet this season</p>
         )}
       </div>
     </div>

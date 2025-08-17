@@ -139,12 +139,12 @@ export default function TeamInsights({
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-      <div 
-        className="flex justify-between items-center p-4 cursor-pointer hover:bg-blue-100 rounded-t-lg transition-colors"
+    <div className="bg-green-200 rounded-lg border border-blue-200">
+      <div
+        className="flex justify-between items-center p-4 cursor-pointer rounded-t-lg transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+        <h3 className="text-xl font-bold flex items-center gap-2">
           🧠 Team Insights
           {isFallback && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
@@ -160,14 +160,12 @@ export default function TeamInsights({
                 generateInsights();
               }}
               disabled={loading}
-              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm"
+              className="px-3 py-1  text-white rounded-md transition-colors text-sm"
             >
-              {loading ? 'Analyzing...' : 'Refresh'}
+              {loading ? "Analyzing..." : "Refresh"}
             </button>
           )}
-          <button className="text-gray-500 hover:text-gray-700">
-            {isCollapsed ? '▼' : '▲'}
-          </button>
+          <button className=" hover:">{isCollapsed ? "▼" : "▲"}</button>
         </div>
       </div>
 
@@ -176,23 +174,21 @@ export default function TeamInsights({
           {loading && (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-              <p className="text-gray-600">Analyzing your team...</p>
+              <p className="">Analyzing your team...</p>
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className=" border border-red-200 rounded-md p-4">
               <p className="text-red-700">{error}</p>
             </div>
           )}
 
           {insights && !loading && (
             <div className="prose prose-sm max-w-none">
-              <div className="text-gray-700 leading-relaxed">
-                {formatInsights(insights)}
-              </div>
+              <div className=" leading-relaxed">{formatInsights(insights)}</div>
               {!isFallback && (
-                <div className="mt-4 text-xs text-gray-500 flex items-center gap-1">
+                <div className="mt-4 text-xs  flex items-center gap-1">
                   <span>⚡</span>
                   <span>Powered by AI analysis</span>
                 </div>

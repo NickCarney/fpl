@@ -101,15 +101,11 @@ export default function Home() {
 
   if (!teamId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              ⚽ FPL Dashboard
-            </h1>
-            <p className="text-gray-600">
-              Track your Fantasy Premier League performance
-            </p>
+            <h1 className="text-4xl font-bold  mb-2">⚽ FPL Dashboard</h1>
+            <p className="">Track your Fantasy Premier League performance</p>
           </div>
           <TeamIdInput onTeamIdSubmit={handleTeamIdSubmit} />
         </div>
@@ -119,10 +115,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your FPL data...</p>
+          <p className="">Loading your FPL data...</p>
         </div>
       </div>
     );
@@ -130,12 +126,12 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-red-600 text-xl mb-4">{error}</div>
           <button
             onClick={() => setTeamId(null)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            className=" text-white px-4 py-2 rounded-md hover:"
           >
             Try Again
           </button>
@@ -148,16 +144,14 @@ export default function Home() {
     bootstrapData?.events.find((event) => event.is_current)?.id || 1;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className=" shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                ⚽ FPL Dashboard
-              </h1>
-              <p className="text-gray-600">Team ID: {teamId}</p>
+              <h1 className="text-2xl font-bold ">⚽ FPL Dashboard</h1>
+              <p className="">Team ID: {teamId}</p>
             </div>
             <button
               onClick={() => setTeamId(null)}
@@ -170,15 +164,15 @@ export default function Home() {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white border-b">
+      <nav className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             <button
               onClick={() => setActiveTab("squad")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === "squad"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-blue-500 text-blue-600 bg-green-600"
+                  : "border-transparent  hover:"
               }`}
             >
               Current Squad
@@ -187,8 +181,8 @@ export default function Home() {
               onClick={() => setActiveTab("stats")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === "stats"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-blue-500 text-blue-600 bg-green-600"
+                  : "border-transparent  hover:"
               }`}
             >
               Player Stats
@@ -197,8 +191,8 @@ export default function Home() {
               onClick={() => setActiveTab("league")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === "league"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-blue-500 text-blue-600 bg-green-600"
+                  : "border-transparent  hover:"
               }`}
             >
               League
@@ -207,8 +201,8 @@ export default function Home() {
               onClick={() => setActiveTab("history")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === "history"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-blue-500 text-blue-600 bg-green-600"
+                  : "border-transparent  hover:"
               }`}
             >
               Season History
@@ -241,7 +235,7 @@ export default function Home() {
         {activeTab === "league" && (
           <div className="space-y-6">
             {!leagueStandings && (
-              <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="p-6 rounded-lg shadow-md">
                 <h2 className="text-xl font-bold mb-4">
                   Load League Standings
                 </h2>
@@ -256,12 +250,12 @@ export default function Home() {
                   <button
                     onClick={handleLoadLeague}
                     disabled={!leagueId}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                    className=" text-white px-4 py-2 rounded-md"
                   >
                     Load League
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs  mt-2">
                   Find your league ID in the URL when viewing your league
                   standings
                 </p>

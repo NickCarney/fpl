@@ -86,7 +86,7 @@ export default function PlayerStats({
     children: React.ReactNode;
   }) => (
     <th
-      className="text-left py-2 cursor-pointer hover:bg-gray-100"
+      className="text-left py-2 cursor-pointer hover:"
       onClick={() => handleSort(field)}
     >
       <div className="flex items-center gap-1">
@@ -99,15 +99,13 @@ export default function PlayerStats({
   );
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
+    <div className=" p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6">Player Stats</h2>
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Position
-          </label>
+          <label className="block text-sm font-medium  mb-2">Position</label>
           <select
             value={selectedPosition || ""}
             onChange={(e) =>
@@ -127,7 +125,7 @@ export default function PlayerStats({
         </div>
 
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium  mb-2">
             Search Players
           </label>
           <input
@@ -161,11 +159,11 @@ export default function PlayerStats({
               const position = getPosition(element.element_type);
 
               return (
-                <tr key={element.id} className="border-b hover:bg-gray-50">
+                <tr key={element.id} className="border-b hover:">
                   <td className="py-3">
                     <div>
                       <div className="font-medium">{element.web_name}</div>
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs ">
                         {element.first_name} {element.second_name}
                       </div>
                     </div>
@@ -189,7 +187,7 @@ export default function PlayerStats({
       </div>
 
       {filteredAndSortedElements.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 ">
           No players found matching your criteria
         </div>
       )}

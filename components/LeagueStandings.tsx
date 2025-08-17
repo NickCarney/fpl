@@ -14,7 +14,7 @@ export default function LeagueStandings({
   userTeamId,
 }: LeagueStandingsProps) {
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
+    <div className=" p-6 rounded-lg shadow-md">
       <h2 className="text-2xl font-bold mb-6">{leagueName} - Standings</h2>
 
       <div className="overflow-x-auto">
@@ -37,8 +37,8 @@ export default function LeagueStandings({
               return (
                 <tr
                   key={standing.entry}
-                  className={`border-b hover:bg-gray-50 ${
-                    isUserTeam ? "bg-blue-50 font-semibold" : ""
+                  className={`border-b hover: ${
+                    isUserTeam ? " font-semibold" : ""
                   }`}
                 >
                   <td className="py-3">{standing.rank}</td>
@@ -59,9 +59,7 @@ export default function LeagueStandings({
                         ↓ {Math.abs(movement)}
                       </span>
                     )}
-                    {movement === 0 && (
-                      <span className="text-gray-500 text-xs">-</span>
-                    )}
+                    {movement === 0 && <span className=" text-xs">-</span>}
                   </td>
                 </tr>
               );
@@ -71,9 +69,7 @@ export default function LeagueStandings({
       </div>
 
       {standings.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No standings data available
-        </div>
+        <div className="text-center py-8 ">No standings data available</div>
       )}
     </div>
   );

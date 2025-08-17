@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #4ade80;
+  --foreground: black;
 }
 
 @theme inline {
@@ -14,8 +14,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #4ade80;
+    --foreground: black;
   }
 }
 
@@ -27,16 +27,27 @@ body {
 
 /* Popup overlay and modal styles */
 .popup-overlay {
-  background: rgba(0, 0, 0, 0.5);
+  background: #4ade80;
 }
 
 .popup-content {
+  background: #4ade80;
   margin: auto;
-  background: white;
   width: 90%;
   max-width: 800px;
   padding: 0;
   border: none;
   border-radius: 8px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+button,
+a {
+  border: 1px solid black;
+  border-radius: 7%;
+  padding-left: 5%;
+  padding-right: 5%;
+  color: black;
+  cursor: pointer;
 }

@@ -65,7 +65,7 @@ export default function CurrentSquad({
     const player = getPlayer(pick.element);
     const team = getTeam(player?.team || 0);
     const position = getPosition(player?.element_type || 0);
-    
+
     if (player && team && position) {
       setSelectedPlayer({ pick, player, team, position });
     }
@@ -94,10 +94,10 @@ export default function CurrentSquad({
           onClick={() => handlePlayerClick(pick)}
           className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer min-h-[120px] ${
             pick.is_captain
-              ? "bg-yellow-100 border-yellow-400"
+              ? "border-yellow-400"
               : pick.is_vice_captain
-              ? "bg-yellow-50 border-yellow-300"
-              : "bg-white border-green-300"
+              ? " border-yellow-300"
+              : " border-green-300"
           }`}
         >
           {/* Player Name and Team */}
@@ -105,7 +105,7 @@ export default function CurrentSquad({
             <h3 className="font-semibold text-sm leading-tight">
               {player.web_name}
             </h3>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs ">
               {team?.short_name} - {position?.singular_name_short}
             </p>
           </div>
@@ -115,13 +115,11 @@ export default function CurrentSquad({
             <p className="text-sm font-bold text-green-700">
               {player.total_points}pts
             </p>
-            <p className="text-xs text-gray-600">
-              £{(player.now_cost / 10).toFixed(1)}m
-            </p>
+            <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
           </div>
 
           {/* Form and Minutes */}
-          <div className="text-center text-xs text-gray-600 mb-2">
+          <div className="text-center text-xs  mb-2">
             <div>Form: {player.form}</div>
             <div>{player.minutes} mins</div>
           </div>
@@ -139,7 +137,7 @@ export default function CurrentSquad({
               </span>
             )}
             {pick.multiplier > 1 && (
-              <span className="px-2 py-1 bg-blue-200 text-xs rounded">
+              <span className="px-2 py-1  text-xs rounded">
                 {pick.multiplier}x
               </span>
             )}
@@ -154,7 +152,7 @@ export default function CurrentSquad({
         key={pick.element}
         onClick={() => handlePlayerClick(pick)}
         className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg ${
-          isBench ? "bg-gray-100 border-gray-300" : "bg-white border-gray-200"
+          isBench ? " border-gray-300" : " border-gray-200"
         } ${pick.is_captain ? "ring-2 ring-yellow-400" : ""} ${
           pick.is_vice_captain ? "ring-2 ring-yellow-200" : ""
         }`}
@@ -162,19 +160,17 @@ export default function CurrentSquad({
         <div className="flex justify-between items-start mb-2">
           <div>
             <h3 className="font-semibold text-sm">{player.web_name}</h3>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs ">
               {team?.short_name} - {position?.singular_name_short}
             </p>
           </div>
           <div className="text-right">
             <p className="text-sm font-bold">{player.total_points}pts</p>
-            <p className="text-xs text-gray-600">
-              £{(player.now_cost / 10).toFixed(1)}m
-            </p>
+            <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
           </div>
         </div>
         <div className="flex justify-between items-center">
-          <div className="text-xs text-gray-600">
+          <div className="text-xs ">
             Form: {player.form} | {player.minutes} mins
           </div>
           <div className="flex gap-1">
@@ -189,7 +185,7 @@ export default function CurrentSquad({
               </span>
             )}
             {pick.multiplier > 1 && (
-              <span className="px-1 py-0.5 bg-blue-200 text-xs rounded">
+              <span className="px-1 py-0.5  text-xs rounded">
                 {pick.multiplier}x
               </span>
             )}
@@ -205,19 +201,17 @@ export default function CurrentSquad({
   }, 0);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
+    <div className=" p-6 rounded-lg shadow-md">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Current Squad</h2>
         <div className="flex items-center gap-4">
           {/* View Toggle */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">View:</span>
+            <span className="text-sm ">View:</span>
             <button
               onClick={() => setIsFormationView(!isFormationView)}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                isFormationView
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                isFormationView ? "text-white bg-green-600" : "  hover:"
               }`}
             >
               Formation
@@ -225,9 +219,7 @@ export default function CurrentSquad({
             <button
               onClick={() => setIsFormationView(!isFormationView)}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                !isFormationView
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                !isFormationView ? " text-white bg-green-600" : "  hover:"
               }`}
             >
               List
@@ -236,7 +228,7 @@ export default function CurrentSquad({
 
           {/* Stats */}
           <div className="text-right">
-            <p className="text-sm text-gray-600">Gameweek {currentEvent}</p>
+            <p className="text-sm ">Gameweek {currentEvent}</p>
             <p className="text-xl font-bold">{totalPoints} points</p>
           </div>
         </div>
@@ -255,7 +247,7 @@ export default function CurrentSquad({
               <div className="absolute inset-0 opacity-20">
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-16 border-2 border-white rounded-b-lg"></div>
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-16 border-2 border-white rounded-t-lg"></div>
-                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white"></div>
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 "></div>
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white rounded-full"></div>
               </div>
 
@@ -336,7 +328,7 @@ export default function CurrentSquad({
             </div>
 
             {/* Formation Info */}
-            <div className="mt-4 text-center text-sm text-gray-600">
+            <div className="mt-4 text-center text-sm ">
               Formation: {defenders.length}-{midfielders.length}-
               {forwards.length}
             </div>
