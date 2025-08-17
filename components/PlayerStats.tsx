@@ -108,10 +108,10 @@ export default function PlayerStats({
     children: React.ReactNode;
   }) => (
     <th
-      className="text-left py-2 cursor-pointer hover:"
+      className="text-center py-2 cursor-pointer px-3 hover:"
       onClick={() => handleSort(field)}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-center gap-1">
         {children}
         {sortBy === field && (
           <span className="text-xs">{sortOrder === "desc" ? "↓" : "↑"}</span>
@@ -510,14 +510,16 @@ export default function PlayerStats({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2">Player</th>
-                <th className="text-left py-2">Team</th>
-                <th className="text-left py-2">Pos</th>
+                <th className="text-center py-2 px-3">Player</th>
+                <th className="text-center py-2 px-3">Team</th>
+                <th className="text-center py-2 px-3">Pos</th>
                 <SortableHeader field="total_points">Points</SortableHeader>
                 <SortableHeader field="form">Form</SortableHeader>
                 <SortableHeader field="now_cost">Price</SortableHeader>
                 <SortableHeader field="ict_index">ICT</SortableHeader>
-                <th className="text-right py-2 text-nowrap">Selected %</th>
+                <th className="text-center py-2 text-nowrap px-3">
+                  Selected %
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -527,25 +529,25 @@ export default function PlayerStats({
 
                 return (
                   <tr key={element.id} className="border-b hover:">
-                    <td className="py-3">
+                    <td className="py-3 text-center">
                       <div>
                         <div className="font-medium">{element.web_name}</div>
-                        <div className="text-xs ">
-                          {element.first_name} {element.second_name}
-                        </div>
+                        <div className="text-xs ">{element.first_name}</div>
                       </div>
                     </td>
-                    <td className="py-3">{team?.short_name}</td>
-                    <td className="py-3">{position?.singular_name_short}</td>
-                    <td className="py-3 font-semibold">
+                    <td className="py-3 text-center">{team?.short_name}</td>
+                    <td className="py-3 text-center">
+                      {position?.singular_name_short}
+                    </td>
+                    <td className="py-3 font-semibold text-center">
                       {element.total_points}
                     </td>
-                    <td className="py-3">{element.form}</td>
-                    <td className="py-3">
+                    <td className="py-3 text-center">{element.form}</td>
+                    <td className="py-3 text-center">
                       £{(element.now_cost / 10).toFixed(1)}m
                     </td>
-                    <td className="py-3">{element.ict_index}</td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 text-center">{element.ict_index}</td>
+                    <td className="py-3 text-center">
                       {element.selected_by_percent}%
                     </td>
                   </tr>
