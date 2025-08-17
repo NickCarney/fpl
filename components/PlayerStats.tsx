@@ -1,7 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Element, Team, ElementType } from "@/types/fpl";
+import {
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Legend,
+} from "recharts";
 
 interface PlayerStatsProps {
   elements: Element[];
@@ -15,11 +27,19 @@ export default function PlayerStats({
   elementTypes,
 }: PlayerStatsProps) {
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<
     "total_points" | "form" | "now_cost" | "ict_index"
   >("total_points");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState<"table" | "chart">("table");
+  const [chartType, setChartType] = useState<"scatter" | "bar" | "comparison">(
+    "scatter"
+  );
+  const [topX, setTopX] = useState(20);
+  const [xAxisStat, setXAxisStat] = useState<keyof Element>("now_cost");
+  const [yAxisStat, setYAxisStat] = useState<keyof Element>("total_points");
 
   const getTeam = (teamId: number) => {
     return teams.find((team) => team.id === teamId);
@@ -33,12 +53,14 @@ export default function PlayerStats({
     .filter((element) => {
       const matchesPosition =
         selectedPosition === null || element.element_type === selectedPosition;
+      const matchesTeam =
+        selectedTeam === null || element.team === selectedTeam;
       const matchesSearch =
         searchTerm === "" ||
         element.web_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         element.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         element.second_name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesPosition && matchesSearch;
+      return matchesPosition && matchesTeam && matchesSearch;
     })
     .sort((a, b) => {
       let aValue: number, bValue: number;
@@ -98,14 +120,325 @@ export default function PlayerStats({
     </th>
   );
 
+  // Available stats for visualization
+  const availableStats = [
+    { key: "total_points", label: "Total Points" },
+    { key: "goals_scored", label: "Goals" },
+    { key: "assists", label: "Assists" },
+    { key: "now_cost", label: "Price (£m)" },
+    { key: "minutes", label: "Minutes" },
+    { key: "clean_sheets", label: "Clean Sheets" },
+    { key: "bonus", label: "Bonus Points" },
+    { key: "bps", label: "BPS" },
+    { key: "saves", label: "Saves" },
+    { key: "yellow_cards", label: "Yellow Cards" },
+    { key: "red_cards", label: "Red Cards" },
+  ] as const;
+
+  // Prepare chart data with proper sorting
+  const getChartData = () => {
+    const limit = topX === 9999 ? filteredAndSortedElements.length : topX;
+    const selectedPlayers = filteredAndSortedElements.slice(0, limit);
+
+    const chartData = selectedPlayers.map((element) => {
+      const team = getTeam(element.team);
+      const position = getPosition(element.element_type);
+
+      return {
+        name: element.web_name,
+        fullName: `${element.first_name} ${element.second_name}`,
+        team: team?.short_name,
+        position: position?.singular_name_short,
+        total_points: element.total_points,
+        goals_scored: element.goals_scored,
+        assists: element.assists,
+        now_cost: element.now_cost / 10, // Convert to millions
+        minutes: element.minutes,
+        clean_sheets: element.clean_sheets,
+        bonus: element.bonus,
+        bps: element.bps,
+        saves: element.saves,
+        yellow_cards: element.yellow_cards,
+        red_cards: element.red_cards,
+        form: parseFloat(element.form) || 0,
+        ict_index: parseFloat(element.ict_index) || 0,
+        selected_by_percent: parseFloat(element.selected_by_percent) || 0,
+      };
+    });
+
+    // Sort chart data based on the chart type and selected axes
+    if (chartType === "scatter") {
+      // For scatter plots, sort by Y-axis first (descending), then by X-axis (ascending)
+      const sorted = chartData.sort((a, b) => {
+        const aYValue = a[yAxisStat as keyof typeof a] as number;
+        const bYValue = b[yAxisStat as keyof typeof b] as number;
+
+        // Primary sort: Y-axis (descending - highest performers first)
+        if (bYValue !== aYValue) {
+          return bYValue - aYValue;
+        }
+
+        // Secondary sort: X-axis (ascending - for ties in Y-axis)
+        const aXValue = a[xAxisStat as keyof typeof a] as number;
+        const bXValue = b[xAxisStat as keyof typeof b] as number;
+        return aXValue - bXValue;
+      });
+      console.log(
+        `Scatter chart sorted by ${yAxisStat} then ${xAxisStat}:`,
+        sorted
+          .slice(0, 5)
+          .map(
+            (p) =>
+              `${p.name}: ${p[yAxisStat as keyof typeof p]} pts, ${
+                p[xAxisStat as keyof typeof p]
+              } ${xAxisStat === "now_cost" ? "£m" : ""}`
+          )
+      );
+      return sorted;
+    } else if (chartType === "bar") {
+      // For bar charts, sort by the selected statistic (descending - highest first)
+      const sorted = chartData.sort((a, b) => {
+        const aValue = a[xAxisStat as keyof typeof a] as number;
+        const bValue = b[xAxisStat as keyof typeof b] as number;
+        return bValue - aValue; // Descending order (highest first)
+      });
+      console.log(
+        `Bar chart sorted by ${xAxisStat}:`,
+        sorted
+          .slice(0, 5)
+          .map((p) => `${p.name}: ${p[xAxisStat as keyof typeof p]}`)
+      );
+      return sorted;
+    } else {
+      // For other charts (comparison), sort by total points descending
+      return chartData.sort((a, b) => b.total_points - a.total_points);
+    }
+  };
+
+  const chartData = getChartData();
+
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="p-3 border border-gray-300 rounded-lg shadow-lg">
+          <p className="font-semibold">{data.fullName}</p>
+          <p className="text-sm text-gray-600">
+            {data.team} - {data.position}
+          </p>
+          <p className="text-sm">{`${
+            availableStats.find((s) => s.key === xAxisStat)?.label
+          }: ${data[xAxisStat]}`}</p>
+          <p className="text-sm">{`${
+            availableStats.find((s) => s.key === yAxisStat)?.label
+          }: ${data[yAxisStat]}`}</p>
+          <p className="text-sm">{`Total Points: ${data.total_points}`}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const renderVisualization = () => {
+    switch (chartType) {
+      case "scatter":
+        return (
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey={xAxisStat}
+                  name={availableStats.find((s) => s.key === xAxisStat)?.label}
+                />
+                <YAxis
+                  dataKey={yAxisStat}
+                  name={availableStats.find((s) => s.key === yAxisStat)?.label}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Scatter
+                  dataKey={yAxisStat}
+                  fill="#3b82f6"
+                  stroke="#1d4ed8"
+                  strokeWidth={1}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        );
+
+      case "bar":
+        return (
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey={xAxisStat} fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+
+      case "comparison":
+        return (
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="goals_scored" fill="#ef4444" name="Goals" />
+                <Bar dataKey="assists" fill="#22c55e" name="Assists" />
+                <Bar
+                  dataKey="clean_sheets"
+                  fill="#3b82f6"
+                  name="Clean Sheets"
+                />
+                <Bar dataKey="bonus" fill="#f59e0b" name="Bonus" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className=" p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Player Stats</h2>
+      <h2 className="text-2xl font-bold mb-6 flex justify-center">
+        Player Stats & Visualizations
+      </h2>
+
+      {/* View Mode Toggle */}
+      <div className="mb-6">
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`px-3 rounded-md font-medium ${
+              viewMode === "table"
+                ? " text-white bg-green-600"
+                : " text-gray-700"
+            }`}
+          >
+            Table View
+          </button>
+          <button
+            onClick={() => setViewMode("chart")}
+            className={`px-3 rounded-md font-medium ${
+              viewMode === "chart"
+                ? "text-white bg-green-600"
+                : " text-gray-700"
+            }`}
+          >
+            Chart View
+          </button>
+        </div>
+      </div>
+
+      {/* Chart Controls */}
+      {viewMode === "chart" && (
+        <div className="mb-6 p-4 bg-green-500 rounded-lg ">
+          <div className="flex justify-center flex-col sm:flex-row gap-x-24 gap-y-2">
+            <div className="text-center">
+              <label className="block text-sm font-medium mb-2">
+                Chart Type
+              </label>
+              <select
+                value={chartType}
+                onChange={(e) => setChartType(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="scatter">Season Scatter Plot</option>
+                <option value="bar">Season Bar Chart</option>
+                <option value="comparison">Multi-Stat Comparison</option>
+              </select>
+            </div>
+
+            <div className="text-center">
+              <label className="block text-sm font-medium mb-2">
+                Player Limit
+              </label>
+              <select
+                value={topX}
+                onChange={(e) => setTopX(parseInt(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={10}>Top 10</option>
+                <option value={20}>Top 20</option>
+                <option value={50}>Top 50</option>
+                <option value={100}>Top 100</option>
+                <option value={9999}>All Players</option>
+              </select>
+            </div>
+
+            {(chartType === "scatter" || chartType === "bar") && (
+              <>
+                <div className="text-center">
+                  <label className="block text-sm font-medium mb-2">
+                    {chartType === "scatter" ? "X-Axis" : "Statistic"}
+                  </label>
+                  <select
+                    value={xAxisStat}
+                    onChange={(e) =>
+                      setXAxisStat(e.target.value as keyof Element)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {availableStats.map((stat) => (
+                      <option key={stat.key} value={stat.key}>
+                        {stat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {chartType === "scatter" && (
+                  <div className="text-center">
+                    <label className="block text-sm font-medium mb-2">
+                      Y-Axis
+                    </label>
+                    <select
+                      value={yAxisStat}
+                      onChange={(e) =>
+                        setYAxisStat(e.target.value as keyof Element)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {availableStats.map((stat) => (
+                        <option key={stat.key} value={stat.key}>
+                          {stat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-4">
-        <div>
-          <label className="block text-sm font-medium  mb-2">Position</label>
+      <div className="mb-6 flex flex-wrap gap-x-12 gap-y-2 items-center flex-col sm:flex-row justify-center">
+        <div className="">
           <select
             value={selectedPosition || ""}
             onChange={(e) =>
@@ -113,7 +446,7 @@ export default function PlayerStats({
                 e.target.value ? parseInt(e.target.value) : null
               )
             }
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[130px]"
           >
             <option value="">All Positions</option>
             {elementTypes.map((type) => (
@@ -124,10 +457,24 @@ export default function PlayerStats({
           </select>
         </div>
 
-        <div className="flex-1">
-          <label className="block text-sm font-medium  mb-2">
-            Search Players
-          </label>
+        <div className="">
+          <select
+            value={selectedTeam || ""}
+            onChange={(e) =>
+              setSelectedTeam(e.target.value ? parseInt(e.target.value) : null)
+            }
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[130px]"
+          >
+            <option value="">All Teams</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.short_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-fit">
           <input
             type="text"
             value={searchTerm}
@@ -138,53 +485,76 @@ export default function PlayerStats({
         </div>
       </div>
 
-      {/* Stats Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left py-2">Player</th>
-              <th className="text-left py-2">Team</th>
-              <th className="text-left py-2">Pos</th>
-              <SortableHeader field="total_points">Points</SortableHeader>
-              <SortableHeader field="form">Form</SortableHeader>
-              <SortableHeader field="now_cost">Price</SortableHeader>
-              <SortableHeader field="ict_index">ICT</SortableHeader>
-              <th className="text-right py-2">Selected %</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAndSortedElements.map((element) => {
-              const team = getTeam(element.team);
-              const position = getPosition(element.element_type);
+      {/* Content */}
+      {viewMode === "chart" ? (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4">
+            {chartType === "scatter" &&
+              `Season: ${
+                availableStats.find((s) => s.key === xAxisStat)?.label
+              } vs ${availableStats.find((s) => s.key === yAxisStat)?.label}`}
+            {chartType === "bar" &&
+              `Season: ${topX === 9999 ? "All" : `Top ${topX}`} Players - ${
+                availableStats.find((s) => s.key === xAxisStat)?.label
+              }`}
+            {chartType === "comparison" &&
+              `Season: Multi-Stat Comparison - ${
+                topX === 9999 ? "All" : `Top ${topX}`
+              } Players`}
+          </h3>
+          {renderVisualization()}
+        </div>
+      ) : (
+        /* Stats Table */
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-2">Player</th>
+                <th className="text-left py-2">Team</th>
+                <th className="text-left py-2">Pos</th>
+                <SortableHeader field="total_points">Points</SortableHeader>
+                <SortableHeader field="form">Form</SortableHeader>
+                <SortableHeader field="now_cost">Price</SortableHeader>
+                <SortableHeader field="ict_index">ICT</SortableHeader>
+                <th className="text-right py-2 text-nowrap">Selected %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAndSortedElements.map((element) => {
+                const team = getTeam(element.team);
+                const position = getPosition(element.element_type);
 
-              return (
-                <tr key={element.id} className="border-b hover:">
-                  <td className="py-3">
-                    <div>
-                      <div className="font-medium">{element.web_name}</div>
-                      <div className="text-xs ">
-                        {element.first_name} {element.second_name}
+                return (
+                  <tr key={element.id} className="border-b hover:">
+                    <td className="py-3">
+                      <div>
+                        <div className="font-medium">{element.web_name}</div>
+                        <div className="text-xs ">
+                          {element.first_name} {element.second_name}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="py-3">{team?.short_name}</td>
-                  <td className="py-3">{position?.singular_name_short}</td>
-                  <td className="py-3 font-semibold">{element.total_points}</td>
-                  <td className="py-3">{element.form}</td>
-                  <td className="py-3">
-                    £{(element.now_cost / 10).toFixed(1)}m
-                  </td>
-                  <td className="py-3">{element.ict_index}</td>
-                  <td className="py-3 text-right">
-                    {element.selected_by_percent}%
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td className="py-3">{team?.short_name}</td>
+                    <td className="py-3">{position?.singular_name_short}</td>
+                    <td className="py-3 font-semibold">
+                      {element.total_points}
+                    </td>
+                    <td className="py-3">{element.form}</td>
+                    <td className="py-3">
+                      £{(element.now_cost / 10).toFixed(1)}m
+                    </td>
+                    <td className="py-3">{element.ict_index}</td>
+                    <td className="py-3 text-right">
+                      {element.selected_by_percent}%
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {filteredAndSortedElements.length === 0 && (
         <div className="text-center py-8 ">
