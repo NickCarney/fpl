@@ -68,7 +68,8 @@ export async function generateTeamInsights(
   squadData: any, 
   currentGameweek: number, 
   gameweekFinished: boolean = false, 
-  fixtures: any[] = []
+  fixtures: any[] = [],
+  elements: any[] = []
 ): Promise<{ insights: string; fallback?: boolean }> {
   const response = await fetch('/api/team-insights', {
     method: 'POST',
@@ -81,6 +82,7 @@ export async function generateTeamInsights(
       currentGameweek,
       gameweekFinished,
       fixtures,
+      elements,
     }),
   });
   

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { ragCache } from '@/lib/rag-cache';
+import { RAG_CONFIG } from '@/lib/rag-config';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -8,7 +10,7 @@ const openai = new OpenAI({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { teamData, squadData, currentGameweek, gameweekFinished, fixtures } = body;
+    const { teamData, squadData, currentGameweek, gameweekFinished, fixtures, elements } = body;
 
     if (!teamData || !squadData) {
       return NextResponse.json(
@@ -16,6 +18,40 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    try {
+      // Fetch RAG data for enhanced analysis with caching
+      let ragData = null;
+      let externalContent = null;
+      
+      const cacheKey = `rag-data-${currentGameweek}`;
+      const cachedData = ragCache.get<{ragData: any, externalContent: any}>(cacheKey);
+      
+      if (cachedData && RAG_CONFIG.features.enableCaching) {
+        ragData = cachedData.ragData;
+        externalContent = cachedData.externalContent;
+      } else {
+        try {
+          const ragResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/rag-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ elements, fixtures, currentGameweek }),
+          });
+          
+          if (ragResponse.ok) {
+            const ragResult = await ragResponse.json();
+            ragData = ragResult.ragData;
+            externalContent = ragResult.externalContent;
+            
+            // Cache the result
+            if (RAG_CONFIG.features.enableCaching) {
+              ragCache.set(cacheKey, { ragData, externalContent }, RAG_CONFIG.cache.ragDataTTL);
+            }
+          }
+        } catch (error) {
+          console.log('Could not fetch RAG data, proceeding with basic analysis');
+        }
+      }
 
     // Prepare data for analysis
     const squadAnalysis = squadData.map((player: any) => ({
@@ -69,10 +105,59 @@ export async function POST(request: NextRequest) {
       ? "Gameweek has finished" 
       : "Gameweek is ongoing - some matches may not have been played yet";
 
+    // Build enhanced context with RAG data
+    let ragContext = '';
+    if (ragData) {
+      ragContext = `
+
+ENHANCED ANALYSIS DATA:
+
+Position Benchmarks:
+${Object.entries(ragData.positionAverages).map(([pos, data]: [string, any]) => 
+  `${pos}: Avg ${data.averagePoints.toFixed(1)} pts, Top performers: ${data.topPerformers.slice(0, 3).join(', ')}, Price ranges: £${data.priceRanges.budget}m-${data.priceRanges.premium}m`
+).join('\n')}
+
+Transfer Market Trends:
+- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(', ')}
+- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(', ')}
+- Rising prices: ${ragData.transferTrends.risingPrices.join(', ')}
+- Falling prices: ${ragData.transferTrends.fallingPrices.join(', ')}
+
+Expert Recommendations:
+${Object.entries(ragData.expertPicks).map(([expert, picks]: [string, any]) => 
+  `${expert}: Captain ${picks.captain}, Differentials: ${picks.differentials.join(', ')}`
+).join('\n')}
+
+Next Gameweek Fixtures: ${ragData.nextGameweekFixtures.length} matches scheduled
+`;
+    }
+
+    // Add external content if available
+    let externalContext = '';
+    if (externalContent) {
+      externalContext = `
+LIVE INTELLIGENCE DATA:
+${externalContent.summary || ''}
+
+Expected Goals (xG) Data:
+${externalContent.analytics?.xGData?.map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`).join(', ') || 'No xG data available'}
+
+Form Trends:
+${externalContent.analytics?.formTable?.map((p: any) => `${p.player}: ${p.form} (${p.trend})`).join(', ') || 'No form data available'}
+
+Community Insights:
+${externalContent.predictions?.map((pred: any) => 
+  pred.predictions.slice(0, 2).map((p: any) => `${p.player}: ${p.prediction}`).join('; ')
+).join('\n') || 'No community insights available'}
+`;
+    }
+
     const prompt = `
-Analyze this Fantasy Premier League team and provide 3-4 concise, insightful observations. 
+You are an expert Fantasy Premier League analyst with access to comprehensive data. Analyze this team and provide 4-5 specific, actionable insights.
 
 IMPORTANT CONTEXT: ${gameweekStatusText}
+${ragContext}
+${externalContext}
 
 Team Overview:
 - Total Points: ${teamData.totalPoints}
@@ -84,57 +169,66 @@ ${squadWithFixtures.map((p: any) =>
   `${p.name} (${p.team}) - ${p.position}: ${p.points}pts, Form: ${p.form}, £${p.price}m, ${p.minutes} mins${p.isCaptain ? ' [CAPTAIN]' : ''}${p.isViceCaptain ? ' [VC]' : ''}${!p.hasPlayedThisGW ? ' [NOT PLAYED YET THIS GW]' : ''}`
 ).join('\n')}
 
-When analyzing:
-- If a player shows "[NOT PLAYED YET THIS GW]", DO NOT criticize them for low points this gameweek
-- Focus on overall season performance, form, and fixture difficulty
-- Consider upcoming matches for players who haven't played yet
-- Only suggest transfers for players with genuine long-term concerns, not those who simply haven't played this gameweek
+Provide data-driven insights about:
+1. **Performance vs Position Benchmarks**: Compare players to position averages and identify over/underperformers
+2. **Transfer Market Analysis**: Highlight alignment with market trends and potential value moves
+3. **Captaincy & Lineup Strategy**: Evaluate choices against expert consensus and upcoming fixtures
+4. **Value & Budget Optimization**: Suggest improvements based on price trends and position efficiency
+5. **Differential Opportunities**: Identify low-owned gems based on the data
 
-Provide insights about:
-1. **Best Performers**: Who are the standout players and why?
-2. **Areas of Concern**: Which players or positions need attention (based on season form, not this gameweek)?
-3. **Team Balance**: Comment on the overall strategy and balance
-4. **Captain Choice**: Evaluate the current captaincy decision
+Requirements:
+- Reference specific benchmark data when available
+- Mention transfer trends and expert picks where relevant
+- If a player shows "[NOT PLAYED YET THIS GW]", focus on season form and upcoming fixtures
+- Be specific with numbers (points, prices, percentages)
+- Prioritize actionable insights over general observations
 
-Keep each insight to 1-2 sentences. Be specific about player names and stats. Use a conversational, expert FPL manager tone.
+Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
 `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: RAG_CONFIG.openAI.model,
       messages: [
         {
           role: "system",
-          content: "You are an expert Fantasy Premier League analyst providing concise, actionable insights about team performance and strategy."
+          content: RAG_CONFIG.openAI.systemPrompt
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      max_tokens: 400,
-      temperature: 0.7,
+      max_tokens: RAG_CONFIG.openAI.maxTokens,
+      temperature: RAG_CONFIG.openAI.temperature,
     });
 
-    const insights = completion.choices[0]?.message?.content || "Unable to generate insights at this time.";
+      const insights = completion.choices[0]?.message?.content || "Unable to generate insights at this time.";
 
-    return NextResponse.json({ insights });
+      return NextResponse.json({ insights });
+
+    } catch (aiError) {
+      console.error('Error with OpenAI analysis:', aiError);
+      
+      // Enhanced fallback insights with basic data
+      const fallbackInsights = `
+**Team Analysis** (Basic Mode)
+• Your squad is performing at the current level for gameweek ${currentGameweek}
+• Monitor players with consistently low minutes for potential rotation risks
+• Consider fixture difficulty and form trends when making transfer decisions
+• Review your captaincy choice based on upcoming opponents and recent performance
+• Note: Some players may not have played this gameweek - check fixtures before transfers`;
+
+      return NextResponse.json({ 
+        insights: fallbackInsights.trim(),
+        fallback: true 
+      });
+    }
 
   } catch (error) {
     console.error('Error generating team insights:', error);
-    
-    // Return fallback insights if OpenAI fails
-    const fallbackInsights = `
-**Team Analysis**
-• Your squad is performing at a solid level for the current gameweek
-• Consider monitoring players with low minutes for potential rotation risks (check season totals, not just this gameweek)
-• Review your captain choice based on upcoming fixtures and form
-• Balance your budget between premium assets and value picks
-• Note: Some players may not have played yet this gameweek - check fixture schedules before making transfer decisions
-    `.trim();
-
-    return NextResponse.json({ 
-      insights: fallbackInsights,
-      fallback: true 
-    });
+    return NextResponse.json(
+      { error: 'Failed to generate team insights' },
+      { status: 500 }
+    );
   }
 }

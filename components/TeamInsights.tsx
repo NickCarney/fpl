@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Element, Pick, Team, ElementType, Event, Fixture } from '@/types/fpl';
-import { generateTeamInsights, getFixtures } from '@/lib/fpl-api';
+import { useState, useEffect } from "react";
+import { Element, Pick, Team, ElementType, Event, Fixture } from "@/types/fpl";
+import { generateTeamInsights, getFixtures } from "@/lib/fpl-api";
 
 interface TeamInsightsProps {
   picks: Pick[];
@@ -23,21 +23,21 @@ export default function TeamInsights({
   totalPoints,
   events,
 }: TeamInsightsProps) {
-  const [insights, setInsights] = useState<string>('');
+  const [insights, setInsights] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
 
   const getPlayer = (elementId: number) => {
-    return elements.find(el => el.id === elementId);
+    return elements.find((el) => el.id === elementId);
   };
 
   const getTeam = (teamId: number) => {
-    return teams.find(team => team.id === teamId);
+    return teams.find((team) => team.id === teamId);
   };
 
   const getPosition = (elementTypeId: number) => {
-    return elementTypes.find(type => type.id === elementTypeId);
+    return elementTypes.find((type) => type.id === elementTypeId);
   };
 
   const generateInsights = async () => {
@@ -46,14 +46,14 @@ export default function TeamInsights({
 
     try {
       // Get current gameweek info
-      const currentGameweek = events.find(event => event.is_current);
+      const currentGameweek = events.find((event) => event.is_current);
       const gameweekFinished = currentGameweek?.finished || false;
 
       // Fetch fixtures data
       const fixtures = await getFixtures();
 
       // Prepare squad data with enhanced information
-      const squadData = picks.map(pick => {
+      const squadData = picks.map((pick) => {
         const player = getPlayer(pick.element);
         const team = getTeam(player?.team || 0);
         const position = getPosition(player?.element_type || 0);
@@ -71,22 +71,24 @@ export default function TeamInsights({
 
       const teamData = {
         totalPoints,
-        squadValue: squadData.reduce((sum, p) => sum + (p?.now_cost || 0), 0) / 10,
+        squadValue:
+          squadData.reduce((sum, p) => sum + (p?.now_cost || 0), 0) / 10,
         currentGameweek: currentEvent,
       };
 
       const result = await generateTeamInsights(
-        teamData, 
-        squadData, 
-        currentEvent, 
-        gameweekFinished, 
-        fixtures
+        teamData,
+        squadData,
+        currentEvent,
+        gameweekFinished,
+        fixtures,
+        elements
       );
       setInsights(result.insights);
       setIsFallback(result.fallback || false);
     } catch (err) {
-      console.error('Failed to generate insights:', err);
-      setError('Failed to generate team insights. Please try again.');
+      console.error("Failed to generate insights:", err);
+      setError("Failed to generate team insights. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -101,26 +103,26 @@ export default function TeamInsights({
 
   const formatInsights = (text: string) => {
     // Split by bullet points and format as list items
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.split("\n").filter((line) => line.trim());
     return lines.map((line, index) => {
-      if (line.startsWith('•') || line.startsWith('-')) {
+      if (line.startsWith("•") || line.startsWith("-")) {
         return (
           <li key={index} className="mb-2">
-            {line.replace(/^[•-]\s*/, '')}
+            {line.replace(/^[•-]\s*/, "")}
           </li>
         );
-      } else if (line.startsWith('**') && line.endsWith('**')) {
+      } else if (line.startsWith("**") && line.endsWith("**")) {
         return (
           <h4 key={index} className="font-semibold text-lg mb-2 text-blue-700">
-            {line.replace(/\*\*/g, '')}
+            {line.replace(/\*\*/g, "")}
           </h4>
         );
-      } else if (line.includes('**')) {
+      } else if (line.includes("**")) {
         // Handle inline bold text
-        const parts = line.split('**');
+        const parts = line.split("**");
         return (
           <p key={index} className="mb-2">
-            {parts.map((part, i) => 
+            {parts.map((part, i) =>
               i % 2 === 1 ? <strong key={i}>{part}</strong> : part
             )}
           </p>
@@ -151,7 +153,7 @@ export default function TeamInsights({
           disabled={loading}
           className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm"
         >
-          {loading ? 'Analyzing...' : 'Refresh'}
+          {loading ? "Analyzing..." : "Refresh"}
         </button>
       </div>
 
