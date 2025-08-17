@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Element, Pick, Team, ElementType } from "@/types/fpl";
+import PlayerDetailPopup from "./PlayerDetailPopup";
 
 interface CurrentSquadProps {
   picks: Pick[];
@@ -19,6 +20,12 @@ export default function CurrentSquad({
   currentEvent,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
+  const [selectedPlayer, setSelectedPlayer] = useState<{
+    pick: Pick;
+    player: Element;
+    team: Team;
+    position: ElementType;
+  } | null>(null);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -50,6 +57,20 @@ export default function CurrentSquad({
   const midfielders = getPlayersByPosition(3); // MID
   const forwards = getPlayersByPosition(4); // FWD
 
+  const handlePlayerClick = (pick: Pick) => {
+    const player = getPlayer(pick.element);
+    const team = getTeam(player?.team || 0);
+    const position = getPosition(player?.element_type || 0);
+    
+    if (player && team && position) {
+      setSelectedPlayer({ pick, player, team, position });
+    }
+  };
+
+  const closePopup = () => {
+    setSelectedPlayer(null);
+  };
+
   const renderPlayer = (
     pick: Pick,
     isBench: boolean = false,
@@ -66,7 +87,8 @@ export default function CurrentSquad({
       return (
         <div
           key={pick.element}
-          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 min-h-[120px] ${
+          onClick={() => handlePlayerClick(pick)}
+          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer min-h-[120px] ${
             pick.is_captain
               ? "bg-yellow-100 border-yellow-400"
               : pick.is_vice_captain
@@ -126,7 +148,8 @@ export default function CurrentSquad({
     return (
       <div
         key={pick.element}
-        className={`p-3 rounded-lg border ${
+        onClick={() => handlePlayerClick(pick)}
+        className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg ${
           isBench ? "bg-gray-100 border-gray-300" : "bg-white border-gray-200"
         } ${pick.is_captain ? "ring-2 ring-yellow-400" : ""} ${
           pick.is_vice_captain ? "ring-2 ring-yellow-200" : ""
@@ -328,6 +351,20 @@ export default function CurrentSquad({
           {bench.map((pick) => renderPlayer(pick, true))}
         </div>
       </div>
+
+      {/* Player Detail Popup */}
+      {selectedPlayer && (
+        <PlayerDetailPopup
+          player={selectedPlayer.player}
+          team={selectedPlayer.team}
+          position={selectedPlayer.position}
+          teams={teams}
+          isOpen={!!selectedPlayer}
+          onClose={closePopup}
+          isCaptain={selectedPlayer.pick.is_captain}
+          isViceCaptain={selectedPlayer.pick.is_vice_captain}
+        />
+      )}
     </div>
   );
 }
