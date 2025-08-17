@@ -2,6 +2,7 @@ import {
   BootstrapStatic,
   TeamPicks,
   TeamHistory,
+  TeamInfo,
   LeagueStandings,
   Fixture,
   PlayerGameweekData,
@@ -30,6 +31,14 @@ export async function getTeamHistory(teamId: number): Promise<TeamHistory> {
   const response = await fetch(`/api/team/${teamId}/history`);
   if (!response.ok) {
     throw new Error("Failed to fetch team history");
+  }
+  return response.json();
+}
+
+export async function getTeamInfo(teamId: number): Promise<TeamInfo> {
+  const response = await fetch(`/api/team/${teamId}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch team info");
   }
   return response.json();
 }

@@ -10,17 +10,20 @@ import {
   getBootstrapStatic,
   getTeamPicks,
   getTeamHistory,
+  getTeamInfo,
   getLeagueStandings,
 } from "@/lib/fpl-api";
 import {
   BootstrapStatic,
   TeamPicks,
   TeamHistory,
+  TeamInfo,
   LeagueStandings as LeagueStandingsType,
 } from "@/types/fpl";
 
 export default function Home() {
   const [teamId, setTeamId] = useState<number | null>(null);
+  const [teamName, setTeamName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
@@ -31,6 +34,7 @@ export default function Home() {
   const [bootstrapData, setBootstrapData] = useState<BootstrapStatic | null>(
     null
   );
+  const [teamInfo, setTeamInfo] = useState<TeamInfo | null>(null);
   const [teamPicks, setTeamPicks] = useState<TeamPicks | null>(null);
   const [teamHistory, setTeamHistory] = useState<TeamHistory | null>(null);
   const [leagueStandings, setLeagueStandings] =
@@ -66,13 +70,16 @@ export default function Home() {
         bootstrapData?.events.find((event) => event.is_current)?.id || 1;
 
       // Load team data
-      const [picks, history] = await Promise.all([
+      const [teamInfoData, picks, history] = await Promise.all([
+        getTeamInfo(id),
         getTeamPicks(id, currentEvent),
         getTeamHistory(id),
       ]);
 
+      setTeamInfo(teamInfoData);
       setTeamPicks(picks);
       setTeamHistory(history);
+      setTeamName(teamInfoData.name);
     } catch (err) {
       setError(
         "Failed to load team data. Please check your team ID and try again."
@@ -104,7 +111,7 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold  mb-2">⚽ FPL Dashboard</h1>
+            <h1 className="text-4xl font-bold  mb-2">FPL Dashboard</h1>
             <p className="">Track your Fantasy Premier League performance</p>
           </div>
           <TeamIdInput onTeamIdSubmit={handleTeamIdSubmit} />
@@ -150,8 +157,16 @@ export default function Home() {
         <div className="flex justify-center">
           <div className="flex justify-between items-center py-4 flex-col">
             <div>
-              <h1 className="text-2xl font-bold ">⚽ FPL Dashboard</h1>
+              <h1 className="text-2xl font-bold ">FPL Dashboard</h1>
+              {teamName && (
+                <p className="text-center text-lg font-semibold">{teamName}</p>
+              )}
               <p className="text-center">Team ID: {teamId}</p>
+              {teamInfo && (
+                <p className="text-center text-sm text-gray-600">
+                  {teamInfo.player_first_name} {teamInfo.player_last_name}
+                </p>
+              )}
             </div>
             <button
               onClick={() => setTeamId(null)}
