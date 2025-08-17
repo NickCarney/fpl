@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
 import PlayerDetailPopup from "./PlayerDetailPopup";
 import TeamInsights from "./TeamInsights";
+import TransferSuggestions from "./TransferSuggestions";
 
 interface CurrentSquadProps {
   picks: Pick[];
@@ -365,6 +366,19 @@ export default function CurrentSquad({
           currentEvent={currentEvent}
           totalPoints={totalPoints}
           events={events}
+        />
+      </div>
+
+      {/* Transfer Suggestions */}
+      <div className="mt-6">
+        <TransferSuggestions
+          picks={picks}
+          elements={elements}
+          teams={teams}
+          elementTypes={elementTypes}
+          currentEvent={currentEvent}
+          events={events}
+          totalPoints={totalPoints}
         />
       </div>
 

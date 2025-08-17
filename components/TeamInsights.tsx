@@ -27,6 +27,7 @@ export default function TeamInsights({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -138,8 +139,11 @@ export default function TeamInsights({
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
-      <div className="flex justify-between items-center mb-4">
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div 
+        className="flex justify-between items-center p-4 cursor-pointer hover:bg-blue-100 rounded-t-lg transition-colors"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
         <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
           🧠 Team Insights
           {isFallback && (
@@ -148,37 +152,51 @@ export default function TeamInsights({
             </span>
           )}
         </h3>
-        <button
-          onClick={generateInsights}
-          disabled={loading}
-          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm"
-        >
-          {loading ? "Analyzing..." : "Refresh"}
-        </button>
+        <div className="flex items-center gap-2">
+          {!isCollapsed && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                generateInsights();
+              }}
+              disabled={loading}
+              className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors text-sm"
+            >
+              {loading ? 'Analyzing...' : 'Refresh'}
+            </button>
+          )}
+          <button className="text-gray-500 hover:text-gray-700">
+            {isCollapsed ? '▼' : '▲'}
+          </button>
+        </div>
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-          <p className="text-gray-600">Analyzing your team...</p>
-        </div>
-      )}
+      {!isCollapsed && (
+        <div className="px-4 pb-4">
+          {loading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+              <p className="text-gray-600">Analyzing your team...</p>
+            </div>
+          )}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <p className="text-red-700">{error}</p>
-        </div>
-      )}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
+              <p className="text-red-700">{error}</p>
+            </div>
+          )}
 
-      {insights && !loading && (
-        <div className="prose prose-sm max-w-none">
-          <div className="text-gray-700 leading-relaxed">
-            {formatInsights(insights)}
-          </div>
-          {!isFallback && (
-            <div className="mt-4 text-xs text-gray-500 flex items-center gap-1">
-              <span>⚡</span>
-              <span>Powered by AI analysis</span>
+          {insights && !loading && (
+            <div className="prose prose-sm max-w-none">
+              <div className="text-gray-700 leading-relaxed">
+                {formatInsights(insights)}
+              </div>
+              {!isFallback && (
+                <div className="mt-4 text-xs text-gray-500 flex items-center gap-1">
+                  <span>⚡</span>
+                  <span>Powered by AI analysis</span>
+                </div>
+              )}
             </div>
           )}
         </div>

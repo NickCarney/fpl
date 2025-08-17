@@ -92,3 +92,37 @@ export async function generateTeamInsights(
   
   return response.json();
 }
+
+export async function generateTransferSuggestions(
+  teamData: any,
+  squadData: any,
+  elements: any[],
+  currentGameweek: number,
+  gameweekFinished: boolean = false,
+  fixtures: any[] = [],
+  bankBalance: number = 0,
+  freeTransfers: number = 1
+): Promise<{ analysis: string; fallback?: boolean; ragDataAvailable?: boolean }> {
+  const response = await fetch('/api/transfer-suggestions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      teamData,
+      squadData,
+      elements,
+      currentGameweek,
+      gameweekFinished,
+      fixtures,
+      bankBalance,
+      freeTransfers,
+    }),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to generate transfer suggestions');
+  }
+  
+  return response.json();
+}
