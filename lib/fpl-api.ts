@@ -150,6 +150,14 @@ export async function getFixtures(): Promise<Fixture[]> {
   return response.json();
 }
 
+export async function getTeamNews(): Promise<any> {
+  const response = await fetch("/api/team-news");
+  if (!response.ok) {
+    throw new Error("Failed to fetch team news");
+  }
+  return response.json();
+}
+
 export async function getPlayerGameweeks(
   playerId: number
 ): Promise<PlayerGameweekData> {
