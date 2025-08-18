@@ -6,6 +6,7 @@ import CurrentSquad from "@/components/CurrentSquad";
 import PlayerStats from "@/components/PlayerStats";
 import LeagueStandings from "@/components/LeagueStandings";
 import SeasonHistory from "@/components/SeasonHistory";
+import TeamPicker from "@/components/TeamPicker";
 import {
   getBootstrapStatic,
   getTeamPicks,
@@ -28,7 +29,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "squad" | "stats" | "league" | "history"
+    "squad" | "picker" | "stats" | "league" | "history"
   >("squad");
 
   // Data states
@@ -234,8 +235,8 @@ export default function Home() {
       </header>
 
       {/* Navigation */}
-      <nav className="w-full px-[10%]">
-        <div className="flex w-full justify-between gap-[10%] text-nowrap flex-col sm:flex-row pt-2 gap-y-2">
+      <nav className="w-full px-[7%]">
+        <div className="flex w-full justify-between gap-[5%] text-nowrap flex-col sm:flex-row pt-2 gap-y-2">
           <button
             onClick={() => setActiveTab("squad")}
             className={`py-1 border-b-2 font-medium text-sm w-full ${
@@ -245,6 +246,16 @@ export default function Home() {
             }`}
           >
             Current Squad
+          </button>
+          <button
+            onClick={() => setActiveTab("picker")}
+            className={`py-1 border-b-2 font-medium text-sm w-full ${
+              activeTab === "picker"
+                ? "border-blue-500 text-blue-600 bg-green-600"
+                : "border-transparent  hover:"
+            }`}
+          >
+            Pick Team
           </button>
           <button
             onClick={() => setActiveTab("stats")}
@@ -283,6 +294,18 @@ export default function Home() {
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {activeTab === "squad" && teamPicks && bootstrapData && (
           <CurrentSquad
+            picks={teamPicks.picks}
+            elements={bootstrapData.elements}
+            teams={bootstrapData.teams}
+            elementTypes={bootstrapData.element_types}
+            currentEvent={currentEvent}
+            events={bootstrapData.events}
+            teamPicks={teamPicks}
+          />
+        )}
+
+        {activeTab === "picker" && bootstrapData && teamPicks && (
+          <TeamPicker
             picks={teamPicks.picks}
             elements={bootstrapData.elements}
             teams={bootstrapData.teams}
