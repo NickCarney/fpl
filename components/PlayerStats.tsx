@@ -89,7 +89,7 @@ export default function PlayerStats({
 
       return sortOrder === "desc" ? bValue - aValue : aValue - bValue;
     })
-    .slice(0, 50); // Limit to top 50 for performance
+    .slice(0, topX === 9999 ? elements.length : Math.max(topX, 50)); // Dynamic limit based on topX
 
   const handleSort = (newSortBy: typeof sortBy) => {
     if (sortBy === newSortBy) {

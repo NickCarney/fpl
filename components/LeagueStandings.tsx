@@ -6,16 +6,34 @@ interface LeagueStandingsProps {
   standings: LeagueStanding[];
   leagueName: string;
   userTeamId?: number;
+  userPosition?: any; // Changed from LeagueStanding to any since we're using userStats
 }
 
 export default function LeagueStandings({
   standings,
   leagueName,
   userTeamId,
+  userPosition,
 }: LeagueStandingsProps) {
+  // Check if user is in the current standings
+  const userInStandings = userTeamId
+    ? standings.find((s) => s.entry === userTeamId)
+    : false;
+  const shouldShowUserPosition = userPosition && !userInStandings;
+
+  // Debug logging
+  console.log("LeagueStandings Debug:", {
+    userTeamId,
+    userPosition,
+    userInStandings: !!userInStandings,
+    shouldShowUserPosition,
+  });
+
   return (
     <div className=" p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6">{leagueName} - Standings</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">
+        {leagueName} - Standings
+      </h2>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -64,12 +82,32 @@ export default function LeagueStandings({
                 </tr>
               );
             })}
+
+            {/* Show user position if they're not in the top results */}
+            {shouldShowUserPosition && (
+              <>
+                <tr className="border-b font-semibold">
+                  <td className="py-3 font-normal">You</td>
+                  <td className="py-3">{userPosition.entry_name}</td>
+                  <td className="py-3">{userPosition.player_name}</td>
+                  <td className="py-3 text-right">
+                    {userPosition.event_total}
+                  </td>
+                  <td className="py-3 text-right font-semibold">
+                    {userPosition.total}
+                  </td>
+                  <td className="py-3 text-center text-gray-500">-</td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>
 
       {standings.length === 0 && (
-        <div className="text-center py-8 ">No standings data available</div>
+        <div className="text-center py-8 text-gray-500">
+          No standings data available
+        </div>
       )}
     </div>
   );

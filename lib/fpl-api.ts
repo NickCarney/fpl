@@ -4,6 +4,7 @@ import {
   TeamHistory,
   TeamInfo,
   LeagueStandings,
+  LeagueStanding,
   Fixture,
   PlayerGameweekData,
 } from "@/types/fpl";
@@ -54,6 +55,83 @@ export async function getLeagueStandings(
     throw new Error("Failed to fetch league standings");
   }
   return response.json();
+}
+
+export async function getLeagueStandingsWithUserStats(
+  leagueId: number,
+  userTeamId?: number
+): Promise<{ standings: LeagueStandings; userStats?: any }> {
+  console.log("getLeagueStandingsWithUserStats called with:", {
+    leagueId,
+    userTeamId,
+  });
+
+  // Get the first page of league standings
+  const standings = await getLeagueStandings(leagueId, 1);
+
+  // If no user team ID provided, just return the standings
+  if (!userTeamId) {
+    console.log("No userTeamId provided, returning standings only");
+    return { standings };
+  }
+
+  // Check if user is in the first page
+  const userInFirstPage = standings.standings.results.find(
+    (standing) => standing.entry === userTeamId
+  );
+
+  if (userInFirstPage) {
+    console.log("User found in first page, no need for separate user stats");
+    return { standings };
+  }
+
+  // User not in first page, get their current team stats
+  try {
+    console.log("User not in first page, fetching user team stats...");
+    const teamResponse = await fetch(`/api/team/${userTeamId}`);
+    if (teamResponse.ok) {
+      const teamData = await teamResponse.json();
+
+      // Get current gameweek from bootstrap data
+      const bootstrapResponse = await fetch("/api/bootstrap-static");
+      let currentGW = 1;
+      let eventTotal = 0;
+
+      if (bootstrapResponse.ok) {
+        const bootstrapData = await bootstrapResponse.json();
+        const currentEvent = bootstrapData.events.find(
+          (e: any) => e.is_current
+        );
+        currentGW = currentEvent ? currentEvent.id : 1;
+
+        // Get the current gameweek picks to get event total
+        const picksResponse = await fetch(
+          `/api/team/${userTeamId}/event/${currentGW}/picks`
+        );
+        if (picksResponse.ok) {
+          const picksData = await picksResponse.json();
+          eventTotal = picksData.entry_history?.points || 0;
+        }
+      }
+
+      const userStats = {
+        entry: userTeamId,
+        entry_name: teamData.name,
+        player_name: `${teamData.player_first_name} ${teamData.player_last_name}`,
+        rank: null, // Don't show rank as it's expensive to calculate
+        last_rank: null,
+        event_total: eventTotal,
+        total: teamData.summary_overall_points,
+      };
+
+      console.log("User stats created:", userStats);
+      return { standings, userStats };
+    }
+  } catch (error) {
+    console.warn("Failed to fetch user team stats:", error);
+  }
+
+  return { standings };
 }
 
 export async function getLiveGameweekData(event: number) {

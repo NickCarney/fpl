@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { teamId: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const teamId = params.teamId;
-    
+    const url = request.nextUrl;
+
+    const segments = url.pathname.split("/");
+    // /api/team/[teamId]/picks
+    const teamId = segments[3];
+
     if (!teamId || isNaN(Number(teamId))) {
-      return NextResponse.json(
-        { error: "Invalid team ID" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid team ID" }, { status: 400 });
     }
 
     const response = await fetch(
@@ -20,10 +18,7 @@ export async function GET(
 
     if (!response.ok) {
       if (response.status === 404) {
-        return NextResponse.json(
-          { error: "Team not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "Team not found" }, { status: 404 });
       }
       throw new Error(`HTTP error! status: ${response.status}`);
     }

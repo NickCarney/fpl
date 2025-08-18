@@ -11,7 +11,7 @@ import {
   getTeamPicks,
   getTeamHistory,
   getTeamInfo,
-  getLeagueStandings,
+  getLeagueStandingsWithUserStats,
 } from "@/lib/fpl-api";
 import {
   BootstrapStatic,
@@ -19,6 +19,7 @@ import {
   TeamHistory,
   TeamInfo,
   LeagueStandings as LeagueStandingsType,
+  LeagueStanding,
 } from "@/types/fpl";
 
 export default function Home() {
@@ -39,6 +40,7 @@ export default function Home() {
   const [teamHistory, setTeamHistory] = useState<TeamHistory | null>(null);
   const [leagueStandings, setLeagueStandings] =
     useState<LeagueStandingsType | null>(null);
+  const [userPosition, setUserPosition] = useState<LeagueStanding | null>(null);
 
   const [leagueId, setLeagueId] = useState<string>("");
 
@@ -46,6 +48,41 @@ export default function Home() {
     // Load bootstrap data on component mount
     loadBootstrapData();
   }, []);
+
+  // Auto-load the first league when team info is loaded
+  useEffect(() => {
+    const autoLoadFirstLeague = async () => {
+      if (
+        teamInfo &&
+        teamInfo.leagues?.classic &&
+        teamInfo.leagues.classic.length > 0 &&
+        !leagueStandings
+      ) {
+        const firstLeague = teamInfo.leagues.classic[0];
+        if (firstLeague.id) {
+          const leagueIdStr = firstLeague.id.toString();
+          setLeagueId(leagueIdStr);
+
+          // Auto-load the first league
+          try {
+            const result = await getLeagueStandingsWithUserStats(
+              firstLeague.id,
+              teamId || undefined
+            );
+            console.log("Auto-load league result:", result);
+            setLeagueStandings(result.standings);
+            setUserPosition(result.userStats || null);
+            setLeagueId(firstLeague.id.toString());
+          } catch (err) {
+            console.log("Failed to auto-load league:", err);
+            // Don't show error for auto-load, user can manually load
+          }
+        }
+      }
+    };
+
+    autoLoadFirstLeague();
+  }, [teamInfo, leagueStandings]);
 
   const loadBootstrapData = async () => {
     try {
@@ -90,19 +127,37 @@ export default function Home() {
     }
   };
 
-  const handleLoadLeague = async () => {
-    if (!leagueId) return;
+  const handleLoadLeague = async (selectedLeagueId?: string) => {
+    const idToLoad = selectedLeagueId || leagueId;
+    if (!idToLoad) return;
 
+    console.log("Loading league with:", { leagueId: idToLoad, teamId });
     setLoading(true);
     try {
-      const standings = await getLeagueStandings(parseInt(leagueId));
-      setLeagueStandings(standings);
+      const result = await getLeagueStandingsWithUserStats(
+        parseInt(idToLoad),
+        teamId || undefined
+      );
+      console.log("Manual load league result:", result);
+      setLeagueStandings(result.standings);
+      setUserPosition(result.userStats || null);
+      setLeagueId(idToLoad);
       setActiveTab("league");
     } catch (err) {
       setError("Failed to load league standings. Please check your league ID.");
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLeagueSelection = (selectedLeagueId: string) => {
+    if (selectedLeagueId) {
+      handleLoadLeague(selectedLeagueId);
+    } else {
+      setLeagueId("");
+      setLeagueStandings(null);
+      setUserPosition(null);
     }
   };
 
@@ -247,38 +302,97 @@ export default function Home() {
 
         {activeTab === "league" && (
           <div className="space-y-6">
-            {!leagueStandings && (
-              <div className="p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-bold mb-4">
-                  Load League Standings
-                </h2>
-                <div className="flex gap-4">
-                  <input
-                    type="number"
-                    value={leagueId}
-                    onChange={(e) => setLeagueId(e.target.value)}
-                    placeholder="Enter League ID"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={handleLoadLeague}
-                    disabled={!leagueId}
-                    className=" text-white px-4 py-2 rounded-md"
-                  >
-                    Load League
-                  </button>
+            {/* League Selection - Always show when teamInfo is available */}
+            {teamInfo &&
+              teamInfo.leagues?.classic &&
+              teamInfo.leagues.classic.length > 0 && (
+                <div className="p-6 rounded-lg flex justify-center">
+                  <div className="mb-4 flex justify-center flex-col">
+                    <label className="block text-sm font-medium mb-2 text-center">
+                      Your Leagues
+                    </label>
+                    <select
+                      value={
+                        leagueStandings
+                          ? leagueStandings.league.id.toString()
+                          : leagueId
+                      }
+                      onChange={(e) => handleLeagueSelection(e.target.value)}
+                      className="px-3 py-2 border rounded-md focus:outline-none"
+                    >
+                      <option value="">Select a league</option>
+                      {teamInfo.leagues.classic.map((league: any) => (
+                        <option key={league.id} value={league.id}>
+                          {league.name}
+                        </option>
+                      ))}
+                    </select>
+                    {/* Manual league ID input - collapsible */}
+                    <details className="mb-4 pt-2 text-center">
+                      <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800">
+                        Enter different league ID manually
+                      </summary>
+                      <div className="mt-3 flex flex-col gap-y-4 justify-center items-center">
+                        <input
+                          type="number"
+                          value={leagueId}
+                          onChange={(e) => setLeagueId(e.target.value)}
+                          placeholder="Enter League ID"
+                          className="border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={() => handleLoadLeague()}
+                          disabled={!leagueId}
+                          className="bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          Load League
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">
+                        Find league ID in the URL when viewing league standings
+                      </p>
+                    </details>
+                  </div>
                 </div>
-                <p className="text-xs  mt-2">
-                  Find your league ID in the URL when viewing your league
-                  standings
-                </p>
-              </div>
-            )}
+              )}
+
+            {/* Fallback for manual entry when no team leagues available */}
+            {!leagueStandings &&
+              (!teamInfo ||
+                !teamInfo.leagues?.classic ||
+                teamInfo.leagues.classic.length === 0) && (
+                <div className="p-6 rounded-lg shadow-md">
+                  <h2 className="text-xl font-bold mb-4">
+                    Load League Standings
+                  </h2>
+                  <div className="flex gap-4">
+                    <input
+                      type="number"
+                      value={leagueId}
+                      onChange={(e) => setLeagueId(e.target.value)}
+                      placeholder="Enter League ID"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => handleLoadLeague()}
+                      disabled={!leagueId}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                    >
+                      Load League
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Find your league ID in the URL when viewing your league
+                    standings
+                  </p>
+                </div>
+              )}
             {leagueStandings && (
               <LeagueStandings
                 standings={leagueStandings.standings.results}
                 leagueName={leagueStandings.league.name}
                 userTeamId={teamId}
+                userPosition={userPosition || undefined}
               />
             )}
           </div>
