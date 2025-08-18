@@ -5,7 +5,11 @@ import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
 import PlayerDetailPopup from "./PlayerDetailPopup";
 import TeamInsights from "./TeamInsights";
 import TransferSuggestions from "./TransferSuggestions";
-import { getTeamNews, getFixtures } from "@/lib/fpl-api";
+import {
+  getTeamNews,
+  getFixtures,
+  generateTransferSuggestions,
+} from "@/lib/fpl-api";
 
 interface CurrentSquadProps {
   picks: Pick[];
@@ -30,6 +34,7 @@ export default function CurrentSquad({
   const [showSuggestedLineup, setShowSuggestedLineup] = useState(false);
   const [teamNews, setTeamNews] = useState<any>(null);
   const [fixtures, setFixtures] = useState<any[]>([]);
+  const [suggestedTransfer, setSuggestedTransfer] = useState<any>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<{
     pick: Pick;
     player: Element;
@@ -47,13 +52,69 @@ export default function CurrentSquad({
         ]);
         setTeamNews(teamNewsData);
         setFixtures(fixturesData);
+
+        // Fetch transfer suggestions for lineup optimization
+        if (teamPicks) {
+          try {
+            const squadData = picks.map((pick) => {
+              const player = getPlayer(pick.element);
+              const team = getTeam(player?.team || 0);
+              const position = getPosition(player?.element_type || 0);
+
+              return {
+                ...player,
+                web_name: player?.web_name,
+                team_name: team?.short_name,
+                position_name: position?.singular_name,
+                is_captain: pick.is_captain,
+                is_vice_captain: pick.is_vice_captain,
+                multiplier: pick.multiplier,
+                is_in_my_squad: true,
+              };
+            });
+
+            const teamData = {
+              totalPoints: picks.reduce((sum, pick) => {
+                const player = getPlayer(pick.element);
+                return (
+                  sum + (player ? player.total_points * pick.multiplier : 0)
+                );
+              }, 0),
+              squadValue:
+                squadData.reduce((sum, p) => sum + (p?.now_cost || 0), 0) / 10,
+              currentGameweek: currentEvent,
+            };
+
+            const bankBalance = teamPicks?.entry_history?.bank
+              ? teamPicks.entry_history.bank / 10
+              : 1.0;
+
+            const transferResult = await generateTransferSuggestions(
+              teamData,
+              squadData,
+              elements,
+              currentEvent,
+              false, // gameweekFinished
+              fixturesData,
+              bankBalance,
+              1 // freeTransfers
+            );
+
+            setSuggestedTransfer(transferResult);
+          } catch (transferError) {
+            console.error(
+              "Error fetching transfer suggestions:",
+              transferError
+            );
+          }
+        }
       } catch (error) {
         console.error("Error fetching team news or fixtures:", error);
       }
     };
 
     fetchData();
-  }, [currentEvent]);
+  }, [currentEvent, teamPicks]);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -78,8 +139,29 @@ export default function CurrentSquad({
       (fixture) => fixture.event === nextGameweekId
     );
 
+    // Create modified squad including suggested transfer
+    let modifiedPicks = [...picks];
+    if (suggestedTransfer?.transfer_out && suggestedTransfer?.transfer_in) {
+      // Remove the transfer out player
+      modifiedPicks = modifiedPicks.filter(
+        (pick) => pick.element !== suggestedTransfer.transfer_out.id
+      );
+
+      // Add the transfer in player
+      const transferInPick = {
+        element: suggestedTransfer.transfer_in.id,
+        position: modifiedPicks.length + 1,
+        selling_price: suggestedTransfer.transfer_in.now_cost,
+        multiplier: 1,
+        purchase_price: suggestedTransfer.transfer_in.now_cost,
+        is_captain: false,
+        is_vice_captain: false,
+      };
+      modifiedPicks.push(transferInPick);
+    }
+
     // Score each player based on multiple factors for NEXT gameweek
-    const scoredPlayers = picks
+    const scoredPlayers = modifiedPicks
       .map((pick) => {
         const player = getPlayer(pick.element);
         const team = getTeam(player?.team || 0);
@@ -353,6 +435,10 @@ export default function CurrentSquad({
     const team = getTeam(player.team);
     const position = getPosition(player.element_type);
 
+    // Check if this is a suggested transfer
+    const isTransferIn = suggestedTransfer?.transfer_in?.id === player.id;
+    const isTransferOut = suggestedTransfer?.transfer_out?.id === player.id;
+
     // Check if this player is part of suggested changes
     const currentPick = picks.find((p) => p.element === pick.element);
     const isCurrentlySelected = currentPick
@@ -412,6 +498,11 @@ export default function CurrentSquad({
           {isBenchedSuggestion && (
             <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
               ↓
+            </div>
+          )}
+          {isTransferIn && (
+            <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              ⚡
             </div>
           )}
           {/* Player Name and Team */}
@@ -497,6 +588,11 @@ export default function CurrentSquad({
         {isBenchedSuggestion && (
           <div className="absolute top-2 right-2 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
             ↓
+          </div>
+        )}
+        {isTransferIn && (
+          <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            ⚡
           </div>
         )}
         <div className="flex justify-between items-start mb-2">
@@ -591,26 +687,32 @@ export default function CurrentSquad({
               onClick={() => setShowSuggestedLineup(!showSuggestedLineup)}
               className={`flex-1 min-w-[200px] max-w-[280px] py-2 rounded-md text-sm font-medium transition-colors text-center ${
                 showSuggestedLineup
-                  ? "text-white bg-blue-600"
+                  ? "text-white bg-blue-100"
                   : "bg-blue-100 text-blue-700 hover:bg-blue-200"
               }`}
             >
               {showSuggestedLineup
                 ? "Show Current Lineup"
-                : `💡 Show GW${suggestedLineup.nextGameweekId} Prediction`}
+                : `Show GW${suggestedLineup.nextGameweekId} Prediction`}
             </button>
           </div>
 
           {/* Suggested Lineup Info */}
           {showSuggestedLineup && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 w-full">
+            <div className=" border border-blue-200 rounded-lg p-3 w-full">
               <div className="text-center">
                 <h4 className="font-semibold text-blue-800 mb-2">
                   Gameweek {suggestedLineup.nextGameweekId} Prediction:{" "}
                   {suggestedLineup.formation.name}
+                  {suggestedTransfer && (
+                    <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+                      ⚡ With Transfer
+                    </span>
+                  )}
                 </h4>
                 <p className="text-xs text-blue-600 mb-2">
                   Based on form, fixtures, team news & injury reports
+                  {suggestedTransfer && " + suggested transfer"}
                 </p>
                 {suggestedLineup.changes.swapCount > 0 ? (
                   <div className="text-sm text-blue-700">
@@ -618,6 +720,20 @@ export default function CurrentSquad({
                       Recommended changes: {suggestedLineup.changes.swapCount}{" "}
                       players
                     </p>
+                    {suggestedTransfer && (
+                      <div className="text-xs mb-2 p-2 bg-purple-50 border border-purple-200 rounded">
+                        <span className="font-medium text-purple-700">
+                          Transfer:{" "}
+                        </span>
+                        <span className="text-red-600">
+                          {suggestedTransfer.transfer_out.web_name} OUT
+                        </span>
+                        <span className="mx-1">→</span>
+                        <span className="text-green-600">
+                          {suggestedTransfer.transfer_in.web_name} IN
+                        </span>
+                      </div>
+                    )}
                     {suggestedLineup.changes.toAdd.length > 0 && (
                       <div className="text-xs">
                         <span className="font-medium">Bring in: </span>
