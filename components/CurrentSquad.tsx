@@ -13,6 +13,7 @@ interface CurrentSquadProps {
   elementTypes: ElementType[];
   currentEvent: number;
   events: Event[];
+  teamPicks?: any; // Full team picks data including entry history
 }
 
 export default function CurrentSquad({
@@ -22,6 +23,7 @@ export default function CurrentSquad({
   elementTypes,
   currentEvent,
   events,
+  teamPicks,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState<{
@@ -364,6 +366,7 @@ export default function CurrentSquad({
           currentEvent={currentEvent}
           events={events}
           totalPoints={totalPoints}
+          teamPicks={teamPicks}
         />
       </div>
 

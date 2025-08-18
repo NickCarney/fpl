@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
-import { generateTransferSuggestions, getFixtures } from "@/lib/fpl-api";
+import {
+  generateTransferSuggestions,
+  getFixtures,
+  getLiveGameweekData,
+} from "@/lib/fpl-api";
 
 interface TransferSuggestionsProps {
   picks: Pick[];
@@ -12,6 +16,7 @@ interface TransferSuggestionsProps {
   currentEvent: number;
   events: Event[];
   totalPoints: number;
+  teamPicks?: any; // Full team picks data including entry history
 }
 
 interface ParsedTransferAnalysis {
@@ -39,6 +44,7 @@ export default function TransferSuggestions({
   currentEvent,
   events,
   totalPoints,
+  teamPicks,
 }: TransferSuggestionsProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [analysis, setAnalysis] = useState<string>("");
@@ -155,14 +161,25 @@ export default function TransferSuggestions({
       const currentGameweek = events.find((event) => event.is_current);
       const gameweekFinished = currentGameweek?.finished || false;
 
-      // Fetch fixtures data
-      const fixtures = await getFixtures();
+      // Fetch fixtures data and live gameweek data
+      const [fixtures, liveData] = await Promise.all([
+        getFixtures(),
+        getLiveGameweekData(currentEvent).catch(() => null),
+      ]);
 
-      // Prepare squad data
+      // Prepare enhanced squad data with current gameweek performance
       const squadData = picks.map((pick) => {
         const player = getPlayer(pick.element);
         const team = getTeam(player?.team || 0);
         const position = getPosition(player?.element_type || 0);
+
+        // Get live gameweek data for this player
+        const livePlayerData = liveData?.elements?.find(
+          (el: any) => el.id === pick.element
+        );
+        const currentGameweekPoints = livePlayerData?.stats?.total_points || 0;
+        const hasPlayed = livePlayerData?.stats?.minutes > 0;
+        const willPlay = !hasPlayed && !gameweekFinished;
 
         return {
           ...player,
@@ -172,6 +189,10 @@ export default function TransferSuggestions({
           is_captain: pick.is_captain,
           is_vice_captain: pick.is_vice_captain,
           multiplier: pick.multiplier,
+          current_gameweek_points: currentGameweekPoints,
+          has_played_current_gw: hasPlayed,
+          will_play_current_gw: willPlay,
+          is_in_my_squad: true, // Mark as owned player
         };
       });
 
@@ -182,6 +203,12 @@ export default function TransferSuggestions({
         currentGameweek: currentEvent,
       };
 
+      // Get bank balance and free transfers from team picks data
+      const bankBalance = teamPicks?.entry_history?.bank
+        ? teamPicks.entry_history.bank / 10
+        : 1.0;
+      const freeTransfers = 1; // This might need to be calculated based on transfers made
+
       const result = await generateTransferSuggestions(
         teamData,
         squadData,
@@ -189,8 +216,8 @@ export default function TransferSuggestions({
         currentEvent,
         gameweekFinished,
         fixtures,
-        1.0, // Default bank balance - could be passed as prop
-        1 // Default free transfers - could be passed as prop
+        bankBalance,
+        freeTransfers
       );
 
       setAnalysis(result.analysis);
@@ -230,7 +257,7 @@ export default function TransferSuggestions({
                 handleGenerateAnalysis();
               }}
               disabled={loading}
-              className="px-3 py-1 text-white rounded-md hover:green-700 transition-colors text-sm"
+              className="px-3 py-1 text-white rounded-md hover:green-700 transition-colors text-sm text-nowrap"
             >
               {loading
                 ? "Analyzing..."

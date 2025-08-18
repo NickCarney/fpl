@@ -142,7 +142,7 @@ CONSTRAINTS:
 ${ragContext}
 ${externalContext}
 
-CURRENT SQUAD:
+MY CURRENT SQUAD (15 players I own):
 ${squadData
   .map(
     (p: any) =>
@@ -150,11 +150,20 @@ ${squadData
         p.total_points
       }pts, Form: ${p.form}, £${(p.now_cost / 10).toFixed(1)}m, ${
         p.minutes
-      } mins${p.is_captain ? " [C]" : ""}${p.is_vice_captain ? " [VC]" : ""}`
+      } mins${p.is_captain ? " [C]" : ""}${p.is_vice_captain ? " [VC]" : ""}${
+        gameweekFinished ? `` : 
+        p.has_played_current_gw ? ` | GW${currentGameweek}: ${p.current_gameweek_points}pts` :
+        ` | GW${currentGameweek}: Not played yet${p.will_play_current_gw ? ' (will play)' : ' (may not play)'}`
+      }`
   )
   .join("\n")}
 
-TASK: Identify the WEAKEST player in the squad and suggest the BEST replacement within budget.
+IMPORTANT: 
+- These 15 players are my CURRENT SQUAD - do NOT suggest transferring IN any of these players as I already own them
+- If gameweek is ongoing, consider that players who haven't played yet may still get points
+- Don't criticize players who haven't played yet for having 0 points in current gameweek
+
+TASK: Identify the WEAKEST player in MY SQUAD and suggest the BEST replacement within budget.
 
 Consider:
 1. Player performance vs position averages
@@ -163,17 +172,18 @@ Consider:
 4. Expected goals data (if available)
 5. Upcoming fixtures
 6. Price trends
+7. Current gameweek performance (if gameweek finished) or playing status (if ongoing)
 
 Provide your response in this EXACT format:
 
 WEAKNESS_ANALYSIS:
-Player: [weakest player name]
+Player: [weakest player name from MY SQUAD]
 Position: [position]
 Issues: [2-3 specific issues with this player]
 
 TRANSFER_SUGGESTION:
 OUT: [player name] (£[price]m)
-IN: [replacement name] (£[price]m) 
+IN: [replacement name - MUST be different from any player in my squad] (£[price]m) 
 Reason: [why this is a good transfer]
 Expected_Improvement: [specific improvement expected]
 Budget_Impact: [cost difference]

@@ -289,6 +289,7 @@ export default function Home() {
             elementTypes={bootstrapData.element_types}
             currentEvent={currentEvent}
             events={bootstrapData.events}
+            teamPicks={teamPicks}
           />
         )}
 
