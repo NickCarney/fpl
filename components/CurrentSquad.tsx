@@ -751,7 +751,7 @@ export default function CurrentSquad({
             >
               {showSuggestedLineup
                 ? "Show Current Lineup"
-                : `Show GW${suggestedLineup.nextGameweekId} Prediction`}
+                : `Show GW${suggestedLineup.nextGameweekId} suggestions`}
             </button>
           </div>
 
