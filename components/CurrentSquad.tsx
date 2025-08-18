@@ -183,20 +183,37 @@ export default function CurrentSquad({
             ? player.clean_sheets * 0.5
             : 0;
 
-        // Fixture difficulty analysis for next gameweek
+        // Fixture difficulty analysis for next gameweek (HEAVILY WEIGHTED)
         const playerFixture = nextGameweekFixtures.find(
           (fixture) =>
             fixture.team_h === player.team || fixture.team_a === player.team
         );
 
         let fixtureBonus = 1.0;
+        let captaincy_score = 0;
         if (playerFixture) {
           const isHome = playerFixture.team_h === player.team;
           const difficulty = isHome
             ? playerFixture.team_h_difficulty
             : playerFixture.team_a_difficulty;
-          // Lower difficulty = better fixture = higher bonus
-          fixtureBonus = difficulty <= 2 ? 1.3 : difficulty <= 3 ? 1.0 : 0.8;
+
+          // HEAVILY weight fixture difficulty - this is now the most important factor
+          if (difficulty <= 2) {
+            fixtureBonus = 2.0; // Excellent fixtures get massive bonus
+            captaincy_score = 3.0; // High captaincy appeal
+          } else if (difficulty <= 3) {
+            fixtureBonus = 1.2; // Average fixtures get small bonus
+            captaincy_score = 1.5; // Moderate captaincy appeal
+          } else {
+            fixtureBonus = 0.6; // Hard fixtures get significant penalty
+            captaincy_score = 0.5; // Low captaincy appeal
+          }
+
+          // Home advantage bonus
+          if (isHome) {
+            fixtureBonus += 0.2;
+            captaincy_score += 0.5;
+          }
         }
 
         // Team news impact
@@ -233,6 +250,11 @@ export default function CurrentSquad({
         // Minutes reliability (consistent starters get bonus)
         const reliabilityBonus = player.starts > events.length * 0.7 ? 1.0 : 0;
 
+        // Captaincy factors (for captain selection later)
+        const attackingBonus = player.element_type >= 3 ? 1.0 : 0.3; // Mids/Forwards better captains
+        const premiumBonus = player.now_cost >= 100 ? 0.8 : 0; // Premium players
+        const penaltyBonus = player.penalties_saved > 0 ? 0.5 : 0; // Use available penalty stat
+
         const totalScore =
           (formScore +
             ppgScore +
@@ -242,7 +264,18 @@ export default function CurrentSquad({
             positionBonus +
             formTrend +
             reliabilityBonus) *
-          fixtureBonus *
+          fixtureBonus * // Heavy fixture weighting
+          teamNewsModifier;
+
+        // Separate captaincy score for captain selection
+        const captaincyScore =
+          (formScore * 1.5 + // Form is crucial for captaincy
+            ppgScore * 2.0 + // Points per game very important
+            expectedScore * 1.5 +
+            attackingBonus +
+            premiumBonus +
+            penaltyBonus) *
+          captaincy_score * // Fixture captaincy appeal
           teamNewsModifier;
 
         return {
@@ -251,6 +284,7 @@ export default function CurrentSquad({
           team,
           position: getPosition(player.element_type),
           score: totalScore,
+          captaincyScore,
           isCurrentlySelected: pick.position <= 11,
           nextGameweekPrediction: {
             fixtureRating: fixtureBonus,
@@ -341,6 +375,28 @@ export default function CurrentSquad({
       ...playersByPosition[4].slice(0, bestFormation.fwd), // Forwards
     ];
 
+    // Select Captain and Vice-Captain based on captaincy scores
+    const captainCandidates = suggestedXI
+      .filter((p) => p!.player.element_type >= 3) // Only midfielders and forwards
+      .sort((a, b) => b!.captaincyScore - a!.captaincyScore);
+
+    // If no attacking players, consider all starting XI
+    if (captainCandidates.length === 0) {
+      captainCandidates.push(
+        ...suggestedXI.sort((a, b) => b!.captaincyScore - a!.captaincyScore)
+      );
+    }
+
+    const captain = captainCandidates[0];
+    const viceCaptain =
+      captainCandidates[1] || suggestedXI.find((p) => p !== captain);
+
+    // Mark captain and vice-captain in the picks
+    suggestedXI.forEach((p) => {
+      p!.pick.is_captain = p === captain;
+      p!.pick.is_vice_captain = p === viceCaptain;
+    });
+
     // Remaining players go to bench
     const allSelected = suggestedXI.map((p) => p!.pick.element);
     const bench = scoredPlayers
@@ -352,6 +408,8 @@ export default function CurrentSquad({
       startingXI: suggestedXI,
       bench,
       formation: bestFormation,
+      captain: captain?.player,
+      viceCaptain: viceCaptain?.player,
       changes: calculateLineupChanges(suggestedXI, bench),
       nextGameweekId,
       confidenceLevel: bestScore > 0 ? "high" : "medium",
@@ -710,6 +768,25 @@ export default function CurrentSquad({
                     </span>
                   )}
                 </h4>
+
+                {/* Captain and Vice-Captain Display */}
+                <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                  <div className="text-sm text-yellow-800">
+                    <span className="font-semibold">Captain: </span>
+                    <span className="font-medium">
+                      {suggestedLineup.captain?.web_name}
+                    </span>
+                    <span className="mx-2">|</span>
+                    <span className="font-semibold">Vice: </span>
+                    <span className="font-medium">
+                      {suggestedLineup.viceCaptain?.web_name}
+                    </span>
+                  </div>
+                  <div className="text-xs text-yellow-600 mt-1">
+                    Based on fixture difficulty, form & attacking potential
+                  </div>
+                </div>
+
                 <p className="text-xs text-blue-600 mb-2">
                   Based on form, fixtures, team news & injury reports
                   {suggestedTransfer && " + suggested transfer"}
