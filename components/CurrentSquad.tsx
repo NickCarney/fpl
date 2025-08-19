@@ -797,20 +797,6 @@ export default function CurrentSquad({
                       Recommended changes: {suggestedLineup.changes.swapCount}{" "}
                       players
                     </p>
-                    {suggestedTransfer && (
-                      <div className="text-xs mb-2 p-2 bg-purple-50 border border-purple-200 rounded">
-                        <span className="font-medium text-purple-700">
-                          Transfer:{" "}
-                        </span>
-                        <span className="text-red-600">
-                          {suggestedTransfer.transfer_out.web_name} OUT
-                        </span>
-                        <span className="mx-1">→</span>
-                        <span className="text-green-600">
-                          {suggestedTransfer.transfer_in.web_name} IN
-                        </span>
-                      </div>
-                    )}
                     {suggestedLineup.changes.toAdd.length > 0 && (
                       <div className="text-xs">
                         <span className="font-medium">Bring in: </span>
