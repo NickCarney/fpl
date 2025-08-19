@@ -23,6 +23,10 @@ import {
   LeagueStanding,
 } from "@/types/fpl";
 
+import Image from "next/image";
+
+import fplgenie from "@/public/fplgenie.png";
+
 export default function Home() {
   const [teamId, setTeamId] = useState<number | null>(null);
   const [teamName, setTeamName] = useState<string | null>(null);
@@ -165,9 +169,18 @@ export default function Home() {
   if (!teamId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
+        <Image
+          src={fplgenie}
+          alt="FplGenie Image"
+          className=""
+          layout="fill"
+          objectFit="cover"
+          style={{ zIndex: -1000 }}
+        />
+
+        <div className="w-full max-w-md bg-[#f4fde0] rounded">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold  mb-2">FPL Dashboard</h1>
+            <h1 className="text-4xl font-bold  mb-2">FPL Genie</h1>
             <p className="">Track your Fantasy Premier League performance</p>
           </div>
           <TeamIdInput onTeamIdSubmit={handleTeamIdSubmit} />
@@ -212,8 +225,15 @@ export default function Home() {
       <header className="">
         <div className="flex justify-center">
           <div className="flex justify-between items-center py-4 flex-col">
-            <div>
-              <h1 className="text-2xl font-bold ">FPL Dashboard</h1>
+            <div className="flex justify-center flex-col items-center">
+              <Image
+                src={fplgenie}
+                alt="FplGenie Image"
+                width={96}
+                height={144}
+                style={{ zIndex: -1000 }}
+              />
+              <h1 className="text-2xl font-bold ">FPL Genie</h1>
               {teamName && (
                 <p className="text-center text-lg font-semibold">{teamName}</p>
               )}
