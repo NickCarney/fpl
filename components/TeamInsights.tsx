@@ -95,12 +95,12 @@ export default function TeamInsights({
     }
   };
 
-  // Auto-generate insights on component mount
-  useEffect(() => {
-    if (picks.length > 0 && elements.length > 0) {
-      generateInsights();
-    }
-  }, [picks, elements, currentEvent]);
+  // Auto-generate insights removed - only trigger when user clicks button
+  // useEffect(() => {
+  //   if (picks.length > 0 && elements.length > 0) {
+  //     generateInsights();
+  //   }
+  // }, [picks, elements, currentEvent]);
 
   const formatInsights = (text: string) => {
     // Split by bullet points and format as list items

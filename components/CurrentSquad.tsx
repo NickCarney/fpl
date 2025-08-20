@@ -42,7 +42,7 @@ export default function CurrentSquad({
     position: ElementType;
   } | null>(null);
 
-  // Fetch team news and fixtures on component mount
+  // Fetch team news and fixtures on component mount (no automatic OpenAI calls)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -53,68 +53,14 @@ export default function CurrentSquad({
         setTeamNews(teamNewsData);
         setFixtures(fixturesData);
 
-        // Fetch transfer suggestions for lineup optimization
-        if (teamPicks) {
-          try {
-            const squadData = picks.map((pick) => {
-              const player = getPlayer(pick.element);
-              const team = getTeam(player?.team || 0);
-              const position = getPosition(player?.element_type || 0);
-
-              return {
-                ...player,
-                web_name: player?.web_name,
-                team_name: team?.short_name,
-                position_name: position?.singular_name,
-                is_captain: pick.is_captain,
-                is_vice_captain: pick.is_vice_captain,
-                multiplier: pick.multiplier,
-                is_in_my_squad: true,
-              };
-            });
-
-            const teamData = {
-              totalPoints: picks.reduce((sum, pick) => {
-                const player = getPlayer(pick.element);
-                return (
-                  sum + (player ? player.total_points * pick.multiplier : 0)
-                );
-              }, 0),
-              squadValue:
-                squadData.reduce((sum, p) => sum + (p?.now_cost || 0), 0) / 10,
-              currentGameweek: currentEvent,
-            };
-
-            const bankBalance = teamPicks?.entry_history?.bank
-              ? teamPicks.entry_history.bank / 10
-              : 1.0;
-
-            const transferResult = await generateTransferSuggestions(
-              teamData,
-              squadData,
-              elements,
-              currentEvent,
-              false, // gameweekFinished
-              fixturesData,
-              bankBalance,
-              1 // freeTransfers
-            );
-
-            setSuggestedTransfer(transferResult);
-          } catch (transferError) {
-            console.error(
-              "Error fetching transfer suggestions:",
-              transferError
-            );
-          }
-        }
+        // Removed automatic transfer suggestions - these should only be triggered by user action
       } catch (error) {
         console.error("Error fetching team news or fixtures:", error);
       }
     };
 
     fetchData();
-  }, [currentEvent, teamPicks]);
+  }, [currentEvent]);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
