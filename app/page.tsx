@@ -428,12 +428,19 @@ export default function Home() {
                   </p>
                 </div>
               )}
-            {leagueStandings && (
+            {leagueStandings && bootstrapData && (
               <LeagueStandings
                 standings={leagueStandings.standings.results}
                 leagueName={leagueStandings.league.name}
                 userTeamId={teamId}
                 userPosition={userPosition || undefined}
+                elements={bootstrapData.elements}
+                teams={bootstrapData.teams}
+                elementTypes={bootstrapData.element_types}
+                currentEvent={
+                  bootstrapData.events.find((e) => e.is_current)?.id || 1
+                }
+                events={bootstrapData.events}
               />
             )}
           </div>

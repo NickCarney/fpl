@@ -1,12 +1,19 @@
 "use client";
 
-import { LeagueStanding } from "@/types/fpl";
+import { useState } from "react";
+import { LeagueStanding, Element, Team, ElementType, Event } from "@/types/fpl";
+import TeamFormationPopup from "./TeamFormationPopup";
 
 interface LeagueStandingsProps {
   standings: LeagueStanding[];
   leagueName: string;
   userTeamId?: number;
   userPosition?: any; // Changed from LeagueStanding to any since we're using userStats
+  elements: Element[];
+  teams: Team[];
+  elementTypes: ElementType[];
+  currentEvent: number;
+  events: Event[];
 }
 
 export default function LeagueStandings({
@@ -14,7 +21,17 @@ export default function LeagueStandings({
   leagueName,
   userTeamId,
   userPosition,
+  elements,
+  teams,
+  elementTypes,
+  currentEvent,
+  events,
 }: LeagueStandingsProps) {
+  const [selectedTeam, setSelectedTeam] = useState<{
+    teamId: number;
+    teamName: string;
+    managerName: string;
+  } | null>(null);
   // Check if user is in the current standings
   const userInStandings = userTeamId
     ? standings.find((s) => s.entry === userTeamId)
@@ -28,6 +45,18 @@ export default function LeagueStandings({
     userInStandings: !!userInStandings,
     shouldShowUserPosition,
   });
+
+  const handleTeamClick = (standing: LeagueStanding) => {
+    setSelectedTeam({
+      teamId: standing.entry,
+      teamName: standing.entry_name,
+      managerName: standing.player_name,
+    });
+  };
+
+  const closeTeamPopup = () => {
+    setSelectedTeam(null);
+  };
 
   return (
     <div className=" p-6 rounded-lg shadow-md">
@@ -55,12 +84,15 @@ export default function LeagueStandings({
               return (
                 <tr
                   key={standing.entry}
-                  className={`border-b hover: ${
-                    isUserTeam ? " font-semibold" : ""
+                  onClick={() => handleTeamClick(standing)}
+                  className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${
+                    isUserTeam ? "bg-blue-50 font-semibold" : ""
                   }`}
                 >
                   <td className="py-3">{standing.rank}</td>
-                  <td className="py-3">{standing.entry_name}</td>
+                  <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
+                    {standing.entry_name}
+                  </td>
                   <td className="py-3">{standing.player_name}</td>
                   <td className="py-3 text-right">{standing.event_total}</td>
                   <td className="py-3 text-right font-semibold">
@@ -86,9 +118,14 @@ export default function LeagueStandings({
             {/* Show user position if they're not in the top results */}
             {shouldShowUserPosition && (
               <>
-                <tr className="border-b font-semibold">
+                <tr
+                  className="border-b font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => handleTeamClick(userPosition)}
+                >
                   <td className="py-3 font-normal">You</td>
-                  <td className="py-3">{userPosition.entry_name}</td>
+                  <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
+                    {userPosition.entry_name}
+                  </td>
                   <td className="py-3">{userPosition.player_name}</td>
                   <td className="py-3 text-right">
                     {userPosition.event_total}
@@ -108,6 +145,27 @@ export default function LeagueStandings({
         <div className="text-center py-8 text-gray-500">
           No standings data available
         </div>
+      )}
+
+      {/* Help text */}
+      <div className="mt-4 text-center text-sm text-gray-500">
+        Click on any team name to view their formation and squad
+      </div>
+
+      {/* Team Formation Popup */}
+      {selectedTeam && (
+        <TeamFormationPopup
+          teamId={selectedTeam.teamId}
+          teamName={selectedTeam.teamName}
+          managerName={selectedTeam.managerName}
+          elements={elements}
+          teams={teams}
+          elementTypes={elementTypes}
+          currentEvent={currentEvent}
+          events={events}
+          isOpen={!!selectedTeam}
+          onClose={closeTeamPopup}
+        />
       )}
     </div>
   );

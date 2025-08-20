@@ -123,6 +123,8 @@ export interface Pick {
   multiplier: number;
   is_captain: boolean;
   is_vice_captain: boolean;
+  selling_price?: number;
+  purchase_price?: number;
 }
 
 export interface TeamPicks {
