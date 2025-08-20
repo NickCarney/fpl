@@ -93,8 +93,19 @@ export default function Home() {
     try {
       const data = await getBootstrapStatic();
       setBootstrapData(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load bootstrap data:", err);
+      const errorMessage = err?.message || "Unknown error";
+      if (
+        errorMessage.includes("403") ||
+        errorMessage.includes("Access denied")
+      ) {
+        setError(
+          "FPL API access denied. This may be a temporary issue - please try again in a few minutes."
+        );
+      } else {
+        setError("Failed to load FPL data. Please try again.");
+      }
     }
   };
 
@@ -111,22 +122,58 @@ export default function Home() {
       const currentEvent =
         bootstrapData?.events.find((event) => event.is_current)?.id || 1;
 
-      // Load team data
-      const [teamInfoData, picks, history] = await Promise.all([
+      // Load team data with better error handling
+      const [teamInfoData, picks, history] = await Promise.allSettled([
         getTeamInfo(id),
         getTeamPicks(id, currentEvent),
         getTeamHistory(id),
       ]);
 
-      setTeamInfo(teamInfoData);
-      setTeamPicks(picks);
-      setTeamHistory(history);
-      setTeamName(teamInfoData.name);
-    } catch (err) {
-      setError(
-        "Failed to load team data. Please check your team ID and try again."
-      );
-      console.error(err);
+      // Check if team info loaded successfully (most critical)
+      if (teamInfoData.status === "rejected") {
+        console.error("Team info error:", teamInfoData.reason);
+        const errorMessage = teamInfoData.reason?.message || "Unknown error";
+        if (
+          errorMessage.includes("404") ||
+          errorMessage.includes("Team not found")
+        ) {
+          throw new Error(
+            `Team ID ${id} not found. Please check your team ID.`
+          );
+        } else if (
+          errorMessage.includes("403") ||
+          errorMessage.includes("Access denied")
+        ) {
+          throw new Error(
+            "FPL API access denied. This may be a temporary issue - please try again in a few minutes."
+          );
+        } else {
+          throw new Error(`Failed to load team information: ${errorMessage}`);
+        }
+      }
+
+      // Check picks
+      if (picks.status === "rejected") {
+        console.error("Team picks error:", picks.reason);
+        // Don't fail completely for picks, but log the error
+      }
+
+      // Check history
+      if (history.status === "rejected") {
+        console.error("Team history error:", history.reason);
+        // Don't fail completely for history, but log the error
+      }
+
+      setTeamInfo(teamInfoData.value);
+      setTeamPicks(picks.status === "fulfilled" ? picks.value : null);
+      setTeamHistory(history.status === "fulfilled" ? history.value : null);
+      setTeamName(teamInfoData.value.name);
+    } catch (err: any) {
+      const errorMessage =
+        err?.message ||
+        "Failed to load team data. Please check your team ID and try again.";
+      setError(errorMessage);
+      console.error("Team data loading error:", err);
     } finally {
       setLoading(false);
     }
@@ -255,7 +302,7 @@ export default function Home() {
       </header>
 
       {/* Navigation */}
-      <nav className="w-full px-112">
+      <nav className="w-full px-12">
         <div className="flex w-full justify-between gap-[5%] text-nowrap flex-col sm:flex-row pt-2 gap-y-2">
           <button
             onClick={() => setActiveTab("squad")}
