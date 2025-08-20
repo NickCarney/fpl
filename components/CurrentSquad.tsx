@@ -391,11 +391,15 @@ export default function CurrentSquad({
     const viceCaptain =
       captainCandidates[1] || suggestedXI.find((p) => p !== captain);
 
-    // Mark captain and vice-captain in the picks
-    suggestedXI.forEach((p) => {
-      p!.pick.is_captain = p === captain;
-      p!.pick.is_vice_captain = p === viceCaptain;
-    });
+    // Create modified picks for suggested lineup without affecting original picks
+    const suggestedXIWithCaptaincy = suggestedXI.map((p) => ({
+      ...p,
+      pick: {
+        ...p!.pick,
+        is_captain: p === captain,
+        is_vice_captain: p === viceCaptain,
+      },
+    }));
 
     // Remaining players go to bench
     const allSelected = suggestedXI.map((p) => p!.pick.element);
@@ -405,7 +409,7 @@ export default function CurrentSquad({
       .slice(0, 4);
 
     return {
-      startingXI: suggestedXI,
+      startingXI: suggestedXIWithCaptaincy,
       bench,
       formation: bestFormation,
       captain: captain?.player,
