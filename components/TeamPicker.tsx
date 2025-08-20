@@ -58,6 +58,7 @@ const PlayerCard = ({
     : "No fixture";
 
   const fixtureDifficulty = nextFixture?.difficulty || 3;
+
   const difficultyColor =
     fixtureDifficulty <= 2
       ? "bg-green-100 text-green-700"
@@ -285,10 +286,18 @@ export default function TeamPicker({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const fixturesData = await getFixtures().catch(() => []);
+        console.log("Fetching fixtures data...");
+        const fixturesData = await getFixtures();
+        console.log(
+          "Fixtures data received:",
+          fixturesData?.length || 0,
+          "fixtures"
+        );
         setFixtures(fixturesData);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching fixtures data:", error);
+        // Set empty array as fallback
+        setFixtures([]);
       }
     };
 
@@ -423,11 +432,24 @@ export default function TeamPicker({
   };
 
   const getNextFixture = (player: Element) => {
+    console.log(
+      "Getting fixture for player:",
+      player.web_name,
+      "team:",
+      player.team,
+      "nextGameweekId:",
+      nextGameweekId,
+      "fixtures count:",
+      fixtures.length
+    );
+
     const fixture = fixtures.find(
       (f) =>
         f.event === nextGameweekId &&
         (f.team_h === player.team || f.team_a === player.team)
     );
+
+    console.log("Found fixture:", fixture ? "YES" : "NO", fixture);
 
     if (!fixture) return null;
 
@@ -435,13 +457,16 @@ export default function TeamPicker({
     const opponentId = isHome ? fixture.team_a : fixture.team_h;
     const opponent = teams.find((t) => t.id === opponentId);
 
-    return {
+    const result = {
       opponent: opponent?.short_name || "TBD",
       isHome,
       difficulty: isHome
         ? fixture.team_h_difficulty
         : fixture.team_a_difficulty,
     };
+
+    console.log("Returning fixture result:", result);
+    return result;
   };
 
   const handleDragStart = (player: Element, pick: Pick, fromBench: boolean) => {
