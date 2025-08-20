@@ -168,23 +168,20 @@ export default function Home() {
 
   if (!teamId) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Image
-          src={fplgenie}
-          alt="FplGenie Image"
-          className=""
-          layout="fill"
-          objectFit="cover"
-          style={{ zIndex: -1000 }}
-        />
-
+      <div className="min-h-screen flex items-center justify-center p-4 flex-col sm:flex-row">
         <div className="w-full max-w-md bg-[#f4fde0] rounded">
-          <div className="text-center mb-8">
+          <div className="text-center">
             <h1 className="text-4xl font-bold  mb-2">FPL Genie</h1>
             <p className="">Track your Fantasy Premier League performance</p>
           </div>
           <TeamIdInput onTeamIdSubmit={handleTeamIdSubmit} />
         </div>
+        <Image
+          src={fplgenie}
+          alt="FplGenie Image"
+          className="transform-[70%]"
+          style={{ zIndex: -1000 }}
+        />
       </div>
     );
   }
