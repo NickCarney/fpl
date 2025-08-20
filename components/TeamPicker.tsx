@@ -81,7 +81,7 @@ const PlayerCard = ({
         onDrop={() => onDrop(pick)}
         onDragOver={onDragOver}
         onClick={() => onClick(pick)}
-        className={`relative flex flex-col py-2 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-20 h-24 overflow-y-scroll ${
+        className={`relative flex flex-col py-2 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-20 h-24 overflow-y-scroll scrolly ${
           isSelected
             ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
             : pick.is_captain
@@ -854,7 +854,7 @@ export default function TeamPicker({
       {/* Bench */}
       <div className="border rounded-lg p-4">
         <h3 className="text-lg font-semibold mb-4">Bench ({bench.length}/4)</h3>
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto scrolly">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {bench.map((pick) => {
               const player = getPlayer(pick.element);

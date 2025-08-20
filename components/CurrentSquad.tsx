@@ -485,7 +485,7 @@ export default function CurrentSquad({
         <div
           key={pick.element}
           onClick={() => handlePlayerClick(pick)}
-          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto ${
+          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto scrolly ${
             pick.is_captain
               ? "border-yellow-400"
               : pick.is_vice_captain

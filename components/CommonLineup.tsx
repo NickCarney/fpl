@@ -190,7 +190,7 @@ export default function CommonLineup({
       <div
         key={element.id}
         onClick={() => handlePlayerClick(playerCount)}
-        className="relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-28 h-36 overflow-y-auto bg-white border-purple-300"
+        className="relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-28 h-36 overflow-y-auto bg-white border-purple-300 scrolly"
       >
         {/* Popularity indicator */}
         <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">

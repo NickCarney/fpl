@@ -112,7 +112,7 @@ export default function TeamFormationPopup({
       <div
         key={pick.element}
         onClick={() => handlePlayerClick(pick)}
-        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto ${
+        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto scrolly ${
           pick.is_captain
             ? "border-yellow-400 bg-yellow-50"
             : pick.is_vice_captain
@@ -171,7 +171,7 @@ export default function TeamFormationPopup({
   if (!teamPicks) {
     return (
       <Popup open={isOpen} onClose={onClose} modal nested>
-        <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto">
+        <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto scrolly">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">
               {teamName} - {managerName}
@@ -214,7 +214,7 @@ export default function TeamFormationPopup({
   return (
     <>
       <Popup open={isOpen} onClose={onClose} modal nested>
-        <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto">
+        <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto scrolly">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold">{teamName}</h2>

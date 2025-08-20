@@ -112,7 +112,7 @@ export default function PlayerDetailPopup({
       className="player-popup"
       overlayStyle={{ background: "rgba(0, 0, 0, 0.5)" }}
     >
-      <div className=" rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className=" rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto scrolly">
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div>
