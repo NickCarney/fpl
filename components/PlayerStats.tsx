@@ -457,6 +457,16 @@ export default function PlayerStats({
           </select>
         </div>
 
+        <div className="w-fit">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by player name..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         <div className="">
           <select
             value={selectedTeam || ""}
@@ -472,16 +482,6 @@ export default function PlayerStats({
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="w-fit">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by player name..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
         </div>
       </div>
 

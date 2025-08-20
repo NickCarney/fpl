@@ -168,8 +168,8 @@ export default function Home() {
 
   if (!teamId) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 flex-col sm:flex-row">
-        <div className="w-full max-w-md bg-[#f4fde0] rounded">
+      <div className="relative min-h-screen flex items-center justify-left p-[15%] flex-col sm:flex-row overflow-hidden">
+        <div className="w-full max-w-md bg-[#f4fde0] rounded relative z-10">
           <div className="text-center">
             <h1 className="text-4xl font-bold  mb-2">FPL Genie</h1>
             <p className="">Track your Fantasy Premier League performance</p>
@@ -179,7 +179,10 @@ export default function Home() {
         <Image
           src={fplgenie}
           alt="FplGenie Image"
-          className="transform-[70%]"
+          width={0}
+          height={0}
+          sizes="100vw"
+          className="fixed right-0 w-auto h-screen object-contain -z-50 translate-y-12 pt-[35%] sm:pt-0"
           style={{ zIndex: -1000 }}
         />
       </div>
@@ -252,7 +255,7 @@ export default function Home() {
       </header>
 
       {/* Navigation */}
-      <nav className="w-full px-1">
+      <nav className="w-full px-112">
         <div className="flex w-full justify-between gap-[5%] text-nowrap flex-col sm:flex-row pt-2 gap-y-2">
           <button
             onClick={() => setActiveTab("squad")}
