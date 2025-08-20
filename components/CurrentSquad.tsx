@@ -726,7 +726,9 @@ export default function CurrentSquad({
             <button
               onClick={() => setIsFormationView(true)}
               className={`flex-1 min-w-[120px] max-w-[160px] py-1 rounded-md text-sm font-medium transition-colors text-center ${
-                isFormationView ? "text-white bg-green-600" : ""
+                isFormationView
+                  ? "text-white bg-green-600 "
+                  : " !bg-transparent"
               }`}
               style={{ marginRight: 4 }}
             >
@@ -735,7 +737,9 @@ export default function CurrentSquad({
             <button
               onClick={() => setIsFormationView(false)}
               className={`flex-1 min-w-[120px] max-w-[160px] py-1 rounded-md text-sm font-medium transition-colors text-center ${
-                !isFormationView ? " text-white bg-green-600" : ""
+                !isFormationView
+                  ? " text-white bg-green-600"
+                  : " !bg-transparent"
               }`}
               style={{ marginLeft: 4 }}
             >

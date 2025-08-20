@@ -243,7 +243,7 @@ export default function Home() {
             </div>
             <button
               onClick={() => setTeamId(null)}
-              className="text-blue-600 hover:text-blue-800 !border-none"
+              className="text-blue-600 hover:text-blue-800 !border-none !bg-transparent"
             >
               Change Team
             </button>
@@ -252,7 +252,7 @@ export default function Home() {
       </header>
 
       {/* Navigation */}
-      <nav className="w-full px-[7%]">
+      <nav className="w-full px-1">
         <div className="flex w-full justify-between gap-[5%] text-nowrap flex-col sm:flex-row pt-2 gap-y-2">
           <button
             onClick={() => setActiveTab("squad")}

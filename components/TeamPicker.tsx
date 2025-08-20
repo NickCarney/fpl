@@ -629,12 +629,24 @@ export default function TeamPicker({
       </div>
 
       {/* Controls */}
-      <div className="flex justify-center gap-4 flex-wrap">
+      <div className="flex items-center justify-center gap-2 w-full">
+        {/* <span className="text-sm ">View:</span> */}
         <button
-          onClick={() => setIsFormationView(!isFormationView)}
-          className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+          onClick={() => setIsFormationView(true)}
+          className={`flex-1 min-w-[120px] max-w-[160px] py-1 rounded-md text-sm font-medium transition-colors text-center ${
+            isFormationView ? "text-white bg-green-600" : " !bg-transparent"
+          }`}
         >
-          {isFormationView ? "Switch to List View" : "Switch to Formation View"}
+          Formation
+        </button>
+        <button
+          onClick={() => setIsFormationView(false)}
+          className={`flex-1 min-w-[120px] max-w-[160px] py-1 rounded-md text-sm font-medium transition-colors text-center ${
+            !isFormationView ? " text-white bg-green-600" : " !bg-transparent"
+          }`}
+          style={{ marginLeft: 4 }}
+        >
+          List
         </button>
       </div>
 
