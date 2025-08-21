@@ -35,6 +35,7 @@ interface PlayerCardProps {
   onClick: (pick: Pick) => void;
   onCaptainSelect: (pick: Pick) => void;
   className?: string;
+  canBeReplaced?: boolean;
 }
 
 const PlayerCard = ({
@@ -52,6 +53,7 @@ const PlayerCard = ({
   onClick,
   onCaptainSelect,
   className = "",
+  canBeReplaced = false,
 }: PlayerCardProps) => {
   const fixtureText = nextFixture
     ? `${nextFixture.isHome ? "vs" : "@"} ${nextFixture.opponent}`
@@ -85,6 +87,8 @@ const PlayerCard = ({
         className={`relative flex flex-col py-2 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-20 h-24 overflow-y-scroll scrolly ${
           isSelected
             ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
+            : canBeReplaced
+            ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
             : pick.is_captain
             ? "border-yellow-400 bg-yellow-50"
             : pick.is_vice_captain
@@ -119,6 +123,11 @@ const PlayerCard = ({
 
           {/* Captain/Vice indicators with click handlers */}
           <div className=" flex items-end flex-col gap-0.5">
+            {canBeReplaced && (
+              <div className="bg-orange-400 text-xs font-bold rounded min-w-3 min-h-3 flex items-center justify-center text-white">
+                ⟷
+              </div>
+            )}
             {pick.is_captain && (
               <div
                 className="bg-yellow-400 text-xs font-bold rounded min-w-3 min-h-3 flex items-center justify-center cursor-pointer"
@@ -172,6 +181,8 @@ const PlayerCard = ({
       className={`relative p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg ${
         isSelected
           ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
+          : canBeReplaced
+          ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
           : isBench
           ? "border-gray-300 bg-gray-50"
           : "border-green-300 bg-white"
@@ -224,6 +235,11 @@ const PlayerCard = ({
           )}
         </div>
         <div className="flex gap-1">
+          {canBeReplaced && (
+            <span className="px-1 py-0.5 bg-orange-400 text-xs rounded font-bold text-white">
+              Replace
+            </span>
+          )}
           {pick.is_captain && (
             <span
               className="px-1 py-0.5 bg-yellow-400 text-xs rounded font-bold cursor-pointer"
@@ -280,6 +296,20 @@ export default function TeamPicker({
   );
   const [selectedPlayer, setSelectedPlayer] = useState<Pick | null>(null);
 
+  // New state for player browser
+  const [showPlayerBrowser, setShowPlayerBrowser] = useState(false);
+  const [browserPosition, setBrowserPosition] = useState<number | null>(null);
+  const [browserTeam, setBrowserTeam] = useState<number | null>(null);
+  const [browserSearchTerm, setBrowserSearchTerm] = useState("");
+  const [browserSortBy, setBrowserSortBy] = useState<
+    "total_points" | "form" | "now_cost" | "ict_index"
+  >("total_points");
+  const [browserSortOrder, setBrowserSortOrder] = useState<"asc" | "desc">(
+    "desc"
+  );
+  const [selectedPlayerToBuy, setSelectedPlayerToBuy] =
+    useState<Element | null>(null);
+
   const nextGameweek = events.find((event) => event.is_next);
   const nextGameweekId = nextGameweek?.id || currentEvent + 1;
 
@@ -309,6 +339,74 @@ export default function TeamPicker({
   const getTeam = (teamId: number) => teams.find((team) => team.id === teamId);
   const getPosition = (elementTypeId: number) =>
     elementTypes.find((type) => type.id === elementTypeId);
+
+  // Get players not in current squad
+  const getAvailablePlayers = () => {
+    const currentPlayerIds = currentPicks.map((pick) => pick.element);
+    return elements.filter((element) => !currentPlayerIds.includes(element.id));
+  };
+
+  // Filter and sort available players for browser
+  const getFilteredAvailablePlayers = () => {
+    const availablePlayers = getAvailablePlayers();
+
+    return availablePlayers
+      .filter((element) => {
+        const matchesPosition =
+          browserPosition === null || element.element_type === browserPosition;
+        const matchesTeam =
+          browserTeam === null || element.team === browserTeam;
+        const matchesSearch =
+          browserSearchTerm === "" ||
+          element.web_name
+            .toLowerCase()
+            .includes(browserSearchTerm.toLowerCase()) ||
+          element.first_name
+            .toLowerCase()
+            .includes(browserSearchTerm.toLowerCase()) ||
+          element.second_name
+            .toLowerCase()
+            .includes(browserSearchTerm.toLowerCase());
+        return matchesPosition && matchesTeam && matchesSearch;
+      })
+      .sort((a, b) => {
+        let aValue: number, bValue: number;
+
+        switch (browserSortBy) {
+          case "total_points":
+            aValue = a.total_points;
+            bValue = b.total_points;
+            break;
+          case "form":
+            aValue = parseFloat(a.form) || 0;
+            bValue = parseFloat(b.form) || 0;
+            break;
+          case "now_cost":
+            aValue = a.now_cost;
+            bValue = b.now_cost;
+            break;
+          case "ict_index":
+            aValue = parseFloat(a.ict_index) || 0;
+            bValue = parseFloat(b.ict_index) || 0;
+            break;
+          default:
+            aValue = 0;
+            bValue = 0;
+        }
+
+        return browserSortOrder === "desc" ? bValue - aValue : aValue - bValue;
+      })
+      .slice(0, 50); // Limit to top 50 for performance
+  };
+
+  const handleBrowserSort = (newSortBy: typeof browserSortBy) => {
+    if (browserSortBy === newSortBy) {
+      setBrowserSortOrder(browserSortOrder === "desc" ? "asc" : "desc");
+    } else {
+      setBrowserSortBy(newSortBy);
+      setBrowserSortOrder("desc");
+    }
+  };
   const calculateSuggestedLineup = (fixturesData: any[], teamNewsData: any) => {
     // This is a simplified version of the logic from CurrentSquad
     const nextGameweekFixtures = fixturesData.filter(
@@ -545,6 +643,12 @@ export default function TeamPicker({
 
   // Handle player click for selection
   const handlePlayerClick = (pick: Pick) => {
+    // If a player is selected for buying, replace the clicked player
+    if (selectedPlayerToBuy) {
+      handlePlayerReplacement(pick.element, selectedPlayerToBuy);
+      return;
+    }
+
     if (selectedPlayer?.element === pick.element) {
       // Deselect if clicking the same player
       setSelectedPlayer(null);
@@ -621,6 +725,46 @@ export default function TeamPicker({
     setCurrentPicks(newPicks);
   };
 
+  // Handle replacing a current player with a new player
+  const handlePlayerReplacement = (
+    currentPickElement: number,
+    newPlayer: Element
+  ) => {
+    const newPicks = [...currentPicks];
+    const pickIndex = newPicks.findIndex(
+      (p) => p.element === currentPickElement
+    );
+
+    if (pickIndex === -1) return;
+
+    // Create new pick with same position but new player
+    const oldPick = newPicks[pickIndex];
+    const newPick: Pick = {
+      element: newPlayer.id,
+      position: oldPick.position,
+      multiplier: oldPick.is_captain ? 2 : 1,
+      is_captain: oldPick.is_captain,
+      is_vice_captain: oldPick.is_vice_captain,
+      selling_price: oldPick.selling_price,
+      purchase_price: newPlayer.now_cost,
+    };
+
+    // Validate the formation with the new player
+    const tempPicks = [...newPicks];
+    tempPicks[pickIndex] = newPick;
+    const validation = validateFormation(tempPicks);
+
+    if (validation.isValid) {
+      setCurrentPicks(tempPicks);
+      setSelectedPlayerToBuy(null);
+      setShowPlayerBrowser(false);
+    } else {
+      alert(
+        `Invalid formation with this replacement! Must have: 1 GK (${validation.goalkeepers}), 3+ DEF (${validation.defenders}), 3+ MID (${validation.midfielders}), 1+ FWD (${validation.forwards})`
+      );
+    }
+  };
+
   const startingXI = currentPicks
     .filter((pick) => pick.position <= 11)
     .sort((a, b) => a.position - b.position);
@@ -640,6 +784,29 @@ export default function TeamPicker({
   const defenders = getPlayersByPosition(2);
   const midfielders = getPlayersByPosition(3);
   const forwards = getPlayersByPosition(4);
+
+  // Sortable header component for browser
+  const BrowserSortableHeader = ({
+    field,
+    children,
+  }: {
+    field: typeof browserSortBy;
+    children: React.ReactNode;
+  }) => (
+    <th
+      className="text-center py-2 cursor-pointer px-3 hover:bg-gray-100"
+      onClick={() => handleBrowserSort(field)}
+    >
+      <div className="flex items-center justify-center gap-1">
+        {children}
+        {browserSortBy === field && (
+          <span className="text-xs">
+            {browserSortOrder === "desc" ? "↓" : "↑"}
+          </span>
+        )}
+      </div>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -716,6 +883,7 @@ export default function TeamPicker({
                           isFormationView={true}
                           isBench={false}
                           isSelected={selectedPlayer?.element === pick.element}
+                          canBeReplaced={!!selectedPlayerToBuy}
                           onDragStart={handleDragStart}
                           onDrop={handleDrop}
                           onDragOver={handleDragOver}
@@ -753,6 +921,7 @@ export default function TeamPicker({
                           isFormationView={true}
                           isBench={false}
                           isSelected={selectedPlayer?.element === pick.element}
+                          canBeReplaced={!!selectedPlayerToBuy}
                           onDragStart={handleDragStart}
                           onDrop={handleDrop}
                           onDragOver={handleDragOver}
@@ -790,6 +959,7 @@ export default function TeamPicker({
                           isFormationView={true}
                           isBench={false}
                           isSelected={selectedPlayer?.element === pick.element}
+                          canBeReplaced={!!selectedPlayerToBuy}
                           onDragStart={handleDragStart}
                           onDrop={handleDrop}
                           onDragOver={handleDragOver}
@@ -824,6 +994,7 @@ export default function TeamPicker({
                         isFormationView={true}
                         isBench={false}
                         isSelected={selectedPlayer?.element === pick.element}
+                        canBeReplaced={!!selectedPlayerToBuy}
                         onDragStart={handleDragStart}
                         onDrop={handleDrop}
                         onDragOver={handleDragOver}
@@ -864,6 +1035,7 @@ export default function TeamPicker({
                   isFormationView={false}
                   isBench={false}
                   isSelected={selectedPlayer?.element === pick.element}
+                  canBeReplaced={!!selectedPlayerToBuy}
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -900,6 +1072,7 @@ export default function TeamPicker({
                   isFormationView={false}
                   isBench={true}
                   isSelected={selectedPlayer?.element === pick.element}
+                  canBeReplaced={!!selectedPlayerToBuy}
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -937,8 +1110,197 @@ export default function TeamPicker({
             • <strong>Formation View:</strong> See your team layout on a
             football pitch
           </li>
+          <li>
+            • <strong>Player Browser:</strong> Browse available players below to
+            replace current squad members
+          </li>
         </ul>
       </div>
+
+      {/* Player Browser Toggle */}
+      <div className="text-center">
+        <button
+          onClick={() => setShowPlayerBrowser(!showPlayerBrowser)}
+          className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+            showPlayerBrowser
+              ? "bg-red-600 text-white hover:bg-red-700"
+              : "bg-green-600 text-white hover:bg-green-700"
+          }`}
+        >
+          {showPlayerBrowser
+            ? "Hide Player Browser"
+            : "Browse Available Players"}
+        </button>
+        {selectedPlayerToBuy && (
+          <p className="text-sm text-green-600 mt-2">
+            Player selected: {selectedPlayerToBuy.web_name} - Click a current
+            player to replace them
+          </p>
+        )}
+      </div>
+
+      {/* Player Browser */}
+      {showPlayerBrowser && (
+        <div className="border rounded-lg p-4 bg-gray-50">
+          <h3 className="text-lg font-semibold mb-4">
+            Available Players ({getAvailablePlayers().length} total)
+          </h3>
+
+          {/* Browser Filters */}
+          <div className="mb-4 flex flex-wrap gap-4 items-center justify-center">
+            <div>
+              <select
+                value={browserPosition || ""}
+                onChange={(e) =>
+                  setBrowserPosition(
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[130px]"
+              >
+                <option value="">All Positions</option>
+                {elementTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.plural_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <input
+                type="text"
+                value={browserSearchTerm}
+                onChange={(e) => setBrowserSearchTerm(e.target.value)}
+                placeholder="Search players..."
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              />
+            </div>
+
+            <div>
+              <select
+                value={browserTeam || ""}
+                onChange={(e) =>
+                  setBrowserTeam(
+                    e.target.value ? parseInt(e.target.value) : null
+                  )
+                }
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[130px]"
+              >
+                <option value="">All Teams</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.short_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Browser Table */}
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-100">
+                <tr className="border-b">
+                  <th className="text-center py-2 px-3">Player</th>
+                  <th className="text-center py-2 px-3">Team</th>
+                  <th className="text-center py-2 px-3">Pos</th>
+                  <BrowserSortableHeader field="total_points">
+                    Points
+                  </BrowserSortableHeader>
+                  <BrowserSortableHeader field="form">
+                    Form
+                  </BrowserSortableHeader>
+                  <BrowserSortableHeader field="now_cost">
+                    Price
+                  </BrowserSortableHeader>
+                  <BrowserSortableHeader field="ict_index">
+                    ICT
+                  </BrowserSortableHeader>
+                  <th className="text-center py-2 px-3">Selected %</th>
+                  <th className="text-center py-2 px-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredAvailablePlayers().map((element) => {
+                  const team = getTeam(element.team);
+                  const position = getPosition(element.element_type);
+                  const nextFixture = getNextFixture(element);
+                  const isSelected = selectedPlayerToBuy?.id === element.id;
+
+                  return (
+                    <tr
+                      key={element.id}
+                      className={`border-b hover:bg-gray-100 cursor-pointer ${
+                        isSelected ? "bg-green-100 border-green-300" : ""
+                      }`}
+                      onClick={() =>
+                        setSelectedPlayerToBuy(isSelected ? null : element)
+                      }
+                    >
+                      <td className="py-3 text-center">
+                        <div>
+                          <div className="font-medium">{element.web_name}</div>
+                          <div className="text-xs text-gray-600">
+                            {element.first_name}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 text-center">{team?.short_name}</td>
+                      <td className="py-3 text-center">
+                        {position?.singular_name_short}
+                      </td>
+                      <td className="py-3 font-semibold text-center">
+                        {element.total_points}
+                      </td>
+                      <td className="py-3 text-center">{element.form}</td>
+                      <td className="py-3 text-center">
+                        £{(element.now_cost / 10).toFixed(1)}m
+                      </td>
+                      <td className="py-3 text-center">{element.ict_index}</td>
+                      <td className="py-3 text-center">
+                        {element.selected_by_percent}%
+                      </td>
+                      <td className="py-3 text-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPlayerToBuy(isSelected ? null : element);
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            isSelected
+                              ? "bg-red-500 text-white hover:bg-red-600"
+                              : "bg-green-500 text-white hover:bg-green-600"
+                          }`}
+                        >
+                          {isSelected ? "Deselect" : "Select"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {getFilteredAvailablePlayers().length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No available players found matching your criteria
+            </div>
+          )}
+
+          {/* Instructions for replacement */}
+          {selectedPlayerToBuy && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>{selectedPlayerToBuy.web_name}</strong> selected. Now
+                click on any current player in your squad above to replace them.
+                The replacement must maintain valid formation rules.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
