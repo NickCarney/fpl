@@ -3,45 +3,45 @@ export const RAG_CONFIG = {
   dataSources: {
     // Team news and injury updates
     fantasyFootballScout: {
-      teamNewsUrl: 'https://www.fantasyfootballscout.co.uk/team-news/',
-      teamNewsSelector: '.team-news-item',
+      teamNewsUrl: "https://www.fantasyfootballscout.co.uk/team-news/",
+      teamNewsSelector: ".team-news-item",
       enabled: true,
     },
-    
+
     // Expected goals and analytics
     understat: {
-      playersUrl: 'https://understat.com/league/EPL',
+      playersUrl: "https://understat.com/league/EPL",
       enabled: true,
     },
-    
+
     // Transfer trends and ownership
     fplGameweek: {
-      transfersUrl: 'https://www.fplgameweek.com/transfers',
+      transfersUrl: "https://www.fplgameweek.com/transfers",
       enabled: true,
     },
-    
+
     // Reddit community insights
     reddit: {
-      baseUrl: 'https://www.reddit.com/r/FantasyPL',
+      baseUrl: "https://www.reddit.com/r/FantasyPL",
       enabled: false, // Requires API key
     },
-    
+
     // Ben Crellin rotation data
     benCrellin: {
-      twitterHandle: '@BenCrellin',
+      twitterHandle: "@BenCrellin",
       enabled: false, // Would need Twitter API
     },
-    
+
     // FPL Statistics
     fplStatistics: {
-      baseUrl: 'https://www.fplstatistics.co.uk',
+      baseUrl: "https://www.fplstatistics.co.uk",
       enabled: true,
     },
   },
 
   // AI Model configuration
   openAI: {
-    model: 'gpt-4-turbo-preview',
+    model: "gpt-4.1-nano",
     maxTokens: 600,
     temperature: 0.3,
     systemPrompt: `You are an elite Fantasy Premier League analyst with access to comprehensive real-time data including:
@@ -56,7 +56,8 @@ export const RAG_CONFIG = {
 
   // Scraping settings
   scraping: {
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     timeout: 10000,
     retries: 3,
     rateLimit: 1000, // ms between requests
@@ -79,8 +80,12 @@ export const RAG_CONFIG = {
 
   // External API endpoints (if available)
   apis: {
-    fplAnalytics: process.env.FPL_ANALYTICS_API_KEY ? 'https://fplanalytics.com/api' : null,
-    understatAPI: process.env.UNDERSTAT_API_KEY ? 'https://understat.com/api' : null,
-    redditAPI: process.env.REDDIT_API_KEY ? 'https://oauth.reddit.com' : null,
+    fplAnalytics: process.env.FPL_ANALYTICS_API_KEY
+      ? "https://fplanalytics.com/api"
+      : null,
+    understatAPI: process.env.UNDERSTAT_API_KEY
+      ? "https://understat.com/api"
+      : null,
+    redditAPI: process.env.REDDIT_API_KEY ? "https://oauth.reddit.com" : null,
   },
 };
