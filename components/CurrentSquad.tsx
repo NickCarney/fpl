@@ -32,6 +32,7 @@ export default function CurrentSquad({
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
   const [showSuggestedLineup, setShowSuggestedLineup] = useState(false);
+  const [showGameweekStats, setShowGameweekStats] = useState(true); // Add stats toggle state
   const [teamNews, setTeamNews] = useState<any>(null);
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [suggestedTransfer, setSuggestedTransfer] = useState<any>(null);
@@ -115,6 +116,83 @@ export default function CurrentSquad({
 
   const getPosition = (elementTypeId: number) => {
     return elementTypes.find((type) => type.id === elementTypeId);
+  };
+
+  // Add function to get player stats based on toggle
+  const getPlayerStats = (player: Element, pick: Pick) => {
+    const playerGameweekData = gameweekData[player.id];
+
+    if (showGameweekStats && playerGameweekData) {
+      // Gameweek-specific stats
+      const gameweekPoints = playerGameweekData.total_points || 0;
+      const gameweekMinutes = playerGameweekData.minutes || 0;
+
+      // Check game status
+      let pointsDisplay: string;
+      let minutesDisplay: string;
+      let statusColor: string;
+
+      if (playerGameweekData.kickoff_time) {
+        const kickoffTime = new Date(playerGameweekData.kickoff_time);
+        const currentTime = new Date();
+        const gameHasStarted = currentTime >= kickoffTime;
+
+        if (gameHasStarted) {
+          if (gameweekMinutes > 0) {
+            pointsDisplay = `${gameweekPoints}pts`;
+            minutesDisplay = `${gameweekMinutes} mins`;
+            statusColor =
+              gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
+          } else {
+            pointsDisplay = "DNP";
+            minutesDisplay = "DNP";
+            statusColor = "text-gray-500";
+          }
+        } else {
+          pointsDisplay = "YTP";
+          minutesDisplay = "YTP";
+          statusColor = "text-blue-500";
+        }
+      } else {
+        pointsDisplay = "YTP";
+        minutesDisplay = "YTP";
+        statusColor = "text-blue-500";
+      }
+
+      return {
+        points: pointsDisplay,
+        minutes: minutesDisplay,
+        statusColor,
+        isGameweek: true,
+        form: player.form,
+        price: (player.now_cost / 10).toFixed(1),
+        // Additional gameweek stats if available
+        goals: playerGameweekData.goals_scored || 0,
+        assists: playerGameweekData.assists || 0,
+        cleanSheets: playerGameweekData.clean_sheets || 0,
+        yellowCards: playerGameweekData.yellow_cards || 0,
+        redCards: playerGameweekData.red_cards || 0,
+        bonus: playerGameweekData.bonus || 0,
+      };
+    } else {
+      // Season stats
+      return {
+        points: `${player.total_points}pts`,
+        minutes: `${player.minutes} mins`,
+        statusColor: "text-green-700",
+        isGameweek: false,
+        form: player.form,
+        price: (player.now_cost / 10).toFixed(1),
+        // Season stats
+        goals: player.goals_scored,
+        assists: player.assists,
+        cleanSheets: player.clean_sheets,
+        yellowCards: player.yellow_cards,
+        redCards: player.red_cards,
+        bonus: player.bonus,
+        ppg: player.points_per_game,
+      };
+    }
   };
 
   // Calculate suggested lineup for the NEXT gameweek based on comprehensive analysis
@@ -485,49 +563,7 @@ export default function CurrentSquad({
 
     const team = getTeam(player.team);
     const position = getPosition(player.element_type);
-
-    // Get gameweek-specific data
-    const playerGameweekData = gameweekData[player.id];
-    const gameweekPoints = playerGameweekData?.total_points || 0;
-    const gameweekMinutes = playerGameweekData?.minutes || 0;
-
-    // Check game status by comparing kickoff time with current time
-    let pointsDisplay: string;
-    let minutesDisplay: string;
-    let statusColor: string;
-
-    if (playerGameweekData && playerGameweekData.kickoff_time) {
-      const kickoffTime = new Date(playerGameweekData.kickoff_time);
-      const currentTime = new Date();
-      const gameHasStarted = currentTime >= kickoffTime;
-
-      if (gameHasStarted) {
-        // Game has started/finished
-        if (gameweekMinutes > 0) {
-          // Player has played
-          pointsDisplay = `${gameweekPoints}pts`;
-          minutesDisplay = `${gameweekMinutes} mins`;
-          statusColor = "";
-        } else {
-          // Player didn't play (DNP - Did Not Play)
-          pointsDisplay = "DNP";
-          minutesDisplay = "DNP";
-          statusColor = "text-gray-500";
-        }
-      } else {
-        // Game hasn't started yet (YTP - Yet To Play)
-        pointsDisplay = "YTP";
-        minutesDisplay = "YTP";
-        statusColor = "text-blue-500";
-      }
-    } else {
-      // No gameweek data or kickoff time available
-      pointsDisplay = "YTP";
-      minutesDisplay = "YTP";
-      statusColor = "text-blue-500";
-    }
-
-    const hasPlayed = playerGameweekData && gameweekMinutes > 0;
+    const stats = getPlayerStats(player, pick);
 
     // Check if this is a suggested transfer
     const isTransferIn = suggestedTransfer?.transfer_in?.id === player.id;
@@ -566,7 +602,7 @@ export default function CurrentSquad({
       : null;
 
     if (isFormation) {
-      // Enhanced formation view with gameweek-specific stats
+      // Enhanced formation view with stats toggle
       return (
         <div
           key={pick.element}
@@ -609,25 +645,51 @@ export default function CurrentSquad({
             </p>
           </div>
 
-          {/* Stats - Updated to show DNP/YTP based on kickoff time */}
+          {/* Stats - Updated to use getPlayerStats */}
           <div className="text-center mb-2">
-            <p
-              className={`text-sm font-bold ${
-                hasPlayed ? "text-green-700" : statusColor
-              }`}
-            >
-              {pointsDisplay}
+            <p className={`text-sm font-bold ${stats.statusColor}`}>
+              {stats.points}
               <span className="text-xs text-gray-500 block">
-                GW{currentEvent}
+                {stats.isGameweek ? `GW${currentEvent}` : "Season"}
               </span>
             </p>
-            <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
+            <p className="text-xs ">£{stats.price}m</p>
           </div>
 
           {/* Form and Minutes - Updated */}
           <div className="text-center text-xs  mb-2">
-            <div>Form: {player.form}</div>
-            <div className={statusColor}>{minutesDisplay}</div>
+            <div>Form: {stats.form}</div>
+            <div className={stats.statusColor}>{stats.minutes}</div>
+            {stats.isGameweek && (
+              <div className="mt-1">
+                {stats.goals > 0 && (
+                  <div className="text-green-600">⚽ {stats.goals}</div>
+                )}
+                {stats.assists > 0 && (
+                  <div className="text-blue-600">🅰️ {stats.assists}</div>
+                )}
+                {stats.cleanSheets > 0 && (
+                  <div className="text-purple-600">🥅 {stats.cleanSheets}</div>
+                )}
+                {stats.bonus > 0 && (
+                  <div className="text-orange-600">⭐ {stats.bonus}</div>
+                )}
+              </div>
+            )}
+            {!stats.isGameweek && (
+              <div className="mt-1">
+                <div>PPG: {stats.ppg}</div>
+                <div className="flex justify-center gap-1 text-xs">
+                  <span className="text-green-600">⚽{stats.goals}</span>
+                  <span className="text-blue-600">🅰️{stats.assists}</span>
+                  {stats.cleanSheets > 0 && (
+                    <span className="text-purple-600">
+                      🥅{stats.cleanSheets}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             {/* Show fixture info when in suggested lineup mode */}
             {showSuggestedLineup && fixtureInfo && (
               <div
@@ -667,7 +729,7 @@ export default function CurrentSquad({
       );
     }
 
-    // Regular list view - Updated
+    // Regular list view - Updated to use getPlayerStats
     return (
       <div
         key={pick.element}
@@ -704,19 +766,53 @@ export default function CurrentSquad({
             </p>
           </div>
           <div className="text-right">
-            <p className={`text-sm font-bold ${hasPlayed ? "" : statusColor}`}>
-              {pointsDisplay}
+            <p className={`text-sm font-bold ${stats.statusColor}`}>
+              {stats.points}
               <span className="text-xs text-gray-500 block">
-                GW{currentEvent}
+                {stats.isGameweek ? `GW${currentEvent}` : "Season"}
               </span>
             </p>
-            <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
+            <p className="text-xs ">£{stats.price}m</p>
           </div>
         </div>
         <div className="flex justify-between items-center">
           <div className="text-xs ">
-            Form: {player.form} |{" "}
-            <span className={statusColor}>{minutesDisplay}</span>
+            Form: {stats.form} |{" "}
+            <span className={stats.statusColor}>{stats.minutes}</span>
+            {stats.isGameweek && (
+              <>
+                {stats.goals > 0 && (
+                  <span className="ml-1 text-green-600">⚽{stats.goals}</span>
+                )}
+                {stats.assists > 0 && (
+                  <span className="ml-1 text-blue-600">🅰️{stats.assists}</span>
+                )}
+                {stats.cleanSheets > 0 && (
+                  <span className="ml-1 text-purple-600">
+                    🥅{stats.cleanSheets}
+                  </span>
+                )}
+                {stats.bonus > 0 && (
+                  <span className="ml-1 text-orange-600">⭐{stats.bonus}</span>
+                )}
+              </>
+            )}
+            {!stats.isGameweek && (
+              <>
+                | PPG: {stats.ppg}
+                {stats.goals > 0 && (
+                  <span className="ml-1 text-green-600">⚽{stats.goals}</span>
+                )}
+                {stats.assists > 0 && (
+                  <span className="ml-1 text-blue-600">🅰️{stats.assists}</span>
+                )}
+                {stats.cleanSheets > 0 && (
+                  <span className="ml-1 text-purple-600">
+                    🥅{stats.cleanSheets}
+                  </span>
+                )}
+              </>
+            )}
             {/* Show fixture info when in suggested lineup mode */}
             {showSuggestedLineup && fixtureInfo && (
               <div
@@ -755,24 +851,29 @@ export default function CurrentSquad({
     );
   };
 
-  // Update total points calculation to only count games that have started
-  const totalPoints = picks.reduce((sum, pick) => {
-    const playerGameweekData = gameweekData[pick.element];
-    if (!playerGameweekData || !playerGameweekData.kickoff_time) {
-      return sum; // Game hasn't started, don't count points yet
-    }
+  // Update total points calculation based on stats toggle
+  const totalPoints = showGameweekStats
+    ? picks.reduce((sum, pick) => {
+        const playerGameweekData = gameweekData[pick.element];
+        if (!playerGameweekData || !playerGameweekData.kickoff_time) {
+          return sum; // Game hasn't started, don't count points yet
+        }
 
-    const kickoffTime = new Date(playerGameweekData.kickoff_time);
-    const currentTime = new Date();
-    const gameHasStarted = currentTime >= kickoffTime;
+        const kickoffTime = new Date(playerGameweekData.kickoff_time);
+        const currentTime = new Date();
+        const gameHasStarted = currentTime >= kickoffTime;
 
-    if (gameHasStarted) {
-      const gameweekPoints = playerGameweekData.total_points || 0;
-      return sum + gameweekPoints * pick.multiplier;
-    }
+        if (gameHasStarted) {
+          const gameweekPoints = playerGameweekData.total_points || 0;
+          return sum + gameweekPoints * pick.multiplier;
+        }
 
-    return sum; // Game hasn't started yet
-  }, 0);
+        return sum; // Game hasn't started yet
+      }, 0)
+    : picks.reduce((sum, pick) => {
+        const player = getPlayer(pick.element);
+        return sum + (player?.total_points || 0);
+      }, 0);
 
   return (
     <div className=" p-6 rounded-lg">
@@ -803,6 +904,22 @@ export default function CurrentSquad({
               style={{ marginLeft: 4 }}
             >
               List
+            </button>
+          </div>
+
+          {/* Stats Toggle */}
+          <div className="flex justify-center mb-2">
+            <button
+              onClick={() => setShowGameweekStats(!showGameweekStats)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border-2 ${
+                showGameweekStats
+                  ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                  : "bg-white text-blue-600 border-blue-600 hover:bg-blue-50"
+              }`}
+            >
+              {showGameweekStats
+                ? `Showing GW${currentEvent} Stats`
+                : "Showing Season Stats"}
             </button>
           </div>
 
@@ -909,7 +1026,9 @@ export default function CurrentSquad({
 
           {/* Stats */}
           <div className="text-right">
-            <p className="text-sm ">Gameweek {currentEvent}</p>
+            <p className="text-sm ">
+              {showGameweekStats ? `Gameweek ${currentEvent}` : "Season Total"}
+            </p>
             <p className="text-xl font-bold">{totalPoints} points</p>
           </div>
         </div>

@@ -236,6 +236,8 @@ export default function LeagueStandings({
           onNavigatePrevious={navigateToPreviousTeam}
           canNavigateNext={selectedTeamIndex < allTeams.length - 1}
           canNavigatePrevious={selectedTeamIndex > 0}
+          // Add standing data
+          standingData={selectedTeam}
         />
       )}
     </div>

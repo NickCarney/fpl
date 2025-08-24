@@ -25,13 +25,16 @@ interface TeamFormationPopupProps {
   isOpen: boolean;
   onClose: () => void;
 
-  // New navigation props
+  // Navigation props
   currentIndex?: number;
   totalTeams?: number;
   onNavigateNext?: () => void;
   onNavigatePrevious?: () => void;
   canNavigateNext?: boolean;
   canNavigatePrevious?: boolean;
+
+  // Add standing data
+  standingData?: any;
 }
 
 export default function TeamFormationPopup({
@@ -51,6 +54,7 @@ export default function TeamFormationPopup({
   onNavigatePrevious,
   canNavigateNext,
   canNavigatePrevious,
+  standingData,
 }: TeamFormationPopupProps) {
   const [teamPicks, setTeamPicks] = useState<TeamPicks | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,6 +64,8 @@ export default function TeamFormationPopup({
     team: Team;
     position: ElementType;
   } | null>(null);
+  const [showGameweekStats, setShowGameweekStats] = useState(true);
+  const [gameweekData, setGameweekData] = useState<{ [key: number]: any }>({});
 
   useEffect(() => {
     if (isOpen && teamId) {
@@ -72,10 +78,45 @@ export default function TeamFormationPopup({
     try {
       const picksData = await getTeamPicks(teamId, currentEvent);
       setTeamPicks(picksData);
+
+      // Fetch gameweek data for all players
+      if (picksData?.picks) {
+        const gameweekPromises = picksData.picks.map((pick) =>
+          fetchPlayerGameweekData(pick.element)
+        );
+        await Promise.all(gameweekPromises);
+      }
     } catch (error) {
       console.error("Error fetching team picks:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPlayerGameweekData = async (playerId: number) => {
+    if (gameweekData[playerId]) return gameweekData[playerId];
+
+    try {
+      const response = await fetch(`/api/player/${playerId}/gameweeks`);
+      const data = await response.json();
+
+      // Find the specific gameweek data from history array
+      const gameweekHistory = data.history?.find(
+        (gw: any) => gw.round === currentEvent
+      );
+
+      setGameweekData((prev) => ({
+        ...prev,
+        [playerId]: gameweekHistory || null,
+      }));
+
+      return gameweekHistory;
+    } catch (error) {
+      console.error(
+        `Error fetching gameweek data for player ${playerId}:`,
+        error
+      );
+      return null;
     }
   };
 
@@ -115,18 +156,95 @@ export default function TeamFormationPopup({
       .sort((a, b) => a.position - b.position);
   };
 
+  const getPlayerStats = (player: Element, pick: Pick) => {
+    const playerGameweekData = gameweekData[player.id];
+
+    if (showGameweekStats && playerGameweekData) {
+      // Gameweek-specific stats
+      const gameweekPoints = playerGameweekData.total_points || 0;
+      const gameweekMinutes = playerGameweekData.minutes || 0;
+
+      // Check game status
+      let pointsDisplay: string;
+      let minutesDisplay: string;
+      let statusColor: string;
+
+      if (playerGameweekData.kickoff_time) {
+        const kickoffTime = new Date(playerGameweekData.kickoff_time);
+        const currentTime = new Date();
+        const gameHasStarted = currentTime >= kickoffTime;
+
+        if (gameHasStarted) {
+          if (gameweekMinutes > 0) {
+            pointsDisplay = `${gameweekPoints}pts`;
+            minutesDisplay = `${gameweekMinutes} mins`;
+            statusColor =
+              gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
+          } else {
+            pointsDisplay = "DNP";
+            minutesDisplay = "DNP";
+            statusColor = "text-gray-500";
+          }
+        } else {
+          pointsDisplay = "YTP";
+          minutesDisplay = "YTP";
+          statusColor = "text-blue-500";
+        }
+      } else {
+        pointsDisplay = "YTP";
+        minutesDisplay = "YTP";
+        statusColor = "text-blue-500";
+      }
+
+      return {
+        points: pointsDisplay,
+        minutes: minutesDisplay,
+        statusColor,
+        isGameweek: true,
+        form: player.form,
+        price: (player.now_cost / 10).toFixed(1),
+        // Additional gameweek stats if available
+        goals: playerGameweekData.goals_scored || 0,
+        assists: playerGameweekData.assists || 0,
+        cleanSheets: playerGameweekData.clean_sheets || 0,
+        yellowCards: playerGameweekData.yellow_cards || 0,
+        redCards: playerGameweekData.red_cards || 0,
+        bonus: playerGameweekData.bonus || 0,
+      };
+    } else {
+      // Season stats
+      return {
+        points: `${player.total_points}pts`,
+        minutes: `${player.minutes} mins`,
+        statusColor: "text-green-700",
+        isGameweek: false,
+        form: player.form,
+        price: (player.now_cost / 10).toFixed(1),
+        // Season stats
+        goals: player.goals_scored,
+        assists: player.assists,
+        cleanSheets: player.clean_sheets,
+        yellowCards: player.yellow_cards,
+        redCards: player.red_cards,
+        bonus: player.bonus,
+        ppg: player.points_per_game,
+      };
+    }
+  };
+
   const renderPlayer = (pick: Pick) => {
     const player = getPlayer(pick.element);
     if (!player) return null;
 
     const team = getTeam(player.team);
     const position = getPosition(player.element_type);
+    const stats = getPlayerStats(player, pick);
 
     return (
       <div
         key={pick.element}
         onClick={() => handlePlayerClick(pick)}
-        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto scrolly ${
+        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-36 overflow-y-auto scrolly ${
           pick.is_captain
             ? "border-yellow-400 bg-yellow-50"
             : pick.is_vice_captain
@@ -146,18 +264,47 @@ export default function TeamFormationPopup({
 
         {/* Stats */}
         <div className="text-center mb-2">
-          <p className="text-sm font-bold text-green-700">
-            {player.total_points}pts
+          <p className={`text-sm font-bold ${stats.statusColor}`}>
+            {stats.points}
+            <span className="text-xs text-gray-500 block">
+              {stats.isGameweek ? `GW${currentEvent}` : "Season"}
+            </span>
           </p>
-          <p className="text-xs text-gray-600">
-            £{(player.now_cost / 10).toFixed(1)}m
-          </p>
+          <p className="text-xs text-gray-600">£{stats.price}m</p>
         </div>
 
-        {/* Form and Minutes */}
+        {/* Additional Stats */}
         <div className="text-center text-xs text-gray-600 mb-2">
-          <div>Form: {player.form}</div>
-          <div>{player.minutes} mins</div>
+          {stats.isGameweek ? (
+            <div>
+              <div>Form: {stats.form}</div>
+              <div className={stats.statusColor}>{stats.minutes}</div>
+              {stats.goals > 0 && (
+                <div className="text-green-600">⚽ {stats.goals}</div>
+              )}
+              {stats.assists > 0 && (
+                <div className="text-blue-600">🅰️ {stats.assists}</div>
+              )}
+              {stats.cleanSheets > 0 && (
+                <div className="text-purple-600">🥅 {stats.cleanSheets}</div>
+              )}
+              {stats.bonus > 0 && (
+                <div className="text-orange-600">⭐ {stats.bonus}</div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div>Form: {stats.form}</div>
+              <div>PPG: {stats.ppg}</div>
+              <div className="flex justify-center gap-1 text-xs">
+                <span className="text-green-600">⚽{stats.goals}</span>
+                <span className="text-blue-600">🅰️{stats.assists}</span>
+                {stats.cleanSheets > 0 && (
+                  <span className="text-purple-600">🥅{stats.cleanSheets}</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Captain/Vice-Captain Badges */}
@@ -186,10 +333,70 @@ export default function TeamFormationPopup({
     return (
       <Popup open={isOpen} onClose={onClose} modal nested>
         <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto scrolly">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">
-              {teamName} - {managerName}
-            </h2>
+          {/* Header with Navigation */}
+          <div className="flex items-center justify-between mb-6">
+            {/* Previous Button */}
+            <button
+              onClick={onNavigatePrevious}
+              disabled={!canNavigatePrevious}
+              className={`p-2 rounded-full transition-colors ${
+                canNavigatePrevious
+                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+
+            {/* Team Info */}
+            <div className="text-center">
+              <h2 className="text-2xl font-bold">{teamName}</h2>
+              <p className="text-gray-600">Manager: {managerName}</p>
+              {currentIndex !== undefined && totalTeams && (
+                <p className="text-sm text-gray-500 mt-1">
+                  {currentIndex + 1} of {totalTeams}
+                </p>
+              )}
+            </div>
+
+            {/* Next Button */}
+            <button
+              onClick={onNavigateNext}
+              disabled={!canNavigateNext}
+              className={`p-2 rounded-full transition-colors ${
+                canNavigateNext
+                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+
+            {/* Close Button */}
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -220,65 +427,104 @@ export default function TeamFormationPopup({
   const midfielders = getPlayersByPosition(3, startingXI);
   const forwards = getPlayersByPosition(4, startingXI);
 
-  const totalPoints = teamPicks.picks.reduce((sum, pick) => {
-    const player = getPlayer(pick.element);
-    return sum + (player ? player.total_points * pick.multiplier : 0);
-  }, 0);
+  // Calculate total points based on current view
+  const totalPoints = showGameweekStats
+    ? standingData?.event_total || 0 // Gameweek points from league standing
+    : standingData?.total || 0; // Total season points from league standing
 
   return (
     <>
       <Popup open={isOpen} onClose={onClose} modal nested>
         <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto scrolly">
-          {/* Header with navigation controls */}
-          <div className="flex items-center justify-between mb-4">
+          {/* Header with Navigation */}
+          <div className="flex items-center justify-between mb-6">
+            {/* Previous Button */}
             <button
               onClick={onNavigatePrevious}
               disabled={!canNavigatePrevious}
-              className={`p-2 rounded-full ${
+              className={`p-2 rounded-full transition-colors ${
                 canNavigatePrevious
                   ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}
             >
-              ←
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
             </button>
 
+            {/* Team Info */}
             <div className="text-center">
-              <h2 className="text-xl font-bold">{teamName}</h2>
-              <p className="text-gray-600">{managerName}</p>
+              <h2 className="text-2xl font-bold">{teamName}</h2>
+              <p className="text-gray-600">Manager: {managerName}</p>
+              <p className="text-sm text-gray-500">
+                {showGameweekStats ? `Gameweek ${currentEvent}` : "Season"} •{" "}
+                {totalPoints} points
+              </p>
               {currentIndex !== undefined && totalTeams && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 mt-1">
                   {currentIndex + 1} of {totalTeams}
                 </p>
               )}
             </div>
 
+            {/* Next Button */}
             <button
               onClick={onNavigateNext}
               disabled={!canNavigateNext}
-              className={`p-2 rounded-full ${
+              className={`p-2 rounded-full transition-colors ${
                 canNavigateNext
                   ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}
             >
-              →
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
             </button>
           </div>
-
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl font-bold">{teamName}</h2>
-              <p className="text-gray-600">Manager: {managerName}</p>
-              <p className="text-sm text-gray-500">
-                Gameweek {currentEvent} • {totalPoints} points
-              </p>
-            </div>
+          <div className="flex justify-center">
+            {/* Close Button */}
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-gray-500 hover:text-gray-700 text-2xl px-2"
             >
               ×
+            </button>
+          </div>
+          {/* Stats Toggle */}
+          <div className="flex justify-center mb-6 mt-6">
+            <button
+              onClick={() => setShowGameweekStats(!showGameweekStats)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border-2 ${
+                showGameweekStats
+                  ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                  : "bg-white text-blue-600 border-blue-600 hover:bg-blue-50"
+              }`}
+            >
+              {showGameweekStats
+                ? `Showing GW${currentEvent} Stats`
+                : "Showing Season Stats"}
             </button>
           </div>
 
@@ -346,6 +592,7 @@ export default function TeamFormationPopup({
 
                 const team = getTeam(player.team);
                 const position = getPosition(player.element_type);
+                const stats = getPlayerStats(player, pick);
 
                 return (
                   <div
@@ -363,17 +610,31 @@ export default function TeamFormationPopup({
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-bold">
-                          {player.total_points}pts
+                        <p className={`text-sm font-bold ${stats.statusColor}`}>
+                          {stats.points}
+                          <span className="text-xs text-gray-500 block">
+                            {stats.isGameweek ? `GW${currentEvent}` : "Season"}
+                          </span>
                         </p>
-                        <p className="text-xs text-gray-600">
-                          £{(player.now_cost / 10).toFixed(1)}m
-                        </p>
+                        <p className="text-xs text-gray-600">£{stats.price}m</p>
                       </div>
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="text-xs text-gray-600">
-                        Form: {player.form} | {player.minutes} mins
+                        Form: {stats.form} |{" "}
+                        {stats.isGameweek
+                          ? stats.minutes
+                          : `${stats.minutes} total`}
+                        {stats.isGameweek && stats.goals > 0 && (
+                          <span className="ml-1 text-green-600">
+                            ⚽{stats.goals}
+                          </span>
+                        )}
+                        {stats.isGameweek && stats.assists > 0 && (
+                          <span className="ml-1 text-blue-600">
+                            🅰️{stats.assists}
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-1">
                         {pick.multiplier > 1 && (
