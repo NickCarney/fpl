@@ -28,17 +28,22 @@ export default function LeagueStandings({
   currentEvent,
   events,
 }: LeagueStandingsProps) {
-  const [selectedTeam, setSelectedTeam] = useState<{
-    teamId: number;
-    teamName: string;
-    managerName: string;
-  } | null>(null);
+  const [selectedTeamIndex, setSelectedTeamIndex] = useState<number | null>(
+    null
+  );
   const [showCommonLineup, setShowCommonLineup] = useState(true);
+
   // Check if user is in the current standings
   const userInStandings = userTeamId
     ? standings.find((s) => s.entry === userTeamId)
     : false;
   const shouldShowUserPosition = userPosition && !userInStandings;
+
+  // Create a combined list of all teams (standings + user position if not in standings)
+  const allTeams = [...standings];
+  if (shouldShowUserPosition) {
+    allTeams.push(userPosition);
+  }
 
   // Debug logging
   console.log("LeagueStandings Debug:", {
@@ -48,17 +53,36 @@ export default function LeagueStandings({
     shouldShowUserPosition,
   });
 
-  const handleTeamClick = (standing: LeagueStanding) => {
-    setSelectedTeam({
-      teamId: standing.entry,
-      teamName: standing.entry_name,
-      managerName: standing.player_name,
-    });
+  const handleTeamClick = (standing: LeagueStanding, index?: number) => {
+    if (index !== undefined) {
+      setSelectedTeamIndex(index);
+    } else {
+      // Find the index of the clicked team
+      const teamIndex = allTeams.findIndex(
+        (team) => team.entry === standing.entry
+      );
+      setSelectedTeamIndex(teamIndex >= 0 ? teamIndex : null);
+    }
   };
 
   const closeTeamPopup = () => {
-    setSelectedTeam(null);
+    setSelectedTeamIndex(null);
   };
+
+  const navigateToNextTeam = () => {
+    if (selectedTeamIndex !== null && selectedTeamIndex < allTeams.length - 1) {
+      setSelectedTeamIndex(selectedTeamIndex + 1);
+    }
+  };
+
+  const navigateToPreviousTeam = () => {
+    if (selectedTeamIndex !== null && selectedTeamIndex > 0) {
+      setSelectedTeamIndex(selectedTeamIndex - 1);
+    }
+  };
+
+  const selectedTeam =
+    selectedTeamIndex !== null ? allTeams[selectedTeamIndex] : null;
 
   return (
     <div className="space-y-6">
@@ -81,14 +105,14 @@ export default function LeagueStandings({
               </tr>
             </thead>
             <tbody>
-              {standings.map((standing) => {
+              {standings.map((standing, index) => {
                 const isUserTeam = userTeamId === standing.entry;
                 const movement = standing.last_rank - standing.rank;
 
                 return (
                   <tr
                     key={standing.entry}
-                    onClick={() => handleTeamClick(standing)}
+                    onClick={() => handleTeamClick(standing, index)}
                     className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${
                       isUserTeam ? "bg-blue-50 font-semibold" : ""
                     }`}
@@ -124,7 +148,9 @@ export default function LeagueStandings({
                 <>
                   <tr
                     className="border-b font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => handleTeamClick(userPosition)}
+                    onClick={() =>
+                      handleTeamClick(userPosition, standings.length)
+                    }
                   >
                     <td className="py-3 font-normal">You</td>
                     <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
@@ -191,11 +217,11 @@ export default function LeagueStandings({
       </div>
 
       {/* Team Formation Popup */}
-      {selectedTeam && (
+      {selectedTeam && selectedTeamIndex !== null && (
         <TeamFormationPopup
-          teamId={selectedTeam.teamId}
-          teamName={selectedTeam.teamName}
-          managerName={selectedTeam.managerName}
+          teamId={selectedTeam.entry}
+          teamName={selectedTeam.entry_name}
+          managerName={selectedTeam.player_name}
           elements={elements}
           teams={teams}
           elementTypes={elementTypes}
@@ -203,6 +229,13 @@ export default function LeagueStandings({
           events={events}
           isOpen={!!selectedTeam}
           onClose={closeTeamPopup}
+          // Navigation props
+          currentIndex={selectedTeamIndex}
+          totalTeams={allTeams.length}
+          onNavigateNext={navigateToNextTeam}
+          onNavigatePrevious={navigateToPreviousTeam}
+          canNavigateNext={selectedTeamIndex < allTeams.length - 1}
+          canNavigatePrevious={selectedTeamIndex > 0}
         />
       )}
     </div>

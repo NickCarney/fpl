@@ -24,6 +24,14 @@ interface TeamFormationPopupProps {
   events: Event[];
   isOpen: boolean;
   onClose: () => void;
+
+  // New navigation props
+  currentIndex?: number;
+  totalTeams?: number;
+  onNavigateNext?: () => void;
+  onNavigatePrevious?: () => void;
+  canNavigateNext?: boolean;
+  canNavigatePrevious?: boolean;
 }
 
 export default function TeamFormationPopup({
@@ -37,6 +45,12 @@ export default function TeamFormationPopup({
   events,
   isOpen,
   onClose,
+  currentIndex,
+  totalTeams,
+  onNavigateNext,
+  onNavigatePrevious,
+  canNavigateNext,
+  canNavigatePrevious,
 }: TeamFormationPopupProps) {
   const [teamPicks, setTeamPicks] = useState<TeamPicks | null>(null);
   const [loading, setLoading] = useState(false);
@@ -215,6 +229,43 @@ export default function TeamFormationPopup({
     <>
       <Popup open={isOpen} onClose={onClose} modal nested>
         <div className="bg-white p-6 rounded-lg max-w-6xl mx-auto max-h-[90vh] overflow-y-auto scrolly">
+          {/* Header with navigation controls */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={onNavigatePrevious}
+              disabled={!canNavigatePrevious}
+              className={`p-2 rounded-full ${
+                canNavigatePrevious
+                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              ←
+            </button>
+
+            <div className="text-center">
+              <h2 className="text-xl font-bold">{teamName}</h2>
+              <p className="text-gray-600">{managerName}</p>
+              {currentIndex !== undefined && totalTeams && (
+                <p className="text-sm text-gray-500">
+                  {currentIndex + 1} of {totalTeams}
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={onNavigateNext}
+              disabled={!canNavigateNext}
+              className={`p-2 rounded-full ${
+                canNavigateNext
+                  ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              →
+            </button>
+          </div>
+
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold">{teamName}</h2>
