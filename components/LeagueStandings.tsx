@@ -22,6 +22,10 @@ interface TeamChips {
   [teamId: number]: string | null;
 }
 
+interface TeamBenchPoints {
+  [teamId: number]: number;
+}
+
 export default function LeagueStandings({
   standings,
   leagueName,
@@ -39,6 +43,8 @@ export default function LeagueStandings({
   const [showCommonLineup, setShowCommonLineup] = useState(true);
   const [teamChips, setTeamChips] = useState<TeamChips>({});
   const [isLoadingChips, setIsLoadingChips] = useState(true);
+  const [teamBenchPoints, setTeamBenchPoints] = useState<TeamBenchPoints>({});
+  const [isLoadingBenchPoints, setIsLoadingBenchPoints] = useState(true);
 
   // Check if user is in the current standings
   const userInStandings = userTeamId
@@ -51,6 +57,9 @@ export default function LeagueStandings({
   if (shouldShowUserPosition) {
     allTeams.push(userPosition);
   }
+
+  // Sort teams by total points (starting XI only, as original)
+  const sortedTeams = [...allTeams].sort((a, b) => b.total - a.total);
 
   // Debug logging
   console.log("LeagueStandings Debug:", {
@@ -65,7 +74,7 @@ export default function LeagueStandings({
       setSelectedTeamIndex(index);
     } else {
       // Find the index of the clicked team
-      const teamIndex = allTeams.findIndex(
+      const teamIndex = sortedTeams.findIndex(
         (team) => team.entry === standing.entry
       );
       setSelectedTeamIndex(teamIndex >= 0 ? teamIndex : null);
@@ -77,7 +86,10 @@ export default function LeagueStandings({
   };
 
   const navigateToNextTeam = () => {
-    if (selectedTeamIndex !== null && selectedTeamIndex < allTeams.length - 1) {
+    if (
+      selectedTeamIndex !== null &&
+      selectedTeamIndex < sortedTeams.length - 1
+    ) {
       setSelectedTeamIndex(selectedTeamIndex + 1);
     }
   };
@@ -89,7 +101,7 @@ export default function LeagueStandings({
   };
 
   const selectedTeam =
-    selectedTeamIndex !== null ? allTeams[selectedTeamIndex] : null;
+    selectedTeamIndex !== null ? sortedTeams[selectedTeamIndex] : null;
 
   // Fetch chips for all teams
   useEffect(() => {
@@ -140,6 +152,80 @@ export default function LeagueStandings({
     }
   }, [standings, currentEvent, shouldShowUserPosition, userPosition]);
 
+  // Fetch bench points for all teams
+  useEffect(() => {
+    const fetchBenchPoints = async () => {
+      setIsLoadingBenchPoints(true);
+      const benchData: TeamBenchPoints = {};
+
+      // Create array of all team IDs to fetch
+      const teamIds = [...standings.map((s) => s.entry)];
+      if (shouldShowUserPosition) {
+        teamIds.push(userPosition.entry);
+      }
+
+      try {
+        // Fetch bench points for all teams in parallel
+        const benchPromises = teamIds.map(async (teamId) => {
+          try {
+            let totalBenchPoints = 0;
+
+            // Fetch picks for all gameweeks to calculate total bench points
+            for (let gw = 1; gw <= currentEvent; gw++) {
+              const response = await fetch(
+                `/api/team/${teamId}/event/${gw}/picks`
+              );
+              if (response.ok) {
+                const data = await response.json();
+                const benchPlayers =
+                  data.picks?.filter((pick: any) => pick.multiplier === 0) ||
+                  [];
+
+                // Calculate bench points for this gameweek
+                const gwBenchPoints = benchPlayers.reduce(
+                  (sum: number, pick: any) => {
+                    const element = elements.find(
+                      (el) => el.id === pick.element
+                    );
+                    if (element && element.total_points) {
+                      return sum + element.total_points;
+                    }
+                    return sum;
+                  },
+                  0
+                );
+
+                totalBenchPoints += gwBenchPoints;
+              }
+            }
+
+            return { teamId, benchPoints: totalBenchPoints };
+          } catch (error) {
+            console.error(
+              `Failed to fetch bench points for team ${teamId}:`,
+              error
+            );
+            return { teamId, benchPoints: 0 };
+          }
+        });
+
+        const results = await Promise.all(benchPromises);
+
+        results.forEach(({ teamId, benchPoints }) => {
+          benchData[teamId] = benchPoints;
+        });
+
+        setTeamBenchPoints(benchData);
+      } catch (error) {
+        console.error("Error fetching bench points:", error);
+      } finally {
+        setIsLoadingBenchPoints(false);
+      }
+    };
+
+    fetchBenchPoints();
+  }, [standings, currentEvent, shouldShowUserPosition, userPosition, elements]);
+
   return (
     <div className="space-y-6">
       {/* League Standings Table */}
@@ -157,15 +243,18 @@ export default function LeagueStandings({
                 <th className="text-left py-2">Manager</th>
                 <th className="text-right py-2">GW Points</th>
                 <th className="text-right py-2">Total</th>
+                <th className="text-right py-2">Bench Points</th>
                 <th className="text-center py-2">Chip</th>
                 <th className="text-center py-2">Movement</th>
               </tr>
             </thead>
             <tbody>
-              {standings.map((standing, index) => {
+              {sortedTeams.map((standing, index) => {
                 const isUserTeam = userTeamId === standing.entry;
-                const movement = standing.last_rank - standing.rank;
+                const movement = standing.last_rank - (index + 1);
                 const activeChip = teamChips[standing.entry];
+                const benchPoints = teamBenchPoints[standing.entry] || 0;
+                const totalWithBench = standing.total + benchPoints;
 
                 return (
                   <tr
@@ -175,7 +264,7 @@ export default function LeagueStandings({
                       isUserTeam ? "bg-blue-50 font-semibold" : ""
                     }`}
                   >
-                    <td className="py-3">{standing.rank}</td>
+                    <td className="py-3">{index + 1}</td>
                     <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
                       {standing.entry_name}
                     </td>
@@ -183,6 +272,13 @@ export default function LeagueStandings({
                     <td className="py-3 text-right">{standing.event_total}</td>
                     <td className="py-3 text-right font-semibold">
                       {standing.total}
+                    </td>
+                    <td className="py-3 text-right text-gray-600">
+                      {isLoadingBenchPoints ? (
+                        <span className="text-gray-400">...</span>
+                      ) : (
+                        benchPoints
+                      )}
                     </td>
                     <td className="py-3 text-center">
                       {isLoadingChips ? (
@@ -209,41 +305,10 @@ export default function LeagueStandings({
                   </tr>
                 );
               })}
-
-              {/* Show user position if they're not in the top results */}
-              {shouldShowUserPosition && (
-                <tr
-                  className="border-b font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
-                  onClick={() =>
-                    handleTeamClick(userPosition, standings.length)
-                  }
-                >
-                  <td className="py-3 font-normal">You</td>
-                  <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
-                    {userPosition.entry_name}
-                  </td>
-                  <td className="py-3">{userPosition.player_name}</td>
-                  <td className="py-3 text-right">
-                    {userPosition.event_total}
-                  </td>
-                  <td className="py-3 text-right font-semibold">
-                    {userPosition.total}
-                  </td>
-                  <td className="py-3 text-center">
-                    {isLoadingChips ? (
-                      <span className="text-gray-400 text-xs">...</span>
-                    ) : teamChips[userPosition.entry] ? (
-                      <ChipIcon chip={teamChips[userPosition.entry]!} />
-                    ) : (
-                      <span className="text-gray-300">-</span>
-                    )}
-                  </td>
-                  <td className="py-3 text-center text-gray-500">-</td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
         {/* Toggle for Common Lineup */}
         <div className="bg-white p-4 rounded-lg shadow-md mt-4 border">
           <div className="flex items-center justify-between">
@@ -305,10 +370,10 @@ export default function LeagueStandings({
           onClose={closeTeamPopup}
           // Navigation props
           currentIndex={selectedTeamIndex}
-          totalTeams={allTeams.length}
+          totalTeams={sortedTeams.length}
           onNavigateNext={navigateToNextTeam}
           onNavigatePrevious={navigateToPreviousTeam}
-          canNavigateNext={selectedTeamIndex < allTeams.length - 1}
+          canNavigateNext={selectedTeamIndex < sortedTeams.length - 1}
           canNavigatePrevious={selectedTeamIndex > 0}
           // Add standing data
           standingData={selectedTeam}
