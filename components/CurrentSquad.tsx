@@ -851,29 +851,108 @@ export default function CurrentSquad({
     );
   };
 
-  // Update total points calculation based on stats toggle
-  const totalPoints = showGameweekStats
-    ? picks.reduce((sum, pick) => {
-        const playerGameweekData = gameweekData[pick.element];
-        if (!playerGameweekData || !playerGameweekData.kickoff_time) {
-          return sum; // Game hasn't started, don't count points yet
-        }
+  // Updated points calculations - use FPL official totals when available
+  const calculatePoints = () => {
+    if (showGameweekStats) {
+      // For gameweek stats, try to use official FPL totals from teamPicks
+      if (teamPicks?.entry_history) {
+        // Use the gameweek-specific points from entry_history
+        const officialGameweekPoints = teamPicks.entry_history.points || 0;
+        const officialPointsOnBench =
+          teamPicks.entry_history.points_on_bench || 0;
 
-        const kickoffTime = new Date(playerGameweekData.kickoff_time);
-        const currentTime = new Date();
-        const gameHasStarted = currentTime >= kickoffTime;
+        return {
+          total: officialGameweekPoints + officialPointsOnBench,
+          starting: officialGameweekPoints,
+          bench: officialPointsOnBench,
+        };
+      }
 
-        if (gameHasStarted) {
-          const gameweekPoints = playerGameweekData.total_points || 0;
-          return sum + gameweekPoints * pick.multiplier;
-        }
+      // Fallback to manual calculation if official data not available
+      const startingPoints = picks
+        .filter((pick) => pick.position <= 11)
+        .reduce((sum, pick) => {
+          const playerGameweekData = gameweekData[pick.element];
+          if (!playerGameweekData || !playerGameweekData.kickoff_time) {
+            return sum; // Game hasn't started, don't count points yet
+          }
 
-        return sum; // Game hasn't started yet
-      }, 0)
-    : picks.reduce((sum, pick) => {
-        const player = getPlayer(pick.element);
-        return sum + (player?.total_points || 0);
-      }, 0);
+          const kickoffTime = new Date(playerGameweekData.kickoff_time);
+          const currentTime = new Date();
+          const gameHasStarted = currentTime >= kickoffTime;
+
+          if (gameHasStarted) {
+            const gameweekPoints = playerGameweekData.total_points || 0;
+            return sum + gameweekPoints * pick.multiplier;
+          }
+
+          return sum; // Game hasn't started yet
+        }, 0);
+
+      const benchPoints = picks
+        .filter((pick) => pick.position > 11)
+        .reduce((sum, pick) => {
+          const playerGameweekData = gameweekData[pick.element];
+          if (!playerGameweekData || !playerGameweekData.kickoff_time) {
+            return sum; // Game hasn't started, don't count points yet
+          }
+
+          const kickoffTime = new Date(playerGameweekData.kickoff_time);
+          const currentTime = new Date();
+          const gameHasStarted = currentTime >= kickoffTime;
+
+          if (gameHasStarted) {
+            const gameweekPoints = playerGameweekData.total_points || 0;
+            return sum + gameweekPoints; // No multiplier for bench players
+          }
+
+          return sum; // Game hasn't started yet
+        }, 0);
+
+      return {
+        total: startingPoints + benchPoints,
+        starting: startingPoints,
+        bench: benchPoints,
+      };
+    } else {
+      // For season stats, use the official total from teamPicks.entry_history.total_points
+      if (teamPicks?.entry_history?.total_points !== undefined) {
+        // This is the official season total that matches league standings (113 in your case)
+        const officialSeasonTotal = teamPicks.entry_history.total_points;
+
+        return {
+          total: officialSeasonTotal,
+          starting: officialSeasonTotal, // Show as "started" since it's the official team total
+          bench: 0, // Can't accurately split historical season data
+          isSeasonTotal: true,
+        };
+      }
+
+      // Fallback to manual calculation (this will be inaccurate for transferred players)
+      const startingPoints = picks
+        .filter((pick) => pick.position <= 11)
+        .reduce((sum, pick) => {
+          const player = getPlayer(pick.element);
+          return sum + (player?.total_points || 0);
+        }, 0);
+
+      const benchPoints = picks
+        .filter((pick) => pick.position > 11)
+        .reduce((sum, pick) => {
+          const player = getPlayer(pick.element);
+          return sum + (player?.total_points || 0);
+        }, 0);
+
+      return {
+        total: startingPoints + benchPoints,
+        starting: startingPoints,
+        bench: benchPoints,
+        isSeasonTotal: false,
+      };
+    }
+  };
+
+  const pointsBreakdown = calculatePoints();
 
   return (
     <div className=" p-6 rounded-lg">
@@ -1024,12 +1103,35 @@ export default function CurrentSquad({
             </div>
           )}
 
-          {/* Stats */}
-          <div className="text-right">
-            <p className="text-sm ">
+          {/* Updated Points Display */}
+          <div className="text-center">
+            <p className="text-sm">
               {showGameweekStats ? `Gameweek ${currentEvent}` : "Season Total"}
             </p>
-            <p className="text-xl font-bold">{totalPoints} points</p>
+            <div className="space-y-1">
+              <p className="text-xl font-bold">
+                {pointsBreakdown.total} points{" "}
+              </p>
+              {showGameweekStats || !pointsBreakdown.isSeasonTotal ? (
+                <div className="flex justify-center gap-4 text-sm">
+                  <span className="text-green-700 font-medium">
+                    {pointsBreakdown.starting} started
+                  </span>
+                  <span className="text-orange-600 font-medium">
+                    {pointsBreakdown.bench} benched
+                  </span>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-600"></div>
+              )}
+              {(showGameweekStats || !pointsBreakdown.isSeasonTotal) &&
+                pointsBreakdown.bench > 0 && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    You left {pointsBreakdown.bench} point
+                    {pointsBreakdown.bench === 1 ? "" : "s"} on the bench
+                  </p>
+                )}
+            </div>
           </div>
         </div>
       </div>
@@ -1166,7 +1268,7 @@ export default function CurrentSquad({
           teams={teams}
           elementTypes={elementTypes}
           currentEvent={currentEvent}
-          totalPoints={totalPoints}
+          totalPoints={pointsBreakdown.total}
           events={events}
         />
       </div>
@@ -1180,7 +1282,7 @@ export default function CurrentSquad({
           elementTypes={elementTypes}
           currentEvent={currentEvent}
           events={events}
-          totalPoints={totalPoints}
+          totalPoints={pointsBreakdown.total}
           teamPicks={teamPicks}
         />
       </div>
