@@ -1,20 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LeagueStanding, Element, Team, ElementType, Event } from "@/types/fpl";
 import TeamFormationPopup from "./TeamFormationPopup";
 import CommonLineup from "./CommonLineup";
+import ChipIcon from "./ChipIcon";
 
 interface LeagueStandingsProps {
   standings: LeagueStanding[];
   leagueName: string;
   userTeamId?: number;
-  userPosition?: any; // Changed from LeagueStanding to any since we're using userStats
+  userPosition?: any;
   elements: Element[];
   teams: Team[];
   elementTypes: ElementType[];
   currentEvent: number;
   events: Event[];
+}
+
+interface TeamChips {
+  [teamId: number]: string | null;
 }
 
 export default function LeagueStandings({
@@ -32,6 +37,8 @@ export default function LeagueStandings({
     null
   );
   const [showCommonLineup, setShowCommonLineup] = useState(true);
+  const [teamChips, setTeamChips] = useState<TeamChips>({});
+  const [isLoadingChips, setIsLoadingChips] = useState(true);
 
   // Check if user is in the current standings
   const userInStandings = userTeamId
@@ -84,6 +91,55 @@ export default function LeagueStandings({
   const selectedTeam =
     selectedTeamIndex !== null ? allTeams[selectedTeamIndex] : null;
 
+  // Fetch chips for all teams
+  useEffect(() => {
+    const fetchTeamChips = async () => {
+      setIsLoadingChips(true);
+      const chipData: TeamChips = {};
+
+      // Create array of all team IDs to fetch
+      const teamIds = [...standings.map((s) => s.entry)];
+      if (shouldShowUserPosition) {
+        teamIds.push(userPosition.entry);
+      }
+
+      try {
+        // Fetch chips for all teams in parallel
+        const chipPromises = teamIds.map(async (teamId) => {
+          try {
+            const response = await fetch(
+              `/api/team/${teamId}/event/${currentEvent}/picks`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              return { teamId, chip: data.active_chip || null };
+            }
+            return { teamId, chip: null };
+          } catch (error) {
+            console.error(`Failed to fetch chips for team ${teamId}:`, error);
+            return { teamId, chip: null };
+          }
+        });
+
+        const results = await Promise.all(chipPromises);
+
+        results.forEach(({ teamId, chip }) => {
+          chipData[teamId] = chip;
+        });
+
+        setTeamChips(chipData);
+      } catch (error) {
+        console.error("Error fetching team chips:", error);
+      } finally {
+        setIsLoadingChips(false);
+      }
+    };
+
+    if (standings.length > 0) {
+      fetchTeamChips();
+    }
+  }, [standings, currentEvent, shouldShowUserPosition, userPosition]);
+
   return (
     <div className="space-y-6">
       {/* League Standings Table */}
@@ -101,6 +157,7 @@ export default function LeagueStandings({
                 <th className="text-left py-2">Manager</th>
                 <th className="text-right py-2">GW Points</th>
                 <th className="text-right py-2">Total</th>
+                <th className="text-center py-2">Chip</th>
                 <th className="text-center py-2">Movement</th>
               </tr>
             </thead>
@@ -108,6 +165,7 @@ export default function LeagueStandings({
               {standings.map((standing, index) => {
                 const isUserTeam = userTeamId === standing.entry;
                 const movement = standing.last_rank - standing.rank;
+                const activeChip = teamChips[standing.entry];
 
                 return (
                   <tr
@@ -125,6 +183,15 @@ export default function LeagueStandings({
                     <td className="py-3 text-right">{standing.event_total}</td>
                     <td className="py-3 text-right font-semibold">
                       {standing.total}
+                    </td>
+                    <td className="py-3 text-center">
+                      {isLoadingChips ? (
+                        <span className="text-gray-400 text-xs">...</span>
+                      ) : activeChip ? (
+                        <ChipIcon chip={activeChip} />
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
                     </td>
                     <td className="py-3 text-center">
                       {movement > 0 && (
@@ -145,27 +212,34 @@ export default function LeagueStandings({
 
               {/* Show user position if they're not in the top results */}
               {shouldShowUserPosition && (
-                <>
-                  <tr
-                    className="border-b font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() =>
-                      handleTeamClick(userPosition, standings.length)
-                    }
-                  >
-                    <td className="py-3 font-normal">You</td>
-                    <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
-                      {userPosition.entry_name}
-                    </td>
-                    <td className="py-3">{userPosition.player_name}</td>
-                    <td className="py-3 text-right">
-                      {userPosition.event_total}
-                    </td>
-                    <td className="py-3 text-right font-semibold">
-                      {userPosition.total}
-                    </td>
-                    <td className="py-3 text-center text-gray-500">-</td>
-                  </tr>
-                </>
+                <tr
+                  className="border-b font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() =>
+                    handleTeamClick(userPosition, standings.length)
+                  }
+                >
+                  <td className="py-3 font-normal">You</td>
+                  <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
+                    {userPosition.entry_name}
+                  </td>
+                  <td className="py-3">{userPosition.player_name}</td>
+                  <td className="py-3 text-right">
+                    {userPosition.event_total}
+                  </td>
+                  <td className="py-3 text-right font-semibold">
+                    {userPosition.total}
+                  </td>
+                  <td className="py-3 text-center">
+                    {isLoadingChips ? (
+                      <span className="text-gray-400 text-xs">...</span>
+                    ) : teamChips[userPosition.entry] ? (
+                      <ChipIcon chip={teamChips[userPosition.entry]!} />
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
+                  <td className="py-3 text-center text-gray-500">-</td>
+                </tr>
               )}
             </tbody>
           </table>
