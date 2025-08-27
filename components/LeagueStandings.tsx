@@ -235,17 +235,17 @@ export default function LeagueStandings({
         </h2>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-spacing-x-[50%] text-center">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2">Rank</th>
-                <th className="text-left py-2">Team</th>
-                <th className="text-left py-2">Manager</th>
-                <th className="text-right py-2">GW Points</th>
-                <th className="text-right py-2">Total</th>
-                <th className="text-right py-2">Bench Points</th>
-                <th className="text-center py-2">Chip</th>
-                <th className="text-center py-2">Movement</th>
+                <th className="text-left py-2 px-3">Rank</th>
+                <th className="text-center py-2 px-3 border-l">Team</th>
+                <th className="text-center py-2 px-3 border-l">Manager</th>
+                <th className="text-center py-2 px-3 border-l">GW Points</th>
+                <th className="text-center py-2 px-3 border-l">Total</th>
+                <th className="text-center py-2 px-3 border-l">Bench Points</th>
+                <th className="text-center py-2 px-3 border-l">Chip</th>
+                <th className="text-center py-2 px-3 border-l">Movement</th>
               </tr>
             </thead>
             <tbody>
@@ -264,23 +264,27 @@ export default function LeagueStandings({
                       isUserTeam ? "bg-blue-50 font-semibold" : ""
                     }`}
                   >
-                    <td className="py-3">{index + 1}</td>
-                    <td className="py-3 text-blue-600 hover:text-blue-800 font-medium">
+                    <td className="py-3 px-3">{index + 1}</td>
+                    <td className="py-3 px-3 text-blue-600 hover:text-blue-800 font-medium border-l">
                       {standing.entry_name}
                     </td>
-                    <td className="py-3">{standing.player_name}</td>
-                    <td className="py-3 text-right">{standing.event_total}</td>
-                    <td className="py-3 text-right font-semibold">
+                    <td className="py-3 px-3 border-l">
+                      {standing.player_name}
+                    </td>
+                    <td className="py-3 px-3 text-center border-l">
+                      {standing.event_total}
+                    </td>
+                    <td className="py-3 px-3 text-center font-semibold border-l">
                       {standing.total}
                     </td>
-                    <td className="py-3 text-right text-gray-600">
+                    <td className="py-3 px-3 text-center text-gray-600 border-l">
                       {isLoadingBenchPoints ? (
                         <span className="text-gray-400">...</span>
                       ) : (
                         benchPoints
                       )}
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="py-3 px-3 text-center border-l">
                       {isLoadingChips ? (
                         <span className="text-gray-400 text-xs">...</span>
                       ) : activeChip ? (
@@ -289,7 +293,7 @@ export default function LeagueStandings({
                         <span className="text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="py-3 px-3 text-center border-l">
                       {movement > 0 && (
                         <span className="text-green-600 text-xs">
                           ↑ {movement}
