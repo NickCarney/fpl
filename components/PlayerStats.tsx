@@ -21,6 +21,17 @@ interface PlayerStatsProps {
   elementTypes: ElementType[];
 }
 
+// Add this interface for fixture data
+interface Fixture {
+  id: number;
+  team_h: number;
+  team_a: number;
+  team_h_difficulty: number;
+  team_a_difficulty: number;
+  event: number;
+  finished: boolean;
+}
+
 export default function PlayerStats({
   elements,
   teams,
@@ -40,6 +51,68 @@ export default function PlayerStats({
   const [topX, setTopX] = useState(20);
   const [xAxisStat, setXAxisStat] = useState<keyof Element>("now_cost");
   const [yAxisStat, setYAxisStat] = useState<keyof Element>("total_points");
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+
+  // Fetch fixtures when component mounts
+  useEffect(() => {
+    const fetchFixtures = async () => {
+      try {
+        const response = await fetch("/api/fixtures");
+        const fixtureData = await response.json();
+        setFixtures(fixtureData);
+      } catch (error) {
+        console.error("Failed to fetch fixtures:", error);
+      }
+    };
+
+    fetchFixtures();
+  }, []);
+
+  // Get fixture difficulty color
+  const getDifficultyColor = (difficulty: number) => {
+    switch (difficulty) {
+      case 1:
+        return "bg-green-500"; // Very easy
+      case 2:
+        return "bg-green-300"; // Easy
+      case 3:
+        return "bg-yellow-300"; // Moderate
+      case 4:
+        return "bg-orange-400"; // Hard
+      case 5:
+        return "bg-red-500"; // Very hard
+      default:
+        return "bg-gray-300";
+    }
+  };
+
+  // Get next 5 fixtures for a team
+  const getNext5Fixtures = (teamId: number) => {
+    const upcomingFixtures = fixtures
+      .filter(
+        (fixture) =>
+          !fixture.finished &&
+          (fixture.team_h === teamId || fixture.team_a === teamId)
+      )
+      .sort((a, b) => a.event - b.event)
+      .slice(0, 5);
+
+    return upcomingFixtures.map((fixture) => {
+      const isHome = fixture.team_h === teamId;
+      const opponentId = isHome ? fixture.team_a : fixture.team_h;
+      const opponent = teams.find((team) => team.id === opponentId);
+      const difficulty = isHome
+        ? fixture.team_h_difficulty
+        : fixture.team_a_difficulty;
+
+      return {
+        opponent: opponent?.short_name || "TBD",
+        isHome,
+        difficulty,
+        gameweek: fixture.event,
+      };
+    });
+  };
 
   const getTeam = (teamId: number) => {
     return teams.find((team) => team.id === teamId);
@@ -108,7 +181,7 @@ export default function PlayerStats({
     children: React.ReactNode;
   }) => (
     <th
-      className="text-center py-2 cursor-pointer px-3 hover:"
+      className="text-center py-2 cursor-pointer px-1 hover:"
       onClick={() => handleSort(field)}
     >
       <div className="flex items-center justify-center gap-1">
@@ -520,15 +593,17 @@ export default function PlayerStats({
                 <th className="text-center py-2 text-nowrap px-3">
                   Selected %
                 </th>
+                <th className="text-center py-2 px-1">Next 5 Fixtures</th>
               </tr>
             </thead>
             <tbody>
               {filteredAndSortedElements.map((element) => {
                 const team = getTeam(element.team);
                 const position = getPosition(element.element_type);
+                const nextFixtures = getNext5Fixtures(element.team);
 
                 return (
-                  <tr key={element.id} className="border-b hover:">
+                  <tr key={element.id} className="border-b">
                     <td className="py-3 text-center">
                       <div>
                         <div className="font-medium">{element.web_name}</div>
@@ -549,6 +624,36 @@ export default function PlayerStats({
                     <td className="py-3 text-center">{element.ict_index}</td>
                     <td className="py-3 text-center">
                       {element.selected_by_percent}%
+                    </td>
+                    <td className="py-3 text-center">
+                      <div className="flex gap-3 justify-center flex-row">
+                        {nextFixtures.map((fixture, index) => (
+                          <div
+                            key={index}
+                            className={`flex flex-1 px-2 py-1 rounded text-xs font-medium text-white justify-center ${getDifficultyColor(
+                              fixture.difficulty
+                            )}`}
+                            title={`GW${fixture.gameweek}: ${
+                              fixture.isHome ? "vs" : "@"
+                            } ${fixture.opponent} (Difficulty: ${
+                              fixture.difficulty
+                            })`}
+                          >
+                            {fixture.isHome ? "vs" : "@"} {fixture.opponent}
+                          </div>
+                        ))}
+                        {/* Fill empty slots if less than 5 fixtures */}
+                        {Array.from({ length: 5 - nextFixtures.length }).map(
+                          (_, index) => (
+                            <div
+                              key={`empty-${index}`}
+                              className="px-2 py-1 rounded text-xs bg-gray-200 text-gray-500"
+                            >
+                              TBD
+                            </div>
+                          )
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
