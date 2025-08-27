@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import TeamIdInput from "@/components/TeamIdInput";
+import TeamSearch from "@/components/TeamSearch";
 import CurrentSquad from "@/components/CurrentSquad";
 import PlayerStats from "@/components/PlayerStats";
 import LeagueStandings from "@/components/LeagueStandings";
@@ -48,6 +49,13 @@ export default function Home() {
   const [userPosition, setUserPosition] = useState<LeagueStanding | null>(null);
 
   const [leagueId, setLeagueId] = useState<string>("");
+
+  const [loginMode, setLoginMode] = useState<"team" | "league" | "search">(
+    "team"
+  );
+  const [leagueLoginId, setLeagueLoginId] = useState<string>("");
+  const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
+  const [leagueLoginLoading, setLeagueLoginLoading] = useState(false);
 
   useEffect(() => {
     // Load bootstrap data on component mount
@@ -213,6 +221,10 @@ export default function Home() {
     }
   };
 
+  const handleTeamSearch = (teamId: number, teamName: string) => {
+    handleTeamIdSubmit(teamId);
+  };
+
   if (!teamId) {
     return (
       <div className="relative min-h-screen flex items-center justify-left p-[15%] flex-col sm:flex-row overflow-hidden">
@@ -221,7 +233,113 @@ export default function Home() {
             <h1 className="text-4xl font-bold  mb-2">FPL Genie</h1>
             <p className="">Track your Fantasy Premier League performance</p>
           </div>
-          <TeamIdInput onTeamIdSubmit={handleTeamIdSubmit} />
+          <div className="flex justify-center gap-2 mb-2 flex-wrap mt-4">
+            <button
+              className={`px-3 py-2 rounded text-sm ${
+                loginMode === "team" ? "bg-blue-600 text-white" : "bg-gray-200"
+              }`}
+              onClick={() => setLoginMode("team")}
+            >
+              Team ID
+            </button>
+            <button
+              className={`px-3 py-2 rounded text-sm ${
+                loginMode === "search"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200"
+              }`}
+              onClick={() => setLoginMode("search")}
+            >
+              Search Team
+            </button>
+            <button
+              className={`px-3 py-2 rounded text-sm ${
+                loginMode === "league"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200"
+              }`}
+              onClick={() => setLoginMode("league")}
+            >
+              Via League
+            </button>
+          </div>
+          {loginMode === "team" && (
+            <TeamIdInput onTeamIdSubmit={handleTeamIdSubmit} />
+          )}
+          {loginMode === "search" && (
+            <TeamSearch onTeamSelect={handleTeamSearch} />
+          )}
+          {loginMode === "league" && (
+            <div>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setLeagueLoginLoading(true);
+                  setError(null);
+                  try {
+                    // Extract league ID from URL or use as is
+                    let id = leagueLoginId.trim();
+                    if (id.includes("/")) {
+                      // Try to extract league ID from URL
+                      const match =
+                        id.match(/leagues\/(\d+)/) ||
+                        id.match(/league-entry\/(\d+)/) ||
+                        id.match(/(\d+)/);
+                      id = match ? match[1] : id;
+                    }
+                    const result = await getLeagueStandingsWithUserStats(
+                      parseInt(id)
+                    );
+                    setLeagueTeams(result.standings.standings.results);
+                    setLeagueLoginId(id);
+                  } catch (err) {
+                    setError(
+                      "Failed to load league. Please check the ID or URL."
+                    );
+                    setLeagueTeams([]);
+                  } finally {
+                    setLeagueLoginLoading(false);
+                  }
+                }}
+                className="flex flex-col gap-2"
+              >
+                <input
+                  type="text"
+                  value={leagueLoginId}
+                  onChange={(e) => setLeagueLoginId(e.target.value)}
+                  placeholder="Enter League ID or URL: 724869"
+                  className="border border-gray-300 rounded-md px-3 py-2"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white rounded-md px-4 py-2"
+                  disabled={leagueLoginLoading || !leagueLoginId}
+                >
+                  {leagueLoginLoading ? "Loading..." : "Show League Teams"}
+                </button>
+              </form>
+              {leagueTeams.length > 0 && (
+                <div className="mt-4">
+                  <p className="font-medium mb-2">Select your team:</p>
+                  <ul className="max-h-64 overflow-y-auto border rounded">
+                    {leagueTeams.map((team) => (
+                      <li key={team.entry} className="border-b last:border-b-0">
+                        <button
+                          className="w-full text-left px-3 py-2 hover:bg-blue-100"
+                          onClick={() => handleTeamIdSubmit(team.entry)}
+                        >
+                          {team.entry_name}{" "}
+                          <span className="text-xs text-gray-500">
+                            ({team.player_name})
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <Image
           src={fplgenie}
