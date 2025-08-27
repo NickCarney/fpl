@@ -110,7 +110,7 @@ export default function TeamSearch({ onTeamSelect }: TeamSearchProps) {
           ) : (
             <div className="px-3 py-6 text-center text-gray-500">
               <div className="text-lg mb-2">🔍</div>
-              <div>No teams found matching "{searchTerm}"</div>
+              <div>No teams found matching &quot;{searchTerm}&quot;</div>
               <div className="text-xs mt-2">
                 Try searching with different keywords or use Team ID directly
               </div>
@@ -131,8 +131,8 @@ export default function TeamSearch({ onTeamSelect }: TeamSearchProps) {
         </p>
         <ul className="list-disc list-inside mt-1 space-y-1">
           <li>Search by your FPL team name or your actual name</li>
-          <li>Make sure you're in a public league for search to work</li>
-          <li>Can't find your team? Use the Team ID option instead</li>
+          <li>Make sure you&apos;re in a public league for search to work</li>
+          <li>Can&apos;t find your team? Use the Team ID option instead</li>
         </ul>
       </div>
     </div>
