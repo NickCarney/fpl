@@ -176,7 +176,7 @@ export default function TeamFormationPopup({
 
         if (gameHasStarted) {
           if (gameweekMinutes > 0) {
-            pointsDisplay = `${gameweekPoints}pts`;
+            pointsDisplay = `${gameweekPoints * pick.multiplier}pts`;
             minutesDisplay = `${gameweekMinutes} mins`;
             statusColor =
               gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
