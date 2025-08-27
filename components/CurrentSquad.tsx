@@ -1110,15 +1110,15 @@ export default function CurrentSquad({
             </p>
             <div className="space-y-1">
               <p className="text-xl font-bold">
-                {pointsBreakdown.total} points{" "}
+                {pointsBreakdown.starting} points{" "}
               </p>
               {showGameweekStats || !pointsBreakdown.isSeasonTotal ? (
                 <div className="flex justify-center gap-4 text-sm">
                   <span className="text-green-700 font-medium">
-                    {pointsBreakdown.starting} started
+                    {pointsBreakdown.bench} benched
                   </span>
                   <span className="text-orange-600 font-medium">
-                    {pointsBreakdown.bench} benched
+                    {pointsBreakdown.total} total
                   </span>
                 </div>
               ) : (
