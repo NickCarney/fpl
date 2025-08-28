@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { ragCache } from '@/lib/rag-cache';
-import { RAG_CONFIG } from '@/lib/rag-config';
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
+import { ragCache } from "@/lib/rag-cache";
+import { RAG_CONFIG } from "@/lib/rag-config";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -10,11 +10,18 @@ const openai = new OpenAI({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { teamData, squadData, currentGameweek, gameweekFinished, fixtures, elements } = body;
+    const {
+      teamData,
+      squadData,
+      currentGameweek,
+      gameweekFinished,
+      fixtures,
+      elements,
+    } = body;
 
     if (!teamData || !squadData) {
       return NextResponse.json(
-        { error: 'Missing required team or squad data' },
+        { error: "Missing required team or squad data" },
         { status: 400 }
       );
     }
@@ -23,136 +30,178 @@ export async function POST(request: NextRequest) {
       // Fetch RAG data for enhanced analysis with caching
       let ragData = null;
       let externalContent = null;
-      
+
       const cacheKey = `rag-data-${currentGameweek}`;
-      const cachedData = ragCache.get<{ragData: any, externalContent: any}>(cacheKey);
-      
+      const cachedData = ragCache.get<{ ragData: any; externalContent: any }>(
+        cacheKey
+      );
+
       if (cachedData && RAG_CONFIG.features.enableCaching) {
         ragData = cachedData.ragData;
         externalContent = cachedData.externalContent;
       } else {
         try {
-          const ragResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/rag-data`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ elements, fixtures, currentGameweek }),
-          });
-          
+          const ragResponse = await fetch(
+            `${
+              process.env.NEXTAUTH_URL || "http://localhost:3000"
+            }/api/rag-data`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ elements, fixtures, currentGameweek }),
+            }
+          );
+
           if (ragResponse.ok) {
             const ragResult = await ragResponse.json();
             ragData = ragResult.ragData;
             externalContent = ragResult.externalContent;
-            
+
             // Cache the result
             if (RAG_CONFIG.features.enableCaching) {
-              ragCache.set(cacheKey, { ragData, externalContent }, RAG_CONFIG.cache.ragDataTTL);
+              ragCache.set(
+                cacheKey,
+                { ragData, externalContent },
+                RAG_CONFIG.cache.ragDataTTL
+              );
             }
           }
         } catch (error) {
-          console.log('Could not fetch RAG data, proceeding with basic analysis');
+          console.log(
+            "Could not fetch RAG data, proceeding with basic analysis"
+          );
         }
       }
 
-    // Prepare data for analysis
-    const squadAnalysis = squadData.map((player: any) => ({
-      name: player.web_name,
-      position: player.position_name,
-      team: player.team_name,
-      teamId: player.team,
-      points: player.total_points,
-      form: player.form,
-      price: player.now_cost / 10,
-      minutes: player.minutes,
-      goals: player.goals_scored,
-      assists: player.assists,
-      cleanSheets: player.clean_sheets,
-      isCaptain: player.is_captain,
-      isViceCaptain: player.is_vice_captain,
-    }));
+      // Prepare data for analysis
+      const squadAnalysis = squadData.map((player: any) => ({
+        name: player.web_name,
+        position: player.position_name,
+        team: player.team_name,
+        teamId: player.team,
+        points: player.total_points,
+        form: player.form,
+        price: player.now_cost / 10,
+        minutes: player.minutes,
+        goals: player.goals_scored,
+        assists: player.assists,
+        cleanSheets: player.clean_sheets,
+        isCaptain: player.is_captain,
+        isViceCaptain: player.is_vice_captain,
+      }));
 
-    // Analyze current gameweek fixtures for each team
-    const currentGameweekFixtures = fixtures?.filter((fixture: any) => 
-      fixture.event === currentGameweek
-    ) || [];
+      // Analyze current gameweek fixtures for each team
+      const currentGameweekFixtures =
+        fixtures?.filter((fixture: any) => fixture.event === currentGameweek) ||
+        [];
 
-    const teamFixtureStatus = new Map();
-    currentGameweekFixtures.forEach((fixture: any) => {
-      teamFixtureStatus.set(fixture.team_h, {
-        hasPlayed: fixture.finished,
-        opponent: fixture.team_a,
-        isHome: true,
-        started: fixture.started
+      const teamFixtureStatus = new Map();
+      currentGameweekFixtures.forEach((fixture: any) => {
+        teamFixtureStatus.set(fixture.team_h, {
+          hasPlayed: fixture.finished,
+          opponent: fixture.team_a,
+          isHome: true,
+          started: fixture.started,
+        });
+        teamFixtureStatus.set(fixture.team_a, {
+          hasPlayed: fixture.finished,
+          opponent: fixture.team_h,
+          isHome: false,
+          started: fixture.started,
+        });
       });
-      teamFixtureStatus.set(fixture.team_a, {
-        hasPlayed: fixture.finished,
-        opponent: fixture.team_h,
-        isHome: false,
-        started: fixture.started
+
+      // Add fixture context to squad analysis
+      const squadWithFixtures = squadAnalysis.map((player: any) => {
+        const fixtureInfo = teamFixtureStatus.get(player.teamId);
+        return {
+          ...player,
+          hasPlayedThisGW: fixtureInfo?.hasPlayed || false,
+          gameStarted: fixtureInfo?.started || false,
+        };
       });
-    });
 
-    // Add fixture context to squad analysis
-    const squadWithFixtures = squadAnalysis.map((player: any) => {
-      const fixtureInfo = teamFixtureStatus.get(player.teamId);
-      return {
-        ...player,
-        hasPlayedThisGW: fixtureInfo?.hasPlayed || false,
-        gameStarted: fixtureInfo?.started || false,
-      };
-    });
+      const gameweekStatusText = gameweekFinished
+        ? "Gameweek has finished"
+        : "Gameweek is ongoing - some matches may not have been played yet";
 
-    const gameweekStatusText = gameweekFinished 
-      ? "Gameweek has finished" 
-      : "Gameweek is ongoing - some matches may not have been played yet";
-
-    // Build enhanced context with RAG data
-    let ragContext = '';
-    if (ragData) {
-      ragContext = `
+      // Build enhanced context with RAG data
+      let ragContext = "";
+      if (ragData) {
+        ragContext = `
 
 ENHANCED ANALYSIS DATA:
 
 Position Benchmarks:
-${Object.entries(ragData.positionAverages).map(([pos, data]: [string, any]) => 
-  `${pos}: Avg ${data.averagePoints.toFixed(1)} pts, Top performers: ${data.topPerformers.slice(0, 3).join(', ')}, Price ranges: £${data.priceRanges.budget}m-${data.priceRanges.premium}m`
-).join('\n')}
+${Object.entries(ragData.positionAverages)
+  .map(
+    ([pos, data]: [string, any]) =>
+      `${pos}: Avg ${data.averagePoints.toFixed(
+        1
+      )} pts, Top performers: ${data.topPerformers
+        .slice(0, 3)
+        .join(", ")}, Price ranges: £${data.priceRanges.budget}m-${
+        data.priceRanges.premium
+      }m`
+  )
+  .join("\n")}
 
 Transfer Market Trends:
-- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(', ')}
-- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(', ')}
-- Rising prices: ${ragData.transferTrends.risingPrices.join(', ')}
-- Falling prices: ${ragData.transferTrends.fallingPrices.join(', ')}
+- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(", ")}
+- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(", ")}
+- Rising prices: ${ragData.transferTrends.risingPrices.join(", ")}
+- Falling prices: ${ragData.transferTrends.fallingPrices.join(", ")}
 
 Expert Recommendations:
-${Object.entries(ragData.expertPicks).map(([expert, picks]: [string, any]) => 
-  `${expert}: Captain ${picks.captain}, Differentials: ${picks.differentials.join(', ')}`
-).join('\n')}
+${Object.entries(ragData.expertPicks)
+  .map(
+    ([expert, picks]: [string, any]) =>
+      `${expert}: Captain ${
+        picks.captain
+      }, Differentials: ${picks.differentials.join(", ")}`
+  )
+  .join("\n")}
 
 Next Gameweek Fixtures: ${ragData.nextGameweekFixtures.length} matches scheduled
 `;
-    }
+      }
 
-    // Add external content if available
-    let externalContext = '';
-    if (externalContent) {
-      externalContext = `
+      // Add external content if available
+      let externalContext = "";
+      if (externalContent) {
+        externalContext = `
 LIVE INTELLIGENCE DATA:
-${externalContent.summary || ''}
+${externalContent.summary || ""}
 
 Expected Goals (xG) Data:
-${externalContent.analytics?.xGData?.map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`).join(', ') || 'No xG data available'}
+${
+  externalContent.analytics?.xGData
+    ?.map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`)
+    .join(", ") || "No xG data available"
+}
 
 Form Trends:
-${externalContent.analytics?.formTable?.map((p: any) => `${p.player}: ${p.form} (${p.trend})`).join(', ') || 'No form data available'}
+${
+  externalContent.analytics?.formTable
+    ?.map((p: any) => `${p.player}: ${p.form} (${p.trend})`)
+    .join(", ") || "No form data available"
+}
 
 Community Insights:
-${externalContent.predictions?.map((pred: any) => 
-  pred.predictions.slice(0, 2).map((p: any) => `${p.player}: ${p.prediction}`).join('; ')
-).join('\n') || 'No community insights available'}
+${
+  externalContent.predictions
+    ?.map((pred: any) =>
+      pred.predictions
+        .slice(0, 2)
+        .map((p: any) => `${p.player}: ${p.prediction}`)
+        .join("; ")
+    )
+    .join("\n") || "No community insights available"
+}
 `;
-    }
+      }
 
-    const prompt = `
+      const prompt = `
 You are an expert Fantasy Premier League analyst with access to comprehensive data. Analyze this team and provide 4-5 specific, actionable insights.
 
 IMPORTANT CONTEXT: ${gameweekStatusText}
@@ -162,12 +211,21 @@ ${externalContext}
 Team Overview:
 - Total Points: ${teamData.totalPoints}
 - Current Gameweek: ${currentGameweek}
-- Squad Value: £${squadData.reduce((sum: number, p: any) => sum + (p.now_cost / 10), 0).toFixed(1)}m
+- Squad Value: £${squadData
+        .reduce((sum: number, p: any) => sum + p.now_cost / 10, 0)
+        .toFixed(1)}m
 
 Squad Details:
-${squadWithFixtures.map((p: any) => 
-  `${p.name} (${p.team}) - ${p.position}: ${p.points}pts, Form: ${p.form}, £${p.price}m, ${p.minutes} mins${p.isCaptain ? ' [CAPTAIN]' : ''}${p.isViceCaptain ? ' [VC]' : ''}${!p.hasPlayedThisGW ? ' [NOT PLAYED YET THIS GW]' : ''}`
-).join('\n')}
+${squadWithFixtures
+  .map(
+    (p: any) =>
+      `${p.name} (${p.team}) - ${p.position}: ${p.points}pts, Form: ${
+        p.form
+      }, £${p.price}m, ${p.minutes} mins${p.isCaptain ? " [CAPTAIN]" : ""}${
+        p.isViceCaptain ? " [VC]" : ""
+      }${!p.hasPlayedThisGW ? " [NOT PLAYED YET THIS GW]" : ""}`
+  )
+  .join("\n")}
 
 Provide data-driven insights about:
 1. **Performance vs Position Benchmarks**: Compare players to position averages and identify over/underperformers
@@ -186,29 +244,30 @@ Requirements:
 Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
 `;
 
-    const completion = await openai.chat.completions.create({
-      model: RAG_CONFIG.openAI.model,
-      messages: [
-        {
-          role: "system",
-          content: RAG_CONFIG.openAI.systemPrompt
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: RAG_CONFIG.openAI.maxTokens,
-      temperature: RAG_CONFIG.openAI.temperature,
-    });
+      const completion = await openai.chat.completions.create({
+        model: RAG_CONFIG.openAI.model,
+        messages: [
+          {
+            role: "system",
+            content: RAG_CONFIG.openAI.systemPrompt,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        // max_tokens: RAG_CONFIG.openAI.maxTokens,
+        // temperature: RAG_CONFIG.openAI.temperature,
+      });
 
-      const insights = completion.choices[0]?.message?.content || "Unable to generate insights at this time.";
+      const insights =
+        completion.choices[0]?.message?.content ||
+        "Unable to generate insights at this time.";
 
       return NextResponse.json({ insights });
-
     } catch (aiError) {
-      console.error('Error with OpenAI analysis:', aiError);
-      
+      console.error("Error with OpenAI analysis:", aiError);
+
       // Enhanced fallback insights with basic data
       const fallbackInsights = `
 **Team Analysis** (Basic Mode)
@@ -218,16 +277,15 @@ Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
 • Review your captaincy choice based on upcoming opponents and recent performance
 • Note: Some players may not have played this gameweek - check fixtures before transfers`;
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         insights: fallbackInsights.trim(),
-        fallback: true 
+        fallback: true,
       });
     }
-
   } catch (error) {
-    console.error('Error generating team insights:', error);
+    console.error("Error generating team insights:", error);
     return NextResponse.json(
-      { error: 'Failed to generate team insights' },
+      { error: "Failed to generate team insights" },
       { status: 500 }
     );
   }

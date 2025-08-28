@@ -151,9 +151,13 @@ ${squadData
       }pts, Form: ${p.form}, £${(p.now_cost / 10).toFixed(1)}m, ${
         p.minutes
       } mins${p.is_captain ? " [C]" : ""}${p.is_vice_captain ? " [VC]" : ""}${
-        gameweekFinished ? `` : 
-        p.has_played_current_gw ? ` | GW${currentGameweek}: ${p.current_gameweek_points}pts` :
-        ` | GW${currentGameweek}: Not played yet${p.will_play_current_gw ? ' (will play)' : ' (may not play)'}`
+        gameweekFinished
+          ? ``
+          : p.has_played_current_gw
+          ? ` | GW${currentGameweek}: ${p.current_gameweek_points}pts`
+          : ` | GW${currentGameweek}: Not played yet${
+              p.will_play_current_gw ? " (will play)" : " (may not play)"
+            }`
       }`
   )
   .join("\n")}
@@ -204,8 +208,8 @@ Keep it concise and data-driven. Reference specific stats and trends when availa
             content: prompt,
           },
         ],
-        max_tokens: 500,
-        temperature: 0.2, // Lower temperature for more consistent transfer advice
+        // max_tokens: 500,
+        // temperature: 0.2, // Lower temperature for more consistent transfer advice
       });
 
       const analysis =
