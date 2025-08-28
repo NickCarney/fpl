@@ -16,7 +16,18 @@ interface TransferSuggestionsProps {
   currentEvent: number;
   events: Event[];
   totalPoints: number;
-  teamPicks?: any; // Full team picks data including entry history
+  teamPicks?: any;
+}
+
+interface ParsedTransfer {
+  playerOut: string;
+  playerIn: string;
+  priceOut: string;
+  priceIn: string;
+  reason: string;
+  expectedImprovement: string;
+  budgetImpact: string;
+  priority: number;
 }
 
 interface ParsedTransferAnalysis {
@@ -25,15 +36,8 @@ interface ParsedTransferAnalysis {
     position: string;
     issues: string;
   };
-  transfer: {
-    playerOut: string;
-    playerIn: string;
-    priceOut: string;
-    priceIn: string;
-    reason: string;
-    expectedImprovement: string;
-    budgetImpact: string;
-  };
+  transfers: ParsedTransfer[]; // Changed from single transfer to array
+  summary: string;
 }
 
 export default function TransferSuggestions({
@@ -53,6 +57,8 @@ export default function TransferSuggestions({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
+  const [streamedContent, setStreamedContent] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -79,8 +85,9 @@ export default function TransferSuggestions({
         line.includes("WEAKNESS_ANALYSIS")
       );
       const transferStart = lines.findIndex((line) =>
-        line.includes("TRANSFER_SUGGESTION")
+        line.includes("TRANSFER_SUGGESTIONS")
       );
+      const summaryStart = lines.findIndex((line) => line.includes("SUMMARY"));
 
       if (weaknessStart === -1 || transferStart === -1) return null;
 
@@ -102,49 +109,64 @@ export default function TransferSuggestions({
           ?.replace("Issues:", "")
           .trim() || "";
 
-      // Parse transfer suggestion
-      const transferSection = lines.slice(transferStart + 1);
-      const playerOut =
-        transferSection
-          .find((line) => line.startsWith("OUT:"))
-          ?.replace("OUT:", "")
-          .trim() || "";
-      const playerIn =
-        transferSection
-          .find((line) => line.startsWith("IN:"))
-          ?.replace("IN:", "")
-          .trim() || "";
-      const reason =
-        transferSection
-          .find((line) => line.startsWith("Reason:"))
-          ?.replace("Reason:", "")
-          .trim() || "";
-      const expectedImprovement =
-        transferSection
-          .find((line) => line.startsWith("Expected_Improvement:"))
-          ?.replace("Expected_Improvement:", "")
-          .trim() || "";
-      const budgetImpact =
-        transferSection
-          .find((line) => line.startsWith("Budget_Impact:"))
-          ?.replace("Budget_Impact:", "")
-          .trim() || "";
+      // Parse multiple transfers
+      const transferEndIndex =
+        summaryStart !== -1 ? summaryStart : lines.length;
+      const transferSection = lines.slice(transferStart + 1, transferEndIndex);
 
-      // Extract prices from player strings
-      const priceOutMatch = playerOut.match(/£([\d.]+)m/);
-      const priceInMatch = playerIn.match(/£([\d.]+)m/);
+      const transfers: ParsedTransfer[] = [];
+      let currentTransfer: Partial<ParsedTransfer> = {};
+      let priority = 1;
+
+      for (const line of transferSection) {
+        if (line.startsWith("TRANSFER_") && line.includes(":")) {
+          // Save previous transfer if complete
+          if (currentTransfer.playerOut && currentTransfer.playerIn) {
+            transfers.push(currentTransfer as ParsedTransfer);
+            priority++;
+          }
+          currentTransfer = { priority };
+        }
+
+        if (line.startsWith("OUT:")) {
+          const playerOut = line.replace("OUT:", "").trim();
+          currentTransfer.playerOut = playerOut.split("(")[0].trim();
+          const priceMatch = playerOut.match(/£([\d.]+)m/);
+          currentTransfer.priceOut = priceMatch ? priceMatch[1] : "";
+        } else if (line.startsWith("IN:")) {
+          const playerIn = line.replace("IN:", "").trim();
+          currentTransfer.playerIn = playerIn.split("(")[0].trim();
+          const priceMatch = playerIn.match(/£([\d.]+)m/);
+          currentTransfer.priceIn = priceMatch ? priceMatch[1] : "";
+        } else if (line.startsWith("Reason:")) {
+          currentTransfer.reason = line.replace("Reason:", "").trim();
+        } else if (line.startsWith("Expected_Improvement:")) {
+          currentTransfer.expectedImprovement = line
+            .replace("Expected_Improvement:", "")
+            .trim();
+        } else if (line.startsWith("Budget_Impact:")) {
+          currentTransfer.budgetImpact = line
+            .replace("Budget_Impact:", "")
+            .trim();
+        }
+      }
+
+      // Add the last transfer
+      if (currentTransfer.playerOut && currentTransfer.playerIn) {
+        transfers.push(currentTransfer as ParsedTransfer);
+      }
+
+      // Parse summary
+      const summarySection =
+        summaryStart !== -1 ? lines.slice(summaryStart + 1) : [];
+      const summary = summarySection.join(" ").trim();
 
       return {
         weakness: { player, position, issues },
-        transfer: {
-          playerOut: playerOut.split("(")[0].trim(),
-          playerIn: playerIn.split("(")[0].trim(),
-          priceOut: priceOutMatch ? priceOutMatch[1] : "",
-          priceIn: priceInMatch ? priceInMatch[1] : "",
-          reason,
-          expectedImprovement,
-          budgetImpact,
-        },
+        transfers,
+        summary:
+          summary ||
+          "Multiple transfer options identified based on current form and fixtures.",
       };
     } catch (error) {
       console.error("Error parsing analysis:", error);
@@ -155,31 +177,40 @@ export default function TransferSuggestions({
   const handleGenerateAnalysis = async () => {
     setLoading(true);
     setError(null);
+    setStreamedContent("");
+    setIsStreaming(true);
 
     try {
       // Get current gameweek info
       const currentGameweek = events.find((event) => event.is_current);
       const gameweekFinished = currentGameweek?.finished || false;
 
-      // Fetch fixtures data and live gameweek data
-      const [fixtures, liveData] = await Promise.all([
+      // Use Promise.allSettled for better error handling and faster execution
+      const [fixturesResult, liveDataResult] = await Promise.allSettled([
         getFixtures(),
-        getLiveGameweekData(currentEvent).catch(() => null),
+        getLiveGameweekData(currentEvent),
       ]);
 
-      // Prepare enhanced squad data with current gameweek performance
-      const squadData = picks.map((pick) => {
-        const player = getPlayer(pick.element);
-        const team = getTeam(player?.team || 0);
-        const position = getPosition(player?.element_type || 0);
+      const fixtures =
+        fixturesResult.status === "fulfilled" ? fixturesResult.value : [];
+      const liveData =
+        liveDataResult.status === "fulfilled" ? liveDataResult.value : null;
 
-        // Get live gameweek data for this player
+      // Prepare enhanced squad data (optimized)
+      const squadData = picks.map((pick) => {
+        const player = elements.find((el) => el.id === pick.element); // Use find directly
+        const team = player
+          ? teams.find((t) => t.id === player.team)
+          : undefined;
+        const position = player
+          ? elementTypes.find((t) => t.id === player.element_type)
+          : undefined;
+
         const livePlayerData = liveData?.elements?.find(
           (el: any) => el.id === pick.element
         );
         const currentGameweekPoints = livePlayerData?.stats?.total_points || 0;
         const hasPlayed = livePlayerData?.stats?.minutes > 0;
-        const willPlay = !hasPlayed && !gameweekFinished;
 
         return {
           ...player,
@@ -191,8 +222,8 @@ export default function TransferSuggestions({
           multiplier: pick.multiplier,
           current_gameweek_points: currentGameweekPoints,
           has_played_current_gw: hasPlayed,
-          will_play_current_gw: willPlay,
-          is_in_my_squad: true, // Mark as owned player
+          will_play_current_gw: !hasPlayed && !gameweekFinished,
+          is_in_my_squad: true,
         };
       });
 
@@ -203,12 +234,12 @@ export default function TransferSuggestions({
         currentGameweek: currentEvent,
       };
 
-      // Get bank balance and free transfers from team picks data
       const bankBalance = teamPicks?.entry_history?.bank
         ? teamPicks.entry_history.bank / 10
         : 1.0;
-      const freeTransfers = 1; // This might need to be calculated based on transfers made
+      const freeTransfers = 1;
 
+      // Request multiple transfers in the API call
       const result = await generateTransferSuggestions(
         teamData,
         squadData,
@@ -217,13 +248,13 @@ export default function TransferSuggestions({
         gameweekFinished,
         fixtures,
         bankBalance,
-        freeTransfers
+        freeTransfers,
+        3
       );
 
       setAnalysis(result.analysis);
       setIsFallback(result.fallback || false);
 
-      // Parse the structured analysis
       const parsed = parseAnalysis(result.analysis);
       setParsedAnalysis(parsed);
     } catch (err) {
@@ -231,6 +262,21 @@ export default function TransferSuggestions({
       setError("Failed to generate transfer suggestions. Please try again.");
     } finally {
       setLoading(false);
+      setIsStreaming(false);
+    }
+  };
+
+  // Helper function to get priority label
+  const getPriorityLabel = (priority: number) => {
+    switch (priority) {
+      case 1:
+        return { label: "Priority", color: "text-red-600 bg-red-100" };
+      case 2:
+        return { label: "Consider", color: "text-orange-600 bg-orange-100" };
+      case 3:
+        return { label: "Alternative", color: "text-blue-600 bg-blue-100" };
+      default:
+        return { label: "Option", color: "text-gray-600 bg-gray-100" };
     }
   };
 
@@ -257,7 +303,7 @@ export default function TransferSuggestions({
                 handleGenerateAnalysis();
               }}
               disabled={loading}
-              className="px-3 py-1 text-white rounded-md hover:green-700 transition-colors text-sm text-nowrap"
+              className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm text-nowrap disabled:opacity-50"
             >
               {loading
                 ? "Analyzing..."
@@ -266,7 +312,9 @@ export default function TransferSuggestions({
                 : "Analyze Squad"}
             </button>
           )}
-          <button className=" hover:">{isCollapsed ? "▼" : "▲"}</button>
+          <button className="hover:bg-green-300 p-1 rounded">
+            {isCollapsed ? "▼" : "▲"}
+          </button>
         </div>
       </div>
 
@@ -276,12 +324,14 @@ export default function TransferSuggestions({
           {loading && (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mr-3"></div>
-              <p className="">Analyzing transfer opportunities with AI...</p>
+              <p className="text-gray-700">
+                Analyzing multiple transfer opportunities with AI...
+              </p>
             </div>
           )}
 
           {error && (
-            <div className=" border border-red-200 rounded-md p-4">
+            <div className="bg-red-50 border border-red-200 rounded-md p-4">
               <p className="text-red-700">{error}</p>
             </div>
           )}
@@ -289,110 +339,151 @@ export default function TransferSuggestions({
           {parsedAnalysis && !loading && (
             <div className="space-y-4">
               {/* Weakness Analysis */}
-              <div className=" rounded-lg p-4 border border-gray-200">
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
                   📊 AI Squad Analysis
                   {!isFallback && (
-                    <span className="text-xs text-blue-800 px-2 py-1 rounded">
+                    <span className="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded">
                       RAG Enhanced
                     </span>
                   )}
                 </h4>
-                <div className=" p-3 rounded-lg border border-red-200">
+                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                   <h5 className="font-medium text-red-800 mb-2">
-                    Identified Weakness
+                    Key Areas for Improvement
                   </h5>
                   <p className="text-sm text-red-700 mb-1">
-                    <strong>Player:</strong> {parsedAnalysis.weakness.player}
+                    <strong>Focus Player:</strong>{" "}
+                    {parsedAnalysis.weakness.player}
                   </p>
                   <p className="text-sm text-red-700 mb-1">
                     <strong>Position:</strong>{" "}
                     {parsedAnalysis.weakness.position}
                   </p>
                   <p className="text-xs text-red-600">
-                    <strong>Issues:</strong> {parsedAnalysis.weakness.issues}
+                    <strong>Analysis:</strong> {parsedAnalysis.weakness.issues}
                   </p>
                 </div>
               </div>
 
-              {/* Transfer Suggestion */}
-              <div className=" rounded-lg p-4 border border-gray-200">
-                <h4 className="font-semibold mb-3">💡 Recommended Transfer</h4>
+              {/* Multiple Transfer Suggestions */}
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <h4 className="font-semibold mb-3">
+                  💡 Transfer Options ({parsedAnalysis.transfers.length})
+                </h4>
 
-                <div className="space-y-3">
-                  {/* Transfer Out */}
-                  <div className="flex items-center justify-between p-3  rounded-lg border border-red-200">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-red-600 font-bold">OUT</span>
-                      <div>
-                        <p className="font-medium text-red-800">
-                          {parsedAnalysis.transfer.playerOut}
-                        </p>
-                        {parsedAnalysis.transfer.priceOut && (
-                          <p className="text-xs text-red-600">
-                            £{parsedAnalysis.transfer.priceOut}m
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                <div className="space-y-4">
+                  {parsedAnalysis.transfers.map((transfer, index) => {
+                    const priorityInfo = getPriorityLabel(transfer.priority);
 
-                  {/* Transfer In */}
-                  <div className="flex items-center justify-between p-3  rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-green-600 font-bold">IN</span>
-                      <div>
-                        <p className="font-medium text-green-800">
-                          {parsedAnalysis.transfer.playerIn}
-                        </p>
-                        {parsedAnalysis.transfer.priceIn && (
-                          <p className="text-xs text-green-600">
-                            £{parsedAnalysis.transfer.priceIn}m
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    return (
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-4"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="font-medium">
+                            Transfer Option {index + 1}
+                          </h5>
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${priorityInfo.color}`}
+                          >
+                            {priorityInfo.label}
+                          </span>
+                        </div>
 
-                  {/* Analysis Details */}
-                  <div className=" p-3 rounded-lg border border-blue-200 space-y-2">
-                    {parsedAnalysis.transfer.reason && (
-                      <div>
-                        <span className="text-sm font-medium text-blue-800">
-                          Reasoning:{" "}
-                        </span>
-                        <span className="text-sm text-blue-700">
-                          {parsedAnalysis.transfer.reason}
-                        </span>
+                        <div className="space-y-3">
+                          {/* Transfer Out */}
+                          <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                            <div className="flex items-center space-x-3">
+                              <span className="text-red-600 font-bold">
+                                OUT
+                              </span>
+                              <div>
+                                <p className="font-medium text-red-800">
+                                  {transfer.playerOut}
+                                </p>
+                                {transfer.priceOut && (
+                                  <p className="text-xs text-red-600">
+                                    £{transfer.priceOut}m
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Transfer In */}
+                          <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                            <div className="flex items-center space-x-3">
+                              <span className="text-green-600 font-bold">
+                                IN
+                              </span>
+                              <div>
+                                <p className="font-medium text-green-800">
+                                  {transfer.playerIn}
+                                </p>
+                                {transfer.priceIn && (
+                                  <p className="text-xs text-green-600">
+                                    £{transfer.priceIn}m
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Transfer Details */}
+                          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-2">
+                            {transfer.reason && (
+                              <div>
+                                <span className="text-sm font-medium text-blue-800">
+                                  Reasoning:
+                                </span>
+                                <span className="text-sm text-blue-700 ml-1">
+                                  {transfer.reason}
+                                </span>
+                              </div>
+                            )}
+                            {transfer.expectedImprovement && (
+                              <div>
+                                <span className="text-sm font-medium text-blue-800">
+                                  Expected Impact:
+                                </span>
+                                <span className="text-sm text-blue-700 ml-1">
+                                  {transfer.expectedImprovement}
+                                </span>
+                              </div>
+                            )}
+                            {transfer.budgetImpact && (
+                              <div>
+                                <span className="text-sm font-medium text-blue-800">
+                                  Budget:
+                                </span>
+                                <span className="text-sm text-blue-700 ml-1">
+                                  {transfer.budgetImpact}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    {parsedAnalysis.transfer.expectedImprovement && (
-                      <div>
-                        <span className="text-sm font-medium text-blue-800">
-                          Expected Impact:{" "}
-                        </span>
-                        <span className="text-sm text-blue-700">
-                          {parsedAnalysis.transfer.expectedImprovement}
-                        </span>
-                      </div>
-                    )}
-                    {parsedAnalysis.transfer.budgetImpact && (
-                      <div>
-                        <span className="text-sm font-medium text-blue-800">
-                          Budget:{" "}
-                        </span>
-                        <span className="text-sm text-blue-700">
-                          {parsedAnalysis.transfer.budgetImpact}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
+
+                {/* Summary */}
+                {parsedAnalysis.summary && (
+                  <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <h5 className="font-medium text-gray-800 mb-2">Summary</h5>
+                    <p className="text-sm text-gray-700">
+                      {parsedAnalysis.summary}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* AI Attribution */}
               {!isFallback && (
-                <div className="text-xs  flex items-center gap-1">
+                <div className="text-xs text-gray-600 flex items-center gap-1">
                   <span>🤖</span>
                   <span>
                     Powered by AI analysis with live market data, xG stats, and
@@ -413,13 +504,13 @@ export default function TransferSuggestions({
 
           {!analysis && !loading && (
             <div className="text-center py-8">
-              <p className=" mb-4">
-                Get AI-powered transfer suggestions based on comprehensive data
-                analysis
+              <p className="text-gray-600 mb-4">
+                Get AI-powered transfer suggestions with multiple options ranked
+                by priority
               </p>
               <button
                 onClick={handleGenerateAnalysis}
-                className="px-4 py-2 text-white rounded-md transition-colors"
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
                 Analyze My Squad
               </button>
