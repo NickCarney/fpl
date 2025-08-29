@@ -24,6 +24,8 @@ import {
   LeagueStanding,
 } from "@/types/fpl";
 
+import Predictions from "@/components/predictions/Predictions";
+
 import Image from "next/image";
 
 import fplgenie from "@/public/fplgenie.png";
@@ -34,7 +36,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "squad" | "picker" | "stats" | "league" | "history"
+    "squad" | "picker" | "stats" | "league" | "history" | "predictions"
   >("squad");
 
   // Data states
@@ -472,6 +474,16 @@ export default function Home() {
           >
             Season History
           </button>
+          <button
+            onClick={() => setActiveTab("predictions")}
+            className={`py-1 border-b-2 font-medium text-sm  w-full ${
+              activeTab === "predictions"
+                ? "border-blue-500 text-blue-600 bg-green-600"
+                : "border-transparent  hover:"
+            }`}
+          >
+            Predictions
+          </button>
         </div>
       </nav>
 
@@ -620,6 +632,7 @@ export default function Home() {
             chips={teamHistory.chips}
           />
         )}
+        {activeTab === "predictions" && teamHistory && <Predictions />}
       </main>
     </div>
   );
