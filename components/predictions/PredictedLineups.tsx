@@ -159,26 +159,52 @@ export default function PredictedLineups() {
     );
   };
 
-  const PlayerCard = ({ player }: { player: Player }) => (
-    <div className="text-center">
-      <div
-        className={`w-16 h-12 rounded text-xs p-1 ${getPositionColor(
-          player.position
-        )} flex flex-col justify-center items-center shadow-sm`}
-      >
-        <div className="font-semibold truncate w-full">{player.name}</div>
-        <div className="text-xs opacity-75">{player.position}</div>
+  const PlayerCard = ({ player }: { player: Player }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+
+    const getInjuryIndicatorColor = (chanceOfPlaying: number) => {
+      if (chanceOfPlaying >= 75) return "bg-yellow-500";
+      if (chanceOfPlaying >= 50) return "bg-orange-500";
+      return "bg-red-500";
+    };
+
+    return (
+      <div className="text-center relative">
+        <div
+          className={`w-16 h-12 rounded text-xs p-1 ${getPositionColor(
+            player.position
+          )} flex flex-col justify-center items-center shadow-sm relative`}
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          <div className="font-semibold truncate w-full">{player.name}</div>
+          <div className="text-xs opacity-75">{player.position}</div>
+
+          {/* Injury indicator dot */}
+          {player.chanceOfPlaying !== null && player.chanceOfPlaying < 100 && (
+            <div
+              className={`absolute -top-1 -right-1 w-3 h-3 ${getInjuryIndicatorColor(
+                player.chanceOfPlaying
+              )} rounded-full border border-white`}
+            ></div>
+          )}
+
+          {/* Tooltip */}
+          {showTooltip &&
+            player.chanceOfPlaying !== null &&
+            player.chanceOfPlaying < 100 && (
+              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                Chance of playing: {player.chanceOfPlaying}%
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
+              </div>
+            )}
+        </div>
+        <div className="text-xs mt-1 space-y-0.5">
+          <div>Form: {player.form}</div>
+        </div>
       </div>
-      <div className="text-xs mt-1 space-y-0.5">
-        <div>Form: {player.form}</div>
-        {player.chanceOfPlaying !== null && player.chanceOfPlaying < 100 && (
-          <div className="text-orange-600 absolute top-0 transform translate-x-2/3">
-            {player.chanceOfPlaying}%
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="predicted-lineups bg-white rounded-lg shadow-lg p-6">
