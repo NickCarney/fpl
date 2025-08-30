@@ -208,7 +208,7 @@ export default function PredictedLineups() {
 
   return (
     <div className="predicted-lineups bg-white rounded-lg shadow-lg p-6">
-      <div className="mb-6">
+      <div className="mb-6 text-center">
         <h2 className="text-2xl font-bold text-gray-900">Predicted Lineups</h2>
         <p className="text-gray-600">
           {lineupsData.gameweekName} - Upcoming Fixtures

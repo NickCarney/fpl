@@ -76,7 +76,6 @@ export default function FormationTeamPrediction({
   const [optimalLineup, setOptimalLineup] = useState<OptimalLineup | null>(
     null
   );
-  const [showOriginal, setShowOriginal] = useState(false);
 
   useEffect(() => {
     if (!teamId) {
@@ -151,13 +150,15 @@ export default function FormationTeamPrediction({
         ];
 
         // Find optimal captain for this formation
-        const sortedByPoints = [...lineup].sort((a, b) => b.predictedPoints - a.predictedPoints);
+        const sortedByPoints = [...lineup].sort(
+          (a, b) => b.predictedPoints - a.predictedPoints
+        );
         const captain = sortedByPoints[0];
 
         // Calculate total with captain getting double points
         const totalPoints = lineup.reduce((sum, player) => {
           if (player.id === captain.id) {
-            return sum + (player.predictedPoints * 2); // Captain gets 2x points
+            return sum + player.predictedPoints * 2; // Captain gets 2x points
           }
           return sum + player.predictedPoints;
         }, 0);
@@ -219,10 +220,70 @@ export default function FormationTeamPrediction({
     return "bg-red-100 text-red-800";
   };
 
-  const renderFormationView = (
-    lineup: OptimalLineup | null,
-    isOriginal = false
-  ) => {
+  // Responsive PlayerCard
+  const PlayerCard = ({
+    player,
+    isCaptain,
+    isViceCaptain,
+  }: {
+    player: PlayerPrediction;
+    isCaptain: boolean;
+    isViceCaptain: boolean;
+  }) => (
+    <div
+      className={`relative flex flex-col items-center p-3 rounded-lg border-2 w-full max-w-[140px] min-w-[110px] mx-auto transition-all hover:shadow-lg
+        ${
+          isCaptain
+            ? "ring-2 ring-yellow-400 bg-yellow-50"
+            : isViceCaptain
+            ? "ring-2 ring-yellow-200 bg-yellow-25"
+            : getPositionColor(player.position)
+        }`}
+    >
+      {/* Captain/Vice Captain Badge */}
+      {isCaptain && (
+        <div className="absolute -top-1 -right-1 bg-yellow-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          C
+        </div>
+      )}
+      {isViceCaptain && (
+        <div className="absolute -top-1 -right-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          V
+        </div>
+      )}
+
+      {/* Player Info */}
+      <div className="text-center w-full">
+        <div className="font-semibold text-sm mb-1 truncate">{player.name}</div>
+        <div className="text-xs text-gray-600 mb-1 truncate">{player.team}</div>
+        <div className="text-lg font-bold text-blue-600">
+          {isCaptain
+            ? (player.predictedPoints * 2).toFixed(1)
+            : player.predictedPoints.toFixed(1)}
+          <span className="text-xs text-gray-500 ml-1">pts</span>
+        </div>
+        <div className={`text-xs ${getConfidenceColor(player.confidence)}`}>
+          {player.confidence}%
+        </div>
+        {player.fixture && (
+          <div className="mt-2">
+            <div className="text-xs font-medium truncate">
+              {player.fixture.isHome ? "vs" : "@"} {player.fixture.opponent}
+            </div>
+            <span
+              className={`inline-block px-1 py-0.5 rounded text-xs ${getDifficultyColor(
+                player.fixture.difficulty
+              )}`}
+            >
+              {player.fixture.difficulty}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderFormationView = (lineup: OptimalLineup | null) => {
     if (!lineup) return null;
 
     const { startingXI, formation } = lineup;
@@ -231,87 +292,19 @@ export default function FormationTeamPrediction({
     const mids = startingXI.filter((p) => p.position === "MID");
     const fwds = startingXI.filter((p) => p.position === "FWD");
 
-    const PlayerCard = ({
-      player,
-      isCaptain,
-      isViceCaptain,
-    }: {
-      player: PlayerPrediction;
-      isCaptain: boolean;
-      isViceCaptain: boolean;
-    }) => (
-      <div
-        className={`relative p-3 rounded-lg border-2 transition-all hover:shadow-lg ${
-          isCaptain
-            ? "ring-2 ring-yellow-400 bg-yellow-50"
-            : isViceCaptain
-            ? "ring-2 ring-yellow-200 bg-yellow-25"
-            : getPositionColor(player.position)
-        }`}
-      >
-        {/* Captain/Vice Captain Badge */}
-        {isCaptain && (
-          <div className="absolute -top-1 -right-1 bg-yellow-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-            C
-          </div>
-        )}
-        {isViceCaptain && (
-          <div className="absolute -top-1 -right-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-            V
-          </div>
-        )}
-
-        {/* Player Info */}
-        <div className="text-center">
-          <div className="font-semibold text-sm mb-1">{player.name}</div>
-          <div className="text-xs text-gray-600 mb-1">{player.team}</div>
-
-          {/* Predicted Points */}
-          <div className="text-lg font-bold text-blue-600">
-            {isCaptain
-              ? (player.predictedPoints * 2).toFixed(1)
-              : player.predictedPoints.toFixed(1)}
-            <span className="text-xs text-gray-500 ml-1">pts</span>
-          </div>
-
-          {/* Confidence */}
-          <div className={`text-xs ${getConfidenceColor(player.confidence)}`}>
-            {player.confidence}%
-          </div>
-
-          {/* Fixture */}
-          {player.fixture && (
-            <div className="mt-2">
-              <div className="text-xs font-medium">
-                {player.fixture.isHome ? "vs" : "@"} {player.fixture.opponent}
-              </div>
-              <span
-                className={`inline-block px-1 py-0.5 rounded text-xs ${getDifficultyColor(
-                  player.fixture.difficulty
-                )}`}
-              >
-                {player.fixture.difficulty}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    // Use flex for each row, centered
+    const rowClass = "flex justify-center gap-3 flex-wrap";
 
     return (
       <div className="formation-view bg-gradient-to-b from-green-100 to-green-50 p-6 rounded-lg border">
         <div className="text-center mb-4">
           <h3 className="text-lg font-bold">{formation} Formation</h3>
           <p className="text-sm text-gray-600">
-            {isOriginal ? "Current Lineup" : "Optimal Lineup"} -{" "}
-            {lineup.totalPoints.toFixed(1)} predicted points
+            Optimal Lineup – {lineup.totalPoints.toFixed(1)} predicted points
           </p>
         </div>
-
-        {/* Formation Layout */}
-        <div className="space-y-6">
-          {/* Forwards */}
-          <div className="flex justify-center gap-4">
+        <div className="space-y-6 content-center">
+          <div className={rowClass}>
             {fwds.map((player) => (
               <PlayerCard
                 key={player.id}
@@ -321,9 +314,7 @@ export default function FormationTeamPrediction({
               />
             ))}
           </div>
-
-          {/* Midfielders */}
-          <div className="flex justify-center gap-4">
+          <div className={rowClass}>
             {mids.map((player) => (
               <PlayerCard
                 key={player.id}
@@ -333,9 +324,7 @@ export default function FormationTeamPrediction({
               />
             ))}
           </div>
-
-          {/* Defenders */}
-          <div className="flex justify-center gap-4">
+          <div className={rowClass}>
             {defs.map((player) => (
               <PlayerCard
                 key={player.id}
@@ -345,9 +334,7 @@ export default function FormationTeamPrediction({
               />
             ))}
           </div>
-
-          {/* Goalkeeper */}
-          <div className="flex justify-center">
+          <div className={rowClass}>
             {gks.map((player) => (
               <PlayerCard
                 key={player.id}
@@ -394,18 +381,22 @@ export default function FormationTeamPrediction({
   const originalStarters = prediction.players.filter((p) => p.isStarter);
   const originalCaptain = prediction.players.find((p) => p.isCaptain);
   const originalViceCaptain = prediction.players.find((p) => p.isViceCaptain);
-  
+
   // Fix the original total calculation
   const originalTotalPoints = originalStarters.reduce((sum, player) => {
     // Use the multiplier from the API (should be 2 for captain, 1 for others)
-    return sum + (player.predictedPoints * player.multiplier);
+    return sum + player.predictedPoints * player.multiplier;
   }, 0);
 
-  console.log('Original lineup calculation:');
-  originalStarters.forEach(p => {
-    console.log(`${p.name}: ${p.predictedPoints} x ${p.multiplier} = ${p.predictedPoints * p.multiplier}`);
+  console.log("Original lineup calculation:");
+  originalStarters.forEach((p) => {
+    console.log(
+      `${p.name}: ${p.predictedPoints} x ${p.multiplier} = ${
+        p.predictedPoints * p.multiplier
+      }`
+    );
   });
-  console.log('Original total:', originalTotalPoints);
+  console.log("Original total:", originalTotalPoints);
 
   const originalLineup: OptimalLineup = {
     formation: "4-4-2", // Default, we'd need to calculate actual formation
@@ -424,126 +415,48 @@ export default function FormationTeamPrediction({
           Optimal Team Formation
         </h2>
         <p className="text-gray-600">{prediction.gameweekName}</p>
-
-        {/* Comparison Summary */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-            <h3 className="text-lg font-bold text-blue-800">Optimal Lineup</h3>
-            <div className="text-2xl font-bold text-blue-600">
-              {optimalLineup.totalPoints.toFixed(1)} pts
-            </div>
-            <p className="text-sm text-blue-600">
-              {optimalLineup.formation} • Captain: {optimalLineup.captain.name}
-            </p>
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+          <h3 className="text-lg font-bold text-blue-800">Optimal Lineup</h3>
+          <div className="text-2xl font-bold text-blue-600">
+            {optimalLineup.totalPoints.toFixed(1)} pts
           </div>
-
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
-            <h3 className="text-lg font-bold text-gray-800">Current Lineup</h3>
-            <div className="text-2xl font-bold text-gray-600">
-              {originalTotalPoints.toFixed(1)} pts
-            </div>
-            <p className="text-sm text-gray-600">
-              Captain: {originalCaptain?.name || "None"}
-            </p>
-
-            {/* Improvement indicator */}
-            {optimalLineup.totalPoints > originalTotalPoints && (
-              <div className="mt-2 text-sm text-green-600 font-medium">
-                +{(optimalLineup.totalPoints - originalTotalPoints).toFixed(1)}{" "}
-                points improvement
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Toggle */}
-      <div className="mb-4 flex justify-center">
-        <div className="bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setShowOriginal(false)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              !showOriginal
-                ? "bg-blue-600 text-white shadow"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Optimal Lineup
-          </button>
-          <button
-            onClick={() => setShowOriginal(true)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              showOriginal
-                ? "bg-gray-600 text-white shadow"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Current Lineup
-          </button>
+          <p className="text-sm text-blue-600">
+            {optimalLineup.formation} • Captain: {optimalLineup.captain.name}
+          </p>
         </div>
       </div>
 
       {/* Formation Display */}
-      {renderFormationView(
-        showOriginal ? originalLineup : optimalLineup,
-        showOriginal
-      )}
+      {renderFormationView(optimalLineup)}
 
       {/* Bench */}
       <div className="mt-6">
         <h4 className="text-lg font-semibold mb-3">
-          Bench (
-          {showOriginal
-            ? originalLineup.bench.length
-            : optimalLineup.bench.length}{" "}
-          players)
+          Bench ({optimalLineup.bench.length} players)
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {(showOriginal ? originalLineup.bench : optimalLineup.bench).map(
-            (player) => (
-              <div
-                key={player.id}
-                className={`p-3 rounded border ${getPositionColor(
-                  player.position
-                )} opacity-75`}
-              >
-                <div className="text-center">
-                  <div className="font-medium text-sm">{player.name}</div>
-                  <div className="text-xs text-gray-600">{player.team}</div>
-                  <div className="text-sm font-bold">
-                    {player.predictedPoints.toFixed(1)} pts
-                  </div>
+        <div className="flex justify-center gap-3 flex-wrap">
+          {optimalLineup.bench.map((player) => (
+            <div
+              key={player.id}
+              className={`p-3 rounded border ${getPositionColor(
+                player.position
+              )} opacity-75 flex flex-col items-center max-w-[140px] min-w-[110px] mx-auto`}
+            >
+              <div className="text-center w-full">
+                <div className="font-medium text-sm truncate">
+                  {player.name}
+                </div>
+                <div className="text-xs text-gray-600 truncate">
+                  {player.team}
+                </div>
+                <div className="text-sm font-bold">
+                  {player.predictedPoints.toFixed(1)} pts
                 </div>
               </div>
-            )
-          )}
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Key Changes (if any) */}
-      {!showOriginal && optimalLineup.totalPoints > originalTotalPoints && (
-        <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-          <h4 className="font-semibold text-green-800 mb-2">
-            Recommended Changes
-          </h4>
-          <div className="text-sm text-green-700">
-            <p>• Switch to {optimalLineup.formation} formation</p>
-            <p>
-              • Make {optimalLineup.captain.name} captain(
-              {(
-                optimalLineup.captain.predictedPoints * 2 -
-                (originalCaptain?.predictedPoints || 0)
-              ).toFixed(1)}
-              pts)
-            </p>
-            <p>
-              • Expected improvement:{" "}
-              {(optimalLineup.totalPoints - originalTotalPoints).toFixed(1)}{" "}
-              points
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
