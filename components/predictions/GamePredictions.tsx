@@ -150,7 +150,7 @@ export default function GamePredictions() {
             className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
           >
             {/* Main prediction display */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center mb-3">
               <div className="flex items-center space-x-4 flex-1">
                 {/* Home team */}
                 <div className="text-right flex-1">
@@ -226,17 +226,17 @@ export default function GamePredictions() {
               </div>
 
               {/* Confidence */}
-              <div
+              {/* <div
                 className={`px-3 py-1 rounded-full text-sm font-medium ${getConfidenceColor(
                   prediction.confidence
                 )}`}
               >
                 {prediction.confidence}% confident
-              </div>
+              </div> */}
             </div>
 
             {/* Additional stats */}
-            <div className="grid grid-cols-2 gap-4 text-sm border-t pt-3">
+            <div className="flex justify-center flex-col text-center gap-4 text-sm border-t pt-3">
               <div>
                 <div className="text-gray-600">
                   Goals For/Against (per game)
@@ -268,7 +268,7 @@ export default function GamePredictions() {
               </div>
               <div>
                 <div className="text-gray-600">FPL Difficulty</div>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 justify-center">
                   <span
                     className={`px-2 py-1 rounded text-xs ${getDifficultyColor(
                       prediction.difficulty.home
