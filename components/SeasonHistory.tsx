@@ -11,6 +11,12 @@ import {
 } from "recharts";
 import { Current, ChipPlay } from "@/types/fpl";
 
+function formatRank(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+  return value.toString();
+}
+
 interface SeasonHistoryProps {
   history: Current[];
   chips: ChipPlay[];
@@ -126,13 +132,10 @@ export default function SeasonHistory({ history, chips }: SeasonHistoryProps) {
               <YAxis
                 reversed
                 label={{ value: "Rank", angle: -90, position: "insideLeft" }}
-                tickFormatter={(value) => value.toLocaleString()}
+                tickFormatter={formatRank}
               />
               <Tooltip
-                formatter={(value: any) => [
-                  value.toLocaleString(),
-                  "Overall Rank",
-                ]}
+                formatter={(value: any) => [formatRank(value), "Overall Rank"]}
                 labelFormatter={(label) => `Gameweek ${label}`}
               />
               <Line
