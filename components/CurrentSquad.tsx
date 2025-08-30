@@ -31,6 +31,7 @@ export default function CurrentSquad({
   teamPicks,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
+  const [manualStarterPoints, setManualStarterPoints] = useState(0);
   const [showSuggestedLineup, setShowSuggestedLineup] = useState(false);
   const [showGameweekStats, setShowGameweekStats] = useState(true); // Add stats toggle state
   const [teamNews, setTeamNews] = useState<any>(null);
@@ -943,6 +944,15 @@ export default function CurrentSquad({
           return sum + (player?.total_points || 0);
         }, 0);
 
+      // Calculate fallback manual sum of all starters' season points
+      const manualPoints = picks
+        .filter((pick) => pick.position <= 11)
+        .reduce((sum, pick) => {
+          const player = getPlayer(pick.element);
+          return sum + (player?.total_points || 0);
+        }, 0);
+      setManualStarterPoints(manualPoints);
+
       return {
         total: startingPoints + benchPoints,
         starting: startingPoints,
@@ -953,6 +963,44 @@ export default function CurrentSquad({
   };
 
   const pointsBreakdown = calculatePoints();
+
+  // Calculate manual sum of all starters' points (gameweek or season)
+  const manualStarterPointsSum = picks
+    .filter((pick) => pick.position <= 11)
+    .reduce((sum, pick) => {
+      if (showGameweekStats) {
+        const gw = gameweekData[pick.element];
+        // Only count if player has played (has points and kickoff_time)
+        if (gw && gw.kickoff_time) {
+          const kickoffTime = new Date(gw.kickoff_time);
+          const currentTime = new Date();
+          if (
+            currentTime >= kickoffTime &&
+            typeof gw.total_points === "number"
+          ) {
+            return sum + gw.total_points * pick.multiplier;
+          }
+        }
+        return sum;
+      } else {
+        const player = getPlayer(pick.element);
+        return sum + (player?.total_points || 0);
+      }
+    }, 0);
+
+  // Check if all starters are YTP (haven't played yet)
+  const allStartersYTP = picks
+    .filter((pick) => pick.position <= 11)
+    .every((pick) => {
+      if (showGameweekStats) {
+        const gw = gameweekData[pick.element];
+        if (!gw || !gw.kickoff_time) return true;
+        const kickoffTime = new Date(gw.kickoff_time);
+        const currentTime = new Date();
+        return currentTime < kickoffTime;
+      }
+      return false;
+    });
 
   return (
     <div className=" p-6 rounded-lg">
@@ -1110,7 +1158,14 @@ export default function CurrentSquad({
             </p>
             <div className="space-y-1">
               <p className="text-xl font-bold">
-                {pointsBreakdown.starting} points{" "}
+                {allStartersYTP
+                  ? "YTP"
+                  : pointsBreakdown.starting > 0
+                  ? pointsBreakdown.starting
+                  : manualStarterPointsSum > 0
+                  ? manualStarterPointsSum
+                  : "0"}{" "}
+                points{" "}
               </p>
               {showGameweekStats || !pointsBreakdown.isSeasonTotal ? (
                 <div className="flex justify-center gap-4 text-sm">
