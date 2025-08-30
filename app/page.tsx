@@ -632,7 +632,9 @@ export default function Home() {
             chips={teamHistory.chips}
           />
         )}
-        {activeTab === "predictions" && teamHistory && <Predictions />}
+        {activeTab === "predictions" && teamId && (
+          <Predictions teamId={teamId} />
+        )}
       </main>
     </div>
   );
