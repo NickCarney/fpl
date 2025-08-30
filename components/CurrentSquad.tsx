@@ -648,7 +648,7 @@ export default function CurrentSquad({
           {/* Stats - Updated to use getPlayerStats */}
           <div className="text-center mb-2">
             <p className={`text-sm font-bold ${stats.statusColor}`}>
-              {parseInt(stats.points) * pick.multiplier} pts
+              {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
               <span className="text-xs text-gray-500 block">
                 {stats.isGameweek ? `GW${currentEvent}` : "Season"}
               </span>
