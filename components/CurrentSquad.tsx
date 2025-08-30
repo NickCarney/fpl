@@ -970,7 +970,6 @@ export default function CurrentSquad({
     .reduce((sum, pick) => {
       if (showGameweekStats) {
         const gw = gameweekData[pick.element];
-        // Only count if player has played (has points and kickoff_time)
         if (gw && gw.kickoff_time) {
           const kickoffTime = new Date(gw.kickoff_time);
           const currentTime = new Date();
@@ -988,7 +987,30 @@ export default function CurrentSquad({
       }
     }, 0);
 
-  // Check if all starters are YTP (haven't played yet)
+  // Calculate manual sum of all bench points
+  const manualBenchPointsSum = picks
+    .filter((pick) => pick.position > 11)
+    .reduce((sum, pick) => {
+      if (showGameweekStats) {
+        const gw = gameweekData[pick.element];
+        if (gw && gw.kickoff_time) {
+          const kickoffTime = new Date(gw.kickoff_time);
+          const currentTime = new Date();
+          if (
+            currentTime >= kickoffTime &&
+            typeof gw.total_points === "number"
+          ) {
+            return sum + gw.total_points; // No multiplier for bench
+          }
+        }
+        return sum;
+      } else {
+        const player = getPlayer(pick.element);
+        return sum + (player?.total_points || 0);
+      }
+    }, 0);
+
+  // Check if all starters are Yet To Play (YTP)
   const allStartersYTP = picks
     .filter((pick) => pick.position <= 11)
     .every((pick) => {
@@ -1001,6 +1023,25 @@ export default function CurrentSquad({
       }
       return false;
     });
+
+  // Use the same logic as before for starter points
+  const displayedStarterPoints = allStartersYTP
+    ? "YTP"
+    : pointsBreakdown.starting > 0
+    ? pointsBreakdown.starting
+    : manualStarterPointsSum > 0
+    ? manualStarterPointsSum
+    : "0";
+
+  // Calculate displayed bench points (show YTP if all starters are YTP)
+  const displayedBenchPoints =
+    displayedStarterPoints === "YTP" ? "YTP" : manualBenchPointsSum;
+
+  // Calculate displayed total (if YTP, show "YTP", else sum starter + bench)
+  const displayedTotalPoints =
+    displayedStarterPoints === "YTP"
+      ? "YTP"
+      : Number(displayedStarterPoints) + manualBenchPointsSum;
 
   return (
     <div className=" p-6 rounded-lg">
@@ -1158,34 +1199,22 @@ export default function CurrentSquad({
             </p>
             <div className="space-y-1">
               <p className="text-xl font-bold">
-                {allStartersYTP
-                  ? "YTP"
-                  : pointsBreakdown.starting > 0
-                  ? pointsBreakdown.starting
-                  : manualStarterPointsSum > 0
-                  ? manualStarterPointsSum
-                  : "0"}{" "}
-                points{" "}
+                {displayedStarterPoints} points{" "}
               </p>
-              {showGameweekStats || !pointsBreakdown.isSeasonTotal ? (
-                <div className="flex justify-center gap-4 text-sm">
-                  <span className="text-green-700 font-medium">
-                    {pointsBreakdown.bench} benched
-                  </span>
-                  <span className="text-orange-600 font-medium">
-                    {pointsBreakdown.total} total
-                  </span>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-600"></div>
+              <div className="flex justify-center gap-4 text-sm">
+                <span className="text-green-700 font-medium">
+                  {manualBenchPointsSum} benched
+                </span>
+                <span className="text-orange-600 font-medium">
+                  {displayedTotalPoints} total
+                </span>
+              </div>
+              {manualBenchPointsSum > 0 && (
+                <p className="text-xs text-gray-600 mt-1">
+                  You left {manualBenchPointsSum} point
+                  {manualBenchPointsSum === 1 ? "" : "s"} on the bench
+                </p>
               )}
-              {(showGameweekStats || !pointsBreakdown.isSeasonTotal) &&
-                pointsBreakdown.bench > 0 && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    You left {pointsBreakdown.bench} point
-                    {pointsBreakdown.bench === 1 ? "" : "s"} on the bench
-                  </p>
-                )}
             </div>
           </div>
         </div>
