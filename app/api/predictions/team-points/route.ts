@@ -438,7 +438,7 @@ function predictPlayerPoints(
   const expectedAssistsPerGame = expectedAssists / gamesPlayed;
 
   // Initialize prediction breakdown
-  let prediction = {
+  const prediction = {
     minutes: 0,
     goals: 0,
     assists: 0,
