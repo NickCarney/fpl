@@ -246,10 +246,10 @@ export default function TeamFormationPopup({
         onClick={() => handlePlayerClick(pick)}
         className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-36 overflow-y-auto scrolly ${
           pick.is_captain
-            ? "border-yellow-400 bg-yellow-50"
+            ? "border-yellow-400"
             : pick.is_vice_captain
-            ? "bg-yellow-25 border-yellow-300"
-            : "bg-white border-green-300"
+            ? "border-yellow-300"
+            : "border-green-300"
         }`}
       >
         {/* Player Name and Team */}

@@ -76,7 +76,7 @@ const PlayerCard = ({
       : "text-red-600";
 
   if (isFormationView && !isBench) {
-    // Formation view for starting XI
+    // Formation view for starting XI - MATCH CurrentSquad
     return (
       <div
         draggable
@@ -84,7 +84,7 @@ const PlayerCard = ({
         onDrop={() => onDrop(pick)}
         onDragOver={onDragOver}
         onClick={() => onClick(pick)}
-        className={`relative flex flex-col py-2 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-20 h-24 overflow-y-scroll scrolly ${
+        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto scrolly ${
           isSelected
             ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
             : canBeReplaced
@@ -93,78 +93,87 @@ const PlayerCard = ({
             ? "border-yellow-400 bg-yellow-50"
             : pick.is_vice_captain
             ? "border-yellow-300 bg-yellow-50"
-            : "border-green-300 bg-white"
+            : "border-green-300"
         } ${className}`}
       >
-        <div className="flex w-full gap-1">
-          {/* Position indicator */}
-          <div
-            className={`relative w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-              position.id === 1
-                ? "bg-purple-500"
-                : position.id === 2
-                ? "bg-blue-500"
-                : position.id === 3
-                ? "bg-green-500"
-                : "bg-red-500"
-            }`}
-          >
-            {position.singular_name_short.charAt(0)}
-          </div>
-
-          {/* Next fixture */}
-          {nextFixture && (
-            <div
-              className={`w-fit text-xs px-1 py-0.5 rounded text-center ${difficultyColor}`}
-            >
-              {nextFixture.opponent}
-            </div>
-          )}
-
-          {/* Captain/Vice indicators with click handlers */}
-          <div className=" flex items-end flex-col gap-0.5">
-            {canBeReplaced && (
-              <div className="bg-orange-400 text-xs font-bold rounded min-w-3 min-h-3 flex items-center justify-center text-white">
-                ⟷
-              </div>
-            )}
-            {pick.is_captain && (
-              <div
-                className="bg-yellow-400 text-xs font-bold rounded min-w-3 min-h-3 flex items-center justify-center cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCaptainSelect(pick);
-                }}
-              >
-                C
-              </div>
-            )}
-            {!pick.is_captain && !pick.is_vice_captain && !isBench && (
-              <div
-                className="bg-gray-200 text-xs font-bold rounded min-w-3 min-h-3 flex items-center justify-center cursor-pointer hover:bg-yellow-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCaptainSelect(pick);
-                }}
-              >
-                +
-              </div>
-            )}
-          </div>
+        {/* Player Name and Team */}
+        <div className="text-center mb-2">
+          <h3 className="font-semibold text-sm leading-tight">
+            {player.web_name}
+          </h3>
+          <p className="text-xs ">
+            {team.short_name} - {position.singular_name_short}
+          </p>
         </div>
 
-        {/* Player info */}
-        <div className="text-center">
-          <div className="font-semibold text-xs leading-tight mb-0.5">
-            {player.web_name}
+        {/* Stats */}
+        <div className="text-center mb-2">
+          <p className="text-sm font-bold text-green-700">
+            {player.total_points}pts
+            <span className="text-xs text-gray-500 block">Season</span>
+          </p>
+          <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
+        </div>
+
+        {/* Form and Minutes */}
+        <div className="text-center text-xs mb-2">
+          <div>Form: {player.form}</div>
+          <div className="text-gray-700">{player.minutes} mins</div>
+          <div className="mt-1">
+            <div>PPG: {player.points_per_game}</div>
+            <div className="flex justify-center gap-1 text-xs">
+              <span className="text-green-600">⚽{player.goals_scored}</span>
+              <span className="text-blue-600">🅰️{player.assists}</span>
+              {player.clean_sheets > 0 && (
+                <span className="text-purple-600">🥅{player.clean_sheets}</span>
+              )}
+            </div>
           </div>
-          <div className="text-xs text-gray-600 mb-0.5">{team.short_name}</div>
-          <div className="text-xs font-bold text-green-600">
-            £{(player.now_cost / 10).toFixed(1)}m
-          </div>
-          <div className="text-xs text-gray-600 mb-0.5">
-            ppg: {player.points_per_game}
-          </div>
+          {/* Fixture info */}
+          {nextFixture && (
+            <div
+              className={`text-xs mt-1 px-1 py-0.5 rounded ${
+                fixtureDifficulty <= 2
+                  ? "bg-green-100 text-green-700"
+                  : fixtureDifficulty <= 3
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {fixtureText} ({fixtureDifficulty})
+            </div>
+          )}
+        </div>
+
+        {/* Captain/Vice-Captain Badges */}
+        <div className="flex justify-center gap-1 mt-auto">
+          {pick.is_captain && (
+            <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+              C
+            </span>
+          )}
+          {pick.is_vice_captain && (
+            <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+              V
+            </span>
+          )}
+          {pick.multiplier > 1 && (
+            <span className="px-2 py-1 text-xs rounded">
+              {pick.multiplier}x
+            </span>
+          )}
+          {/* Captain select button (optional, keep if you want quick selection) */}
+          {!pick.is_captain && !pick.is_vice_captain && !isBench && (
+            <span
+              className="px-2 py-1 bg-gray-200 text-xs rounded font-bold cursor-pointer hover:bg-yellow-200"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCaptainSelect(pick);
+              }}
+            >
+              +
+            </span>
+          )}
         </div>
       </div>
     );
@@ -185,7 +194,7 @@ const PlayerCard = ({
           ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
           : isBench
           ? "border-gray-300 bg-gray-50"
-          : "border-green-300 bg-white"
+          : "border-green-300"
       } ${pick.is_captain ? "ring-2 ring-yellow-400" : ""} ${
         pick.is_vice_captain ? "ring-2 ring-yellow-300" : ""
       } ${className}`}
@@ -849,170 +858,195 @@ export default function TeamPicker({
         </h3>
 
         {isFormationView ? (
-          /* Formation View */
-          <div className="bg-gradient-to-b from-green-400 to-green-500 p-4 rounded-lg relative min-h-64">
-            {/* Pitch markings */}
-            <div className="absolute inset-0 opacity-20">
-              <div className="absolute top-1/2 left-0 right-0 h-0.5"></div>
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 border-white rounded-full"></div>
+          // --- Formation View (MATCH CurrentSquad) ---
+          <>
+            {/* Football Pitch Background */}
+            <div className="bg-gradient-to-b from-green-400 to-green-500 p-6 rounded-lg relative overflow-hidden">
+              {/* Vertical Stripes - Center 60% only */}
+              <div className="absolute inset-0">
+                <div className="flex h-full">
+                  {/* Left 20% - no stripes */}
+                  <div className="w-1/5 bg-[#4ade80]"></div>
+                  {/* Center 60% - with stripes */}
+                  <div className="w-3/5 flex">
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                    <div className="flex-1 bg-green-100 opacity-20"></div>
+                    <div className="flex-1"></div>
+                  </div>
+                  {/* Right 20% - no stripes */}
+                  <div className="w-1/5 bg-[#4ade80]"></div>
+                </div>
+              </div>
+              {/* Pitch Lines */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-16 border-2 border-white rounded-b-lg"></div>
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-16 border-2 border-white rounded-t-lg"></div>
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 "></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white rounded-full"></div>
+              </div>
+              {/* Formation Layout */}
+              <div className="relative z-10 space-y-12">
+                {/* Forwards */}
+                {forwards.length > 0 && (
+                  <div className="flex justify-center">
+                    <div className="flex gap-4 justify-center">
+                      {forwards.map((pick) => {
+                        const player = getPlayer(pick.element);
+                        const team = getTeam(player?.team || 0);
+                        const position = getPosition(player?.element_type || 0);
+                        const nextFixture = player
+                          ? getNextFixture(player)
+                          : null;
+                        if (!player || !team || !position) return null;
+                        return (
+                          <PlayerCard
+                            key={pick.element}
+                            pick={pick}
+                            player={player}
+                            team={team}
+                            position={position}
+                            nextFixture={nextFixture}
+                            isFormationView={true}
+                            isBench={false}
+                            isSelected={
+                              selectedPlayer?.element === pick.element
+                            }
+                            canBeReplaced={!!selectedPlayerToBuy}
+                            onDragStart={handleDragStart}
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onClick={handlePlayerClick}
+                            onCaptainSelect={handleCaptainSelect}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* Midfielders */}
+                {midfielders.length > 0 && (
+                  <div className="flex justify-center">
+                    <div className="flex gap-4 justify-center flex-wrap">
+                      {midfielders.map((pick) => {
+                        const player = getPlayer(pick.element);
+                        const team = getTeam(player?.team || 0);
+                        const position = getPosition(player?.element_type || 0);
+                        const nextFixture = player
+                          ? getNextFixture(player)
+                          : null;
+                        if (!player || !team || !position) return null;
+                        return (
+                          <PlayerCard
+                            key={pick.element}
+                            pick={pick}
+                            player={player}
+                            team={team}
+                            position={position}
+                            nextFixture={nextFixture}
+                            isFormationView={true}
+                            isBench={false}
+                            isSelected={
+                              selectedPlayer?.element === pick.element
+                            }
+                            canBeReplaced={!!selectedPlayerToBuy}
+                            onDragStart={handleDragStart}
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onClick={handlePlayerClick}
+                            onCaptainSelect={handleCaptainSelect}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* Defenders */}
+                {defenders.length > 0 && (
+                  <div className="flex justify-center">
+                    <div className="flex gap-4 justify-center flex-wrap">
+                      {defenders.map((pick) => {
+                        const player = getPlayer(pick.element);
+                        const team = getTeam(player?.team || 0);
+                        const position = getPosition(player?.element_type || 0);
+                        const nextFixture = player
+                          ? getNextFixture(player)
+                          : null;
+                        if (!player || !team || !position) return null;
+                        return (
+                          <PlayerCard
+                            key={pick.element}
+                            pick={pick}
+                            player={player}
+                            team={team}
+                            position={position}
+                            nextFixture={nextFixture}
+                            isFormationView={true}
+                            isBench={false}
+                            isSelected={
+                              selectedPlayer?.element === pick.element
+                            }
+                            canBeReplaced={!!selectedPlayerToBuy}
+                            onDragStart={handleDragStart}
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onClick={handlePlayerClick}
+                            onCaptainSelect={handleCaptainSelect}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* Goalkeeper */}
+                {goalkeepers.length > 0 && (
+                  <div className="flex justify-center">
+                    <div className="flex justify-center">
+                      {goalkeepers.map((pick) => {
+                        const player = getPlayer(pick.element);
+                        const team = getTeam(player?.team || 0);
+                        const position = getPosition(player?.element_type || 0);
+                        const nextFixture = player
+                          ? getNextFixture(player)
+                          : null;
+                        if (!player || !team || !position) return null;
+                        return (
+                          <PlayerCard
+                            key={pick.element}
+                            pick={pick}
+                            player={player}
+                            team={team}
+                            position={position}
+                            nextFixture={nextFixture}
+                            isFormationView={true}
+                            isBench={false}
+                            isSelected={
+                              selectedPlayer?.element === pick.element
+                            }
+                            canBeReplaced={!!selectedPlayerToBuy}
+                            onDragStart={handleDragStart}
+                            onDrop={handleDrop}
+                            onDragOver={handleDragOver}
+                            onClick={handlePlayerClick}
+                            onCaptainSelect={handleCaptainSelect}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-
-            <div className="relative z-10 space-y-6">
-              {/* Forwards */}
-              {forwards.length > 0 && (
-                <div className="flex justify-center">
-                  <div className="flex gap-3">
-                    {forwards.map((pick) => {
-                      const player = getPlayer(pick.element);
-                      const team = getTeam(player?.team || 0);
-                      const position = getPosition(player?.element_type || 0);
-                      const nextFixture = player
-                        ? getNextFixture(player)
-                        : null;
-
-                      if (!player || !team || !position) return null;
-
-                      return (
-                        <PlayerCard
-                          key={pick.element}
-                          pick={pick}
-                          player={player}
-                          team={team}
-                          position={position}
-                          nextFixture={nextFixture}
-                          isFormationView={true}
-                          isBench={false}
-                          isSelected={selectedPlayer?.element === pick.element}
-                          canBeReplaced={!!selectedPlayerToBuy}
-                          onDragStart={handleDragStart}
-                          onDrop={handleDrop}
-                          onDragOver={handleDragOver}
-                          onClick={handlePlayerClick}
-                          onCaptainSelect={handleCaptainSelect}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Midfielders */}
-              {midfielders.length > 0 && (
-                <div className="flex justify-center">
-                  <div className="flex gap-3 flex-wrap justify-center">
-                    {midfielders.map((pick) => {
-                      const player = getPlayer(pick.element);
-                      const team = getTeam(player?.team || 0);
-                      const position = getPosition(player?.element_type || 0);
-                      const nextFixture = player
-                        ? getNextFixture(player)
-                        : null;
-
-                      if (!player || !team || !position) return null;
-
-                      return (
-                        <PlayerCard
-                          key={pick.element}
-                          pick={pick}
-                          player={player}
-                          team={team}
-                          position={position}
-                          nextFixture={nextFixture}
-                          isFormationView={true}
-                          isBench={false}
-                          isSelected={selectedPlayer?.element === pick.element}
-                          canBeReplaced={!!selectedPlayerToBuy}
-                          onDragStart={handleDragStart}
-                          onDrop={handleDrop}
-                          onDragOver={handleDragOver}
-                          onClick={handlePlayerClick}
-                          onCaptainSelect={handleCaptainSelect}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Defenders */}
-              {defenders.length > 0 && (
-                <div className="flex justify-center">
-                  <div className="flex gap-3 flex-wrap justify-center">
-                    {defenders.map((pick) => {
-                      const player = getPlayer(pick.element);
-                      const team = getTeam(player?.team || 0);
-                      const position = getPosition(player?.element_type || 0);
-                      const nextFixture = player
-                        ? getNextFixture(player)
-                        : null;
-
-                      if (!player || !team || !position) return null;
-
-                      return (
-                        <PlayerCard
-                          key={pick.element}
-                          pick={pick}
-                          player={player}
-                          team={team}
-                          position={position}
-                          nextFixture={nextFixture}
-                          isFormationView={true}
-                          isBench={false}
-                          isSelected={selectedPlayer?.element === pick.element}
-                          canBeReplaced={!!selectedPlayerToBuy}
-                          onDragStart={handleDragStart}
-                          onDrop={handleDrop}
-                          onDragOver={handleDragOver}
-                          onClick={handlePlayerClick}
-                          onCaptainSelect={handleCaptainSelect}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Goalkeeper */}
-              {goalkeepers.length > 0 && (
-                <div className="flex justify-center">
-                  {goalkeepers.map((pick) => {
-                    const player = getPlayer(pick.element);
-                    const team = getTeam(player?.team || 0);
-                    const position = getPosition(player?.element_type || 0);
-                    const nextFixture = player ? getNextFixture(player) : null;
-
-                    if (!player || !team || !position) return null;
-
-                    return (
-                      <PlayerCard
-                        key={pick.element}
-                        pick={pick}
-                        player={player}
-                        team={team}
-                        position={position}
-                        nextFixture={nextFixture}
-                        isFormationView={true}
-                        isBench={false}
-                        isSelected={selectedPlayer?.element === pick.element}
-                        canBeReplaced={!!selectedPlayerToBuy}
-                        onDragStart={handleDragStart}
-                        onDrop={handleDrop}
-                        onDragOver={handleDragOver}
-                        onClick={handlePlayerClick}
-                        onCaptainSelect={handleCaptainSelect}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
             {/* Formation Info */}
-            <div className="mt-4 text-center text-white">
+            <div className="mt-4 text-center text-sm ">
               Formation: {defenders.length}-{midfielders.length}-
               {forwards.length}
             </div>
-          </div>
+          </>
         ) : (
           /* List View */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
