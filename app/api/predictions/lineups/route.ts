@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           };
         }
       } catch (error) {
-        console.log(`Failed to fetch history for player ${player.id}`);
+        //console.log(`Failed to fetch history for player ${player.id}`);
       }
       return null;
     });

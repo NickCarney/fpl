@@ -46,7 +46,7 @@ export async function fetchFPLAPI(
 
       // Retry on 5xx errors or 429 (rate limit)
       if ((response.status >= 500 || response.status === 429) && retries > 0) {
-        console.log(`Retrying request to ${url}, attempts left: ${retries}`);
+        //console.log(`Retrying request to ${url}, attempts left: ${retries}`);
         await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
         return fetchFPLAPI(url, options, retries - 1);
       }
@@ -75,9 +75,9 @@ export async function fetchFPLAPI(
         "Request timeout - FPL API is taking too long to respond"
       );
     } else if (error.name === "TypeError" && retries > 0) {
-      console.log(
-        `Network error, retrying request to ${url}, attempts left: ${retries}`
-      );
+      //console.log(
+      //   `Network error, retrying request to ${url}, attempts left: ${retries}`
+      // );
       await new Promise((resolve) => setTimeout(resolve, 1000));
       return fetchFPLAPI(url, options, retries - 1);
     }

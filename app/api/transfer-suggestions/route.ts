@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (error) {
-        console.log("Could not fetch RAG data, proceeding with basic analysis");
+        //console.log("Could not fetch RAG data, proceeding with basic analysis");
       }
     }
 

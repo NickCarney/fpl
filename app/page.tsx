@@ -84,12 +84,12 @@ export default function Home() {
               firstLeague.id,
               teamId || undefined
             );
-            console.log("Auto-load league result:", result);
+            //console.log("Auto-load league result:", result);
             setLeagueStandings(result.standings);
             setUserPosition(result.userStats || null);
             setLeagueId(firstLeague.id.toString());
           } catch (err) {
-            console.log("Failed to auto-load league:", err);
+            //console.log("Failed to auto-load league:", err);
             // Don't show error for auto-load, user can manually load
           }
         }
@@ -193,14 +193,14 @@ export default function Home() {
     const idToLoad = selectedLeagueId || leagueId;
     if (!idToLoad) return;
 
-    console.log("Loading league with:", { leagueId: idToLoad, teamId });
+    //console.log("Loading league with:", { leagueId: idToLoad, teamId });
     setLoading(true);
     try {
       const result = await getLeagueStandingsWithUserStats(
         parseInt(idToLoad),
         teamId || undefined
       );
-      console.log("Manual load league result:", result);
+      //console.log("Manual load league result:", result);
       setLeagueStandings(result.standings);
       setUserPosition(result.userStats || null);
       setLeagueId(idToLoad);
@@ -510,6 +510,7 @@ export default function Home() {
             currentEvent={currentEvent}
             events={bootstrapData.events}
             teamPicks={teamPicks}
+            teamId={teamInfo?.id}
           />
         )}
 

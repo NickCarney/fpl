@@ -68,9 +68,9 @@ export default function CommonLineup({
       const teamsToAnalyze = Math.min(24, Math.ceil(totalTeams / 2));
       const topTeams = standings.slice(0, teamsToAnalyze);
 
-      console.log(
-        `Analyzing ${teamsToAnalyze} teams out of ${totalTeams} total teams`
-      );
+      //console.log(
+      //   `Analyzing ${teamsToAnalyze} teams out of ${totalTeams} total teams`
+      // );
 
       // Fetch all team picks
       const teamPicksPromises = topTeams.map((team) =>
@@ -83,9 +83,9 @@ export default function CommonLineup({
       const allTeamPicks = await Promise.all(teamPicksPromises);
       const validTeamPicks = allTeamPicks.filter((picks) => picks !== null);
 
-      console.log(
-        `Successfully fetched picks for ${validTeamPicks.length} teams`
-      );
+      //console.log(
+      //   `Successfully fetched picks for ${validTeamPicks.length} teams`
+      // );
 
       // Count player occurrences
       const playerCounts = new Map<

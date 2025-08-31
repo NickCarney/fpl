@@ -62,12 +62,12 @@ export default function LeagueStandings({
   const sortedTeams = [...allTeams].sort((a, b) => b.total - a.total);
 
   // Debug logging
-  console.log("LeagueStandings Debug:", {
-    userTeamId,
-    userPosition,
-    userInStandings: !!userInStandings,
-    shouldShowUserPosition,
-  });
+  //console.log("LeagueStandings Debug:", {
+  //   userTeamId,
+  //   userPosition,
+  //   userInStandings: !!userInStandings,
+  //   shouldShowUserPosition,
+  // });
 
   const handleTeamClick = (standing: LeagueStanding, index?: number) => {
     if (index !== undefined) {

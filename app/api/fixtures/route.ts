@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    console.log("Fetching fixtures from FPL API...");
+    //console.log("Fetching fixtures from FPL API...");
 
     // Add timeout to the fetch request
     const controller = new AbortController();
@@ -26,7 +26,7 @@ export async function GET() {
     }
 
     const data = await response.json();
-    console.log(`Successfully fetched ${data.length} fixtures`);
+    //console.log(`Successfully fetched ${data.length} fixtures`);
 
     return NextResponse.json(data);
   } catch (error) {

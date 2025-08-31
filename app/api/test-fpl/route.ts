@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         );
     }
 
-    console.log(`Testing FPL API: ${description} - ${testUrl}`);
+    //console.log(`Testing FPL API: ${description} - ${testUrl}`);
 
     const startTime = Date.now();
     const response = await fetchFPLAPI(testUrl);

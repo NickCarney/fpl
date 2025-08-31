@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
-import { getFixtures } from "@/lib/fpl-api";
+import { getFixtures, getTeamInfo } from "@/lib/fpl-api";
 
 interface TeamPickerProps {
   picks: Pick[];
@@ -12,6 +12,7 @@ interface TeamPickerProps {
   currentEvent: number;
   events: Event[];
   teamPicks?: any;
+  teamId?: number;
 }
 
 interface DraggedPlayer {
@@ -90,9 +91,9 @@ const PlayerCard = ({
             : canBeReplaced
             ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
             : pick.is_captain
-            ? "border-yellow-400 bg-yellow-50"
+            ? "border-yellow-400"
             : pick.is_vice_captain
-            ? "border-yellow-300 bg-yellow-50"
+            ? "border-yellow-300"
             : "border-green-300"
         } ${className}`}
       >
@@ -296,6 +297,7 @@ export default function TeamPicker({
   currentEvent,
   events,
   teamPicks,
+  teamId,
 }: TeamPickerProps) {
   const [currentPicks, setCurrentPicks] = useState<Pick[]>(picks);
   const [isFormationView, setIsFormationView] = useState(true);
@@ -322,16 +324,18 @@ export default function TeamPicker({
   const nextGameweek = events.find((event) => event.is_next);
   const nextGameweekId = nextGameweek?.id || currentEvent + 1;
 
+  const [teamInfo, setTeamInfo] = useState<any>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("Fetching fixtures data...");
+        //console.log("Fetching fixtures data...");
         const fixturesData = await getFixtures();
-        console.log(
-          "Fixtures data received:",
-          fixturesData?.length || 0,
-          "fixtures"
-        );
+        //console.log(
+        //   "Fixtures data received:",
+        //   fixturesData?.length || 0,
+        //   "fixtures"
+        // );
         setFixtures(fixturesData);
       } catch (error) {
         console.error("Error fetching fixtures data:", error);
@@ -348,6 +352,20 @@ export default function TeamPicker({
   const getTeam = (teamId: number) => teams.find((team) => team.id === teamId);
   const getPosition = (elementTypeId: number) =>
     elementTypes.find((type) => type.id === elementTypeId);
+
+  useEffect(() => {
+    async function fetchTeamInfo() {
+      if (!teamId) return;
+      try {
+        //console.log("TEAM\n\n ID\n\n\n ID\n\n\n ID DID", teamId);
+        const info = await getTeamInfo(teamId);
+        setTeamInfo(info);
+      } catch (e) {
+        setTeamInfo(null);
+      }
+    }
+    fetchTeamInfo();
+  }, []);
 
   // Get players not in current squad
   const getAvailablePlayers = () => {
@@ -539,16 +557,16 @@ export default function TeamPicker({
   };
 
   const getNextFixture = (player: Element) => {
-    console.log(
-      "Getting fixture for player:",
-      player.web_name,
-      "team:",
-      player.team,
-      "nextGameweekId:",
-      nextGameweekId,
-      "fixtures count:",
-      fixtures.length
-    );
+    //console.log(
+    //   "Getting fixture for player:",
+    //   player.web_name,
+    //   "team:",
+    //   player.team,
+    //   "nextGameweekId:",
+    //   nextGameweekId,
+    //   "fixtures count:",
+    //   fixtures.length
+    // );
 
     const fixture = fixtures.find(
       (f) =>
@@ -556,7 +574,7 @@ export default function TeamPicker({
         (f.team_h === player.team || f.team_a === player.team)
     );
 
-    console.log("Found fixture:", fixture ? "YES" : "NO", fixture);
+    //console.log("Found fixture:", fixture ? "YES" : "NO", fixture);
 
     if (!fixture) return null;
 
@@ -572,7 +590,7 @@ export default function TeamPicker({
         : fixture.team_a_difficulty,
     };
 
-    console.log("Returning fixture result:", result);
+    //console.log("Returning fixture result:", result);
     return result;
   };
 
@@ -827,6 +845,18 @@ export default function TeamPicker({
         <p className="text-gray-600">
           Drag players between starting XI and bench to optimize your lineup
         </p>
+        {teamInfo && (
+          <div className="mt-2 flex justify-center gap-6 text-sm text-gray-800">
+            <span>
+              <strong>Budget:</strong> £
+              {(teamInfo.last_deadline_bank / 10).toFixed(1)}m
+            </span>
+            <span>
+              <strong>Team Value:</strong> £
+              {(teamInfo.last_deadline_value / 10).toFixed(1)}m
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Controls */}

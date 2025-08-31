@@ -256,17 +256,17 @@ export default function PlayerStats({
         const bXValue = b[xAxisStat as keyof typeof b] as number;
         return aXValue - bXValue;
       });
-      console.log(
-        `Scatter chart sorted by ${yAxisStat} then ${xAxisStat}:`,
-        sorted
-          .slice(0, 5)
-          .map(
-            (p) =>
-              `${p.name}: ${p[yAxisStat as keyof typeof p]} pts, ${
-                p[xAxisStat as keyof typeof p]
-              } ${xAxisStat === "now_cost" ? "£m" : ""}`
-          )
-      );
+      //console.log(
+      //   `Scatter chart sorted by ${yAxisStat} then ${xAxisStat}:`,
+      //   sorted
+      //     .slice(0, 5)
+      //     .map(
+      //       (p) =>
+      //         `${p.name}: ${p[yAxisStat as keyof typeof p]} pts, ${
+      //           p[xAxisStat as keyof typeof p]
+      //         } ${xAxisStat === "now_cost" ? "£m" : ""}`
+      //     )
+      // );
       return sorted;
     } else if (chartType === "bar") {
       // For bar charts, sort by the selected statistic (descending - highest first)
@@ -275,12 +275,12 @@ export default function PlayerStats({
         const bValue = b[xAxisStat as keyof typeof b] as number;
         return bValue - aValue; // Descending order (highest first)
       });
-      console.log(
-        `Bar chart sorted by ${xAxisStat}:`,
-        sorted
-          .slice(0, 5)
-          .map((p) => `${p.name}: ${p[xAxisStat as keyof typeof p]}`)
-      );
+      //console.log(
+      //   `Bar chart sorted by ${xAxisStat}:`,
+      //   sorted
+      //     .slice(0, 5)
+      //     .map((p) => `${p.name}: ${p[xAxisStat as keyof typeof p]}`)
+      // );
       return sorted;
     } else {
       // For other charts (comparison), sort by total points descending

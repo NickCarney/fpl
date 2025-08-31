@@ -61,17 +61,17 @@ export async function getLeagueStandingsWithUserStats(
   leagueId: number,
   userTeamId?: number
 ): Promise<{ standings: LeagueStandings; userStats?: any }> {
-  console.log("getLeagueStandingsWithUserStats called with:", {
-    leagueId,
-    userTeamId,
-  });
+  //console.log("getLeagueStandingsWithUserStats called with:", {
+  //   leagueId,
+  //   userTeamId,
+  // });
 
   // Get the first page of league standings
   const standings = await getLeagueStandings(leagueId, 1);
 
   // If no user team ID provided, just return the standings
   if (!userTeamId) {
-    console.log("No userTeamId provided, returning standings only");
+    //console.log("No userTeamId provided, returning standings only");
     return { standings };
   }
 
@@ -81,13 +81,13 @@ export async function getLeagueStandingsWithUserStats(
   );
 
   if (userInFirstPage) {
-    console.log("User found in first page, no need for separate user stats");
+    //console.log("User found in first page, no need for separate user stats");
     return { standings };
   }
 
   // User not in first page, get their current team stats
   try {
-    console.log("User not in first page, fetching user team stats...");
+    //console.log("User not in first page, fetching user team stats...");
     const teamResponse = await fetch(`/api/team/${userTeamId}`);
     if (teamResponse.ok) {
       const teamData = await teamResponse.json();
@@ -124,7 +124,7 @@ export async function getLeagueStandingsWithUserStats(
         total: teamData.summary_overall_points,
       };
 
-      console.log("User stats created:", userStats);
+      //console.log("User stats created:", userStats);
       return { standings, userStats };
     }
   } catch (error) {

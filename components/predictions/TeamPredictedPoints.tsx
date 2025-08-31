@@ -388,15 +388,15 @@ export default function FormationTeamPrediction({
     return sum + player.predictedPoints * player.multiplier;
   }, 0);
 
-  console.log("Original lineup calculation:");
+  //console.log("Original lineup calculation:");
   originalStarters.forEach((p) => {
-    console.log(
-      `${p.name}: ${p.predictedPoints} x ${p.multiplier} = ${
-        p.predictedPoints * p.multiplier
-      }`
-    );
+    //console.log(
+    // `${p.name}: ${p.predictedPoints} x ${p.multiplier} = ${
+    //   p.predictedPoints * p.multiplier
+    // }`
+    // );
   });
-  console.log("Original total:", originalTotalPoints);
+  //console.log("Original total:", originalTotalPoints);
 
   const originalLineup: OptimalLineup = {
     formation: "4-4-2", // Default, we'd need to calculate actual formation

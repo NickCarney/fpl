@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`Fetching predictions for team ${teamId}`);
+    //console.log(`Fetching predictions for team ${teamId}`);
 
     // Fetch bootstrap data
     const bootstrapResponse = await fetch(`${FPL_BASE_URL}/bootstrap-static/`, {
@@ -101,16 +101,16 @@ export async function GET(request: NextRequest) {
     const teams: Team[] = bootstrapData.teams;
     const events = bootstrapData.events;
 
-    console.log(
-      "Available events:",
-      events.map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        is_current: e.is_current,
-        is_next: e.is_next,
-        finished: e.finished,
-      }))
-    );
+    //console.log(
+    // "Available events:",
+    // events.map((e: any) => ({
+    //   id: e.id,
+    //   name: e.name,
+    //   is_current: e.is_current,
+    //   is_next: e.is_next,
+    //   finished: e.finished,
+    // })
+    // );
 
     // Find the correct gameweek to predict for
     let targetEvent = events.find((e: any) => e.is_current && !e.finished);
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
       targetEvent = events.find((e: any) => !e.finished);
     }
 
-    console.log("Target event:", targetEvent);
+    //console.log("Target event:", targetEvent);
 
     if (!targetEvent) {
       return NextResponse.json(
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     // First try the target event
     try {
-      console.log(`Trying to fetch picks for event ${picksEvent}`);
+      //console.log(`Trying to fetch picks for event ${picksEvent}`);
       const teamResponse = await fetch(
         `${FPL_BASE_URL}/entry/${teamId}/event/${picksEvent}/picks/`,
         {
@@ -157,11 +157,11 @@ export async function GET(request: NextRequest) {
       }
 
       teamData = await teamResponse.json();
-      console.log("Successfully fetched picks for event:", picksEvent);
+      //console.log("Successfully fetched picks for event:", picksEvent);
     } catch (error) {
-      console.log(
-        `Failed to fetch picks for event ${picksEvent}, trying previous event...`
-      );
+      //console.log(
+      //   `Failed to fetch picks for event ${picksEvent}, trying previous event...`
+      // );
 
       // If that fails, try the previous gameweek (current team might not have made picks for next week yet)
       const previousEvent = events.find(
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
       );
       if (previousEvent) {
         picksEvent = previousEvent.id;
-        console.log(`Trying to fetch picks for previous event ${picksEvent}`);
+        //console.log(`Trying to fetch picks for previous event ${picksEvent}`);
 
         const teamResponse = await fetch(
           `${FPL_BASE_URL}/entry/${teamId}/event/${picksEvent}/picks/`,
@@ -186,17 +186,17 @@ export async function GET(request: NextRequest) {
           throw new Error("Failed to fetch team picks for any recent gameweek");
         }
         teamData = await teamResponse.json();
-        console.log(
-          "Successfully fetched picks for previous event:",
-          picksEvent
-        );
+        //console.log(
+        //   "Successfully fetched picks for previous event:",
+        //   picksEvent
+        // );
       } else {
         throw new Error("Failed to fetch team picks");
       }
     }
 
     const picks: Pick[] = teamData.picks;
-    console.log("Fetched picks:", picks.length, "players");
+    //console.log("Fetched picks:", picks.length, "players");
 
     // Fetch fixtures for the target gameweek
     const fixturesResponse = await fetch(
@@ -212,20 +212,20 @@ export async function GET(request: NextRequest) {
 
     // Get upcoming fixtures only
     const upcomingFixtures = fixtures.filter((fixture) => !fixture.finished);
-    console.log("Upcoming fixtures:", upcomingFixtures.length);
+    //console.log("Upcoming fixtures:", upcomingFixtures.length);
 
     // Predict points for each player in the squad
     const playerPredictions = picks
       .map((pick) => {
         const player = elements.find((el) => el.id === pick.element);
         if (!player) {
-          console.log("Player not found for pick:", pick.element);
+          //console.log("Player not found for pick:", pick.element);
           return null;
         }
 
         const team = teams.find((t) => t.id === player.team);
         if (!team) {
-          console.log("Team not found for player:", player.web_name);
+          //console.log("Team not found for player:", player.web_name);
           return null;
         }
 
@@ -273,23 +273,23 @@ export async function GET(request: NextRequest) {
       })
       .filter((p) => p !== null);
 
-    console.log("Player predictions generated:", playerPredictions.length);
-    console.log("Captain:", playerPredictions.find((p) => p!.isCaptain)?.name);
-    console.log(
-      "Vice Captain:",
-      playerPredictions.find((p) => p!.isViceCaptain)?.name
-    );
+    //console.log("Player predictions generated:", playerPredictions.length);
+    //console.log("Captain:", playerPredictions.find((p) => p!.isCaptain)?.name);
+    //console.log(
+    //   "Vice Captain:",
+    //   playerPredictions.find((p) => p!.isViceCaptain)?.name
+    // );
 
     // Calculate total predicted points (with captain multiplier)
     const totalPredictedPoints = playerPredictions.reduce((sum, p) => {
       const points = p!.predictedPoints * p!.multiplier; // multiplier should be 2 for captain
-      console.log(
-        `${p!.name}: ${p!.predictedPoints} x ${p!.multiplier} = ${points}`
-      );
+      //console.log(
+      //   `${p!.name}: ${p!.predictedPoints} x ${p!.multiplier} = ${points}`
+      // );
       return sum + points;
     }, 0);
 
-    console.log("Total predicted points:", totalPredictedPoints);
+    //console.log("Total predicted points:", totalPredictedPoints);
 
     return NextResponse.json({
       gameweek: targetEvent.id,
@@ -321,7 +321,7 @@ function generatePredictions(
   targetEvent: any,
   upcomingFixtures: Fixture[]
 ) {
-  console.log("Generating predictions...");
+  //console.log("Generating predictions...");
 
   // Predict points for each player in the squad
   const playerPredictions = picks
@@ -329,15 +329,15 @@ function generatePredictions(
       try {
         const player = elements.find((el) => el.id === pick.element);
         if (!player) {
-          console.log(`Player not found for element ${pick.element}`);
+          //console.log(`Player not found for element ${pick.element}`);
           return null;
         }
 
         const team = teams.find((t) => t.id === player.team);
         if (!team) {
-          console.log(
-            `Team not found for player ${player.web_name}, team ID: ${player.team}`
-          );
+          //console.log(
+          //   `Team not found for player ${player.web_name}, team ID: ${player.team}`
+          // );
           return null;
         }
 
@@ -347,11 +347,11 @@ function generatePredictions(
             fixture.team_h === player.team || fixture.team_a === player.team
         );
 
-        console.log(
-          `Processing player ${index + 1}/${picks.length}: ${
-            player.web_name
-          } (${team.short_name})`
-        );
+        //console.log(
+        //   `Processing player ${index + 1}/${picks.length}: ${
+        //     player.web_name
+        //   } (${team.short_name})`
+        // );
 
         const prediction = predictPlayerPoints(
           player,
@@ -395,14 +395,14 @@ function generatePredictions(
     })
     .filter((p) => p !== null);
 
-  console.log("Predictions generated for", playerPredictions.length, "players");
+  //console.log("Predictions generated for", playerPredictions.length, "players");
 
   // Calculate total predicted points
   const totalPredictedPoints = playerPredictions
     .filter((p) => p!.isStarter)
     .reduce((sum, p) => sum + p!.predictedPoints * p!.multiplier, 0);
 
-  console.log("Total predicted points:", totalPredictedPoints);
+  //console.log("Total predicted points:", totalPredictedPoints);
 
   return NextResponse.json({
     gameweek: targetEvent.id,
