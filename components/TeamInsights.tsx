@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Element, Pick, Team, ElementType, Event, Fixture } from "@/types/fpl";
-import { generateTeamInsights, getFixtures } from "@/lib/fpl-api";
+import { getFixtures } from "@/lib/fpl-api";
 
 interface TeamInsightsProps {
   picks: Pick[];
@@ -28,6 +28,8 @@ export default function TeamInsights({
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [streamedContent, setStreamedContent] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -44,6 +46,9 @@ export default function TeamInsights({
   const generateInsights = async () => {
     setLoading(true);
     setError(null);
+    setStreamedContent("");
+    setIsStreaming(true);
+    setInsights("");
 
     try {
       // Get current gameweek info
@@ -77,30 +82,62 @@ export default function TeamInsights({
         currentGameweek: currentEvent,
       };
 
-      const result = await generateTeamInsights(
-        teamData,
-        squadData,
-        currentEvent,
-        gameweekFinished,
-        fixtures,
-        elements
-      );
-      setInsights(result.insights);
-      setIsFallback(result.fallback || false);
+      // Make streaming request
+      const response = await fetch("/api/team-insights", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          teamData,
+          squadData,
+          currentGameweek: currentEvent,
+          gameweekFinished,
+          fixtures,
+          elements,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate insights");
+      }
+
+      // Check if it's a streaming response
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("text/plain")) {
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedContent = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedContent += chunk;
+            setStreamedContent(accumulatedContent);
+          }
+        }
+
+        setInsights(accumulatedContent);
+        setIsFallback(false);
+      } else {
+        // Handle regular JSON response (fallback)
+        const result = await response.json();
+        setInsights(result.insights);
+        setIsFallback(result.fallback || false);
+        setStreamedContent(result.insights);
+      }
     } catch (err) {
       console.error("Failed to generate insights:", err);
       setError("Failed to generate team insights. Please try again.");
     } finally {
       setLoading(false);
+      setIsStreaming(false);
     }
   };
-
-  // Auto-generate insights removed - only trigger when user clicks button
-  // useEffect(() => {
-  //   if (picks.length > 0 && elements.length > 0) {
-  //     generateInsights();
-  //   }
-  // }, [picks, elements, currentEvent]);
 
   const formatInsights = (text: string) => {
     // Split by bullet points and format as list items
@@ -151,6 +188,11 @@ export default function TeamInsights({
               Basic Analysis
             </span>
           )}
+          {/* {isStreaming && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded animate-pulse">
+              Streaming...
+            </span>
+          )} */}
         </h3>
         <div className="flex items-center gap-2">
           {!isCollapsed && (
@@ -160,37 +202,45 @@ export default function TeamInsights({
                 generateInsights();
               }}
               disabled={loading}
-              className="px-3 py-1  text-white rounded-md transition-colors text-sm"
+              className="px-3 py-1 text-white rounded-md transition-colors text-sm disabled:opacity-50"
             >
-              {loading ? "Analyzing..." : "Refresh"}
+              {loading ? "Analyzing..." : "New analysis"}
             </button>
           )}
-          <button className=" hover:">{isCollapsed ? "▼" : "▲"}</button>
+          <button className="p-1">{isCollapsed ? "▼" : "▲"}</button>
         </div>
       </div>
 
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          {loading && (
+          {/* {loading && (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-              <p className="">Analyzing your team...</p>
+              <p className="">
+                {isStreaming
+                  ? "Streaming analysis..."
+                  : "Analyzing your team..."}
+              </p>
             </div>
-          )}
+          )} */}
 
           {error && (
-            <div className=" border border-red-200 rounded-md p-4">
+            <div className="border border-red-200 rounded-md p-4">
               <p className="text-red-700">{error}</p>
             </div>
           )}
 
-          {insights && !loading && (
+          {(streamedContent || insights) && (
             <div className="prose prose-sm max-w-none">
-              <div className=" leading-relaxed">{formatInsights(insights)}</div>
-              {!isFallback && (
-                <div className="mt-4 text-xs  flex items-center gap-1">
-                  <span>⚡</span>
-                  <span>Powered by AI analysis</span>
+              <div className="leading-relaxed">
+                {formatInsights(streamedContent || insights)}
+              </div>
+              {/* {isStreaming && (
+                <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
+              )} */}
+              {!isFallback && !isStreaming && (
+                <div className="mt-4 text-xs flex items-center gap-1">
+                  <span>Powered by AI</span>
                 </div>
               )}
             </div>

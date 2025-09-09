@@ -16,7 +16,7 @@ interface TransferRequest {
   fixtures: any[];
   bankBalance?: number;
   freeTransfers?: number;
-  numberOfTransfers?: number; // Add this
+  numberOfTransfers?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       fixtures,
       bankBalance = 0,
       freeTransfers = 1,
-      numberOfTransfers = 3, // Add this
+      numberOfTransfers = 3,
     } = body;
 
     if (!teamData || !squadData || !elements) {
@@ -86,11 +86,10 @@ export async function POST(request: NextRequest) {
     const currentSquadIds = squadData.map((p: any) => p.id);
 
     // Build comprehensive player database for AI reference
-    // Filter out current squad and organize by position for better context
     const availablePlayers = elements
       .filter((player: any) => !currentSquadIds.includes(player.id))
-      .sort((a: any, b: any) => b.total_points - a.total_points) // Sort by points descending
-      .slice(0, 200); // Limit to top 200 to keep context manageable
+      .sort((a: any, b: any) => b.total_points - a.total_points)
+      .slice(0, 200);
 
     // Group players by position for better organization
     const playersByPosition = availablePlayers.reduce(
@@ -167,7 +166,7 @@ ${
 
 ${Object.entries(playersByPosition)
   .map(([position, players]: [string, any]) => {
-    const topPlayers = players.slice(0, 15); // Top 15 per position
+    const topPlayers = players.slice(0, 15);
     return `${position}:
 ${topPlayers
   .map(
@@ -268,7 +267,8 @@ SUMMARY:
 Keep it concise and data-driven. Reference specific stats and trends when available.`;
 
     try {
-      const completion = await openai.chat.completions.create({
+      // Create streaming response
+      const stream = await openai.chat.completions.create({
         model: RAG_CONFIG.openAI.model,
         messages: [
           {
@@ -281,18 +281,32 @@ Keep it concise and data-driven. Reference specific stats and trends when availa
             content: prompt,
           },
         ],
-        // max_tokens: 1500, // Increase token limit for multiple transfers
-        // temperature: 0.2, // Lower temperature for more consistent transfer advice
+        stream: true,
       });
 
-      const analysis =
-        completion.choices[0]?.message?.content ||
-        "Unable to generate transfer analysis.";
+      // Create a ReadableStream to handle the OpenAI stream
+      const readableStream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of stream) {
+              const content = chunk.choices[0]?.delta?.content || "";
+              if (content) {
+                controller.enqueue(new TextEncoder().encode(content));
+              }
+            }
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+      });
 
-      return NextResponse.json({
-        analysis,
-        ragDataAvailable: !!ragData,
-        externalDataAvailable: !!externalContent,
+      return new Response(readableStream, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
       });
     } catch (aiError) {
       console.error("Error with OpenAI transfer analysis:", aiError);

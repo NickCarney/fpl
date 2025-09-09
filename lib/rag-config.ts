@@ -41,7 +41,7 @@ export const RAG_CONFIG = {
 
   // AI Model configuration
   openAI: {
-    model: "gpt-5-mini",
+    model: "gpt-4.1-nano",
     // maxTokens: 600,
     // temperature: 0.1,
     systemPrompt: `You are an elite Fantasy Premier League analyst with access to comprehensive real-time data including:

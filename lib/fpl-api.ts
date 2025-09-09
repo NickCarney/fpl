@@ -195,7 +195,29 @@ export async function generateTeamInsights(
     throw new Error("Failed to generate team insights");
   }
 
-  return response.json();
+  // Check if it's a streaming response
+  const contentType = response.headers.get("content-type");
+  if (contentType?.includes("text/plain")) {
+    // Handle streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let accumulatedContent = "";
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        accumulatedContent += chunk;
+      }
+    }
+
+    return { insights: accumulatedContent };
+  } else {
+    // Handle regular JSON response (fallback)
+    return response.json();
+  }
 }
 
 export async function generateTransferSuggestions(
@@ -235,5 +257,27 @@ export async function generateTransferSuggestions(
     throw new Error("Failed to generate transfer suggestions");
   }
 
-  return response.json();
+  // Check if it's a streaming response
+  const contentType = response.headers.get("content-type");
+  if (contentType?.includes("text/plain")) {
+    // Handle streaming response
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let accumulatedContent = "";
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        accumulatedContent += chunk;
+      }
+    }
+
+    return { analysis: accumulatedContent };
+  } else {
+    // Handle regular JSON response (fallback)
+    return response.json();
+  }
 }

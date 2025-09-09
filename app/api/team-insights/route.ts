@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
             ragData = ragResult.ragData;
             externalContent = ragResult.externalContent;
 
-            // Cache the result
             if (RAG_CONFIG.features.enableCaching) {
               ragCache.set(
                 cacheKey,
@@ -68,8 +67,8 @@ export async function POST(request: NextRequest) {
           }
         } catch (error) {
           //console.log(
-            "Could not fetch RAG data, proceeding with basic analysis"
-          );
+          //   "Could not fetch RAG data, proceeding with basic analysis"
+          // );
         }
       }
 
@@ -244,7 +243,8 @@ Requirements:
 Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
 `;
 
-      const completion = await openai.chat.completions.create({
+      // Create streaming response
+      const stream = await openai.chat.completions.create({
         model: RAG_CONFIG.openAI.model,
         messages: [
           {
@@ -256,15 +256,33 @@ Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
             content: prompt,
           },
         ],
-        // max_tokens: RAG_CONFIG.openAI.maxTokens,
-        // temperature: RAG_CONFIG.openAI.temperature,
+        stream: true,
       });
 
-      const insights =
-        completion.choices[0]?.message?.content ||
-        "Unable to generate insights at this time.";
+      // Create a ReadableStream to handle the OpenAI stream
+      const readableStream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of stream) {
+              const content = chunk.choices[0]?.delta?.content || "";
+              if (content) {
+                controller.enqueue(new TextEncoder().encode(content));
+              }
+            }
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+      });
 
-      return NextResponse.json({ insights });
+      return new Response(readableStream, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
     } catch (aiError) {
       console.error("Error with OpenAI analysis:", aiError);
 

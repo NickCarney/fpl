@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
-import {
-  generateTransferSuggestions,
-  getFixtures,
-  getLiveGameweekData,
-} from "@/lib/fpl-api";
+import { getFixtures, getLiveGameweekData } from "@/lib/fpl-api";
 
 interface TransferSuggestionsProps {
   picks: Pick[];
@@ -36,7 +32,7 @@ interface ParsedTransferAnalysis {
     position: string;
     issues: string;
   };
-  transfers: ParsedTransfer[]; // Changed from single transfer to array
+  transfers: ParsedTransfer[];
   summary: string;
 }
 
@@ -84,8 +80,10 @@ export default function TransferSuggestions({
       const weaknessStart = lines.findIndex((line) =>
         line.includes("WEAKNESS_ANALYSIS")
       );
-      const transferStart = lines.findIndex((line) =>
-        line.includes("TRANSFER_SUGGESTIONS")
+      const transferStart = lines.findIndex(
+        (line) =>
+          line.includes("TRANSFER_SUGGESTIONS") ||
+          line.includes("TRANSFER_SUGGESTION_1")
       );
       const summaryStart = lines.findIndex((line) => line.includes("SUMMARY"));
 
@@ -179,6 +177,8 @@ export default function TransferSuggestions({
     setError(null);
     setStreamedContent("");
     setIsStreaming(true);
+    setAnalysis("");
+    setParsedAnalysis(null);
 
     try {
       // Get current gameweek info
@@ -198,7 +198,7 @@ export default function TransferSuggestions({
 
       // Prepare enhanced squad data (optimized)
       const squadData = picks.map((pick) => {
-        const player = elements.find((el) => el.id === pick.element); // Use find directly
+        const player = elements.find((el) => el.id === pick.element);
         const team = player
           ? teams.find((t) => t.id === player.team)
           : undefined;
@@ -239,24 +239,70 @@ export default function TransferSuggestions({
         : 1.0;
       const freeTransfers = 1;
 
-      // Request multiple transfers in the API call
-      const result = await generateTransferSuggestions(
-        teamData,
-        squadData,
-        elements,
-        currentEvent,
-        gameweekFinished,
-        fixtures,
-        bankBalance,
-        freeTransfers,
-        3
-      );
+      // Make streaming request
+      const response = await fetch("/api/transfer-suggestions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          teamData,
+          squadData,
+          elements,
+          currentGameweek: currentEvent,
+          gameweekFinished,
+          fixtures,
+          bankBalance,
+          freeTransfers,
+          numberOfTransfers: 3,
+        }),
+      });
 
-      setAnalysis(result.analysis);
-      setIsFallback(result.fallback || false);
+      if (!response.ok) {
+        throw new Error("Failed to generate transfer suggestions");
+      }
 
-      const parsed = parseAnalysis(result.analysis);
-      setParsedAnalysis(parsed);
+      // Check if it's a streaming response
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("text/plain")) {
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedContent = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedContent += chunk;
+            setStreamedContent(accumulatedContent);
+
+            // Try to parse analysis in real-time for better UX
+            const parsed = parseAnalysis(accumulatedContent);
+            if (parsed && parsed.transfers.length > 0) {
+              setParsedAnalysis(parsed);
+            }
+          }
+        }
+
+        setAnalysis(accumulatedContent);
+        setIsFallback(false);
+
+        // Final parse
+        const finalParsed = parseAnalysis(accumulatedContent);
+        setParsedAnalysis(finalParsed);
+      } else {
+        // Handle regular JSON response (fallback)
+        const result = await response.json();
+        setAnalysis(result.analysis);
+        setIsFallback(result.fallback || false);
+        setStreamedContent(result.analysis);
+
+        const parsed = parseAnalysis(result.analysis);
+        setParsedAnalysis(parsed);
+      }
     } catch (err) {
       console.error("Failed to generate transfer suggestions:", err);
       setError("Failed to generate transfer suggestions. Please try again.");
@@ -294,6 +340,11 @@ export default function TransferSuggestions({
               Basic Mode
             </span>
           )}
+          {/* {isStreaming && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded animate-pulse">
+              Streaming...
+            </span>
+          )} */}
         </h3>
         <div className="flex items-center gap-2">
           {!isCollapsed && (
@@ -321,14 +372,16 @@ export default function TransferSuggestions({
       {/* Collapsible content */}
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          {loading && (
+          {/* {loading && (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mr-3"></div>
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mr-3"></div>
               <p className="text-gray-700">
-                Analyzing multiple transfer opportunities with AI...
+                {isStreaming
+                  ? "Streaming AI analysis with live market data..."
+                  : "Analyzing multiple transfer opportunities with AI..."} 
               </p>
             </div>
-          )}
+          )} */}
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
@@ -336,7 +389,7 @@ export default function TransferSuggestions({
             </div>
           )}
 
-          {parsedAnalysis && !loading && (
+          {parsedAnalysis && (
             <div className="space-y-4">
               {/* Weakness Analysis */}
               <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -347,6 +400,9 @@ export default function TransferSuggestions({
                       RAG Enhanced
                     </span>
                   )}
+                  {/* {isStreaming && (
+                    <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
+                  )} */}
                 </h4>
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                   <h5 className="font-medium text-red-800 mb-2">
@@ -370,6 +426,11 @@ export default function TransferSuggestions({
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-semibold mb-3">
                   💡 Transfer Options ({parsedAnalysis.transfers.length})
+                  {/* {isStreaming && parsedAnalysis.transfers.length < 3 && (
+                    <span className="text-sm text-blue-600 ml-2">
+                      (Loading more options...)
+                    </span>
+                  )} */}
                 </h4>
 
                 <div className="space-y-4">
@@ -476,6 +537,9 @@ export default function TransferSuggestions({
                     <h5 className="font-medium text-gray-800 mb-2">Summary</h5>
                     <p className="text-sm text-gray-700">
                       {parsedAnalysis.summary}
+                      {/* {isStreaming && (
+                        <span className="inline-block w-2 h-4 bg-gray-600 animate-pulse ml-1"></span>
+                      )} */}
                     </p>
                   </div>
                 )}
@@ -484,25 +548,21 @@ export default function TransferSuggestions({
               {/* AI Attribution */}
               {!isFallback && (
                 <div className="text-xs text-gray-600 flex items-center gap-1">
-                  <span>🤖</span>
-                  <span>
-                    Powered by AI analysis with live market data, xG stats, and
-                    expert insights
-                  </span>
+                  <span>Powered by AI</span>
                 </div>
               )}
             </div>
           )}
 
           {/* Raw Analysis Display (for debugging/detailed view) */}
-          {analysis && !parsedAnalysis && !loading && (
-            <div className=" rounded-lg p-4 border border-gray-200">
+          {(analysis || streamedContent) && !parsedAnalysis && (
+            <div className="rounded-lg p-4 border border-gray-200">
               <h4 className="font-semibold mb-3">Raw Analysis</h4>
               <pre className="text-sm  whitespace-pre-wrap">{analysis}</pre>
             </div>
           )}
 
-          {!analysis && !loading && (
+          {!analysis && !streamedContent && !loading && (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">
                 Get AI-powered transfer suggestions with multiple options ranked

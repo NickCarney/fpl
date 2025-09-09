@@ -49,7 +49,7 @@ export default function SeasonHistory({ history, chips }: SeasonHistoryProps) {
 
   return (
     <div className=" p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6">Season History</h2>
+      <h2 className="text-2xl font-bold mb-6 text-center">Season History</h2>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
