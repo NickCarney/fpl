@@ -354,7 +354,7 @@ export default function TransferSuggestions({
                 handleGenerateAnalysis();
               }}
               disabled={loading}
-              className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm text-nowrap disabled:opacity-50"
+              className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
             >
               {loading
                 ? "Analyzing..."

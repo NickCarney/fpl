@@ -295,7 +295,7 @@ export default function PlayerStats({
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="p-3 border border-gray-300 rounded-lg shadow-lg">
+        <div className="p-3 border border-gray-300 rounded-lg shadow-lg bg-[#fdf6e0]">
           <p className="font-semibold">{data.fullName}</p>
           <p className="text-sm text-gray-600">
             {data.team} - {data.position}
@@ -329,7 +329,11 @@ export default function PlayerStats({
                   dataKey={yAxisStat}
                   name={availableStats.find((s) => s.key === yAxisStat)?.label}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  content={<CustomTooltip />}
+                  active={true}
+                  wrapperStyle={{ pointerEvents: "auto" }}
+                />
                 <Scatter
                   dataKey={yAxisStat}
                   fill="#3b82f6"
@@ -354,7 +358,11 @@ export default function PlayerStats({
                   height={80}
                 />
                 <YAxis />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip
+                  content={<CustomTooltip />}
+                  active={true}
+                  wrapperStyle={{ pointerEvents: "auto" }}
+                />
                 <Bar dataKey={xAxisStat} fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>

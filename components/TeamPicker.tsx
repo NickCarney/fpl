@@ -920,7 +920,7 @@ export default function TeamPicker({
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white rounded-full"></div>
               </div>
               {/* Formation Layout */}
-              <div className="relative z-10 space-y-12">
+              <div className="relative z-10 space-y-20 sm:space-y-12">
                 {/* Forwards */}
                 {forwards.length > 0 && (
                   <div className="flex justify-center">

@@ -1244,7 +1244,7 @@ export default function CurrentSquad({
                   <div className="w-1/5 bg-[#4ade80]"></div>
 
                   {/* Center 60% - with stripes */}
-                  <div className="w-3/5 flex">
+                  <div className="w-[150%] flex">
                     <div className="flex-1 bg-green-100 opacity-20"></div>
                     <div className="flex-1"></div>
                     <div className="flex-1 bg-green-100 opacity-20"></div>
@@ -1269,11 +1269,11 @@ export default function CurrentSquad({
               </div>
 
               {/* Formation Layout */}
-              <div className="relative z-10 space-y-12">
+              <div className="relative z-10 space-y-20 sm:space-y-12">
                 {/* Forwards */}
                 {forwards.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center">
+                    <div className="flex gap-4 justify-center flex-wrap">
                       {forwards.map((pick) => renderPlayer(pick, false, true))}
                     </div>
                   </div>
