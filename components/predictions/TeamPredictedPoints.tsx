@@ -231,7 +231,7 @@ export default function FormationTeamPrediction({
     isViceCaptain: boolean;
   }) => (
     <div
-      className={`relative flex flex-col items-center p-3 rounded-lg border-2 w-full max-w-[140px] min-w-[110px] mx-auto transition-all hover:shadow-lg 
+      className={`relative flex items-center p-3 rounded-lg border-2 mx-auto transition-all hover:shadow-lg w-[100px]
         ${
           isCaptain
             ? "ring-2 ring-yellow-400"
@@ -242,19 +242,21 @@ export default function FormationTeamPrediction({
     >
       {/* Captain/Vice Captain Badge */}
       {isCaptain && (
-        <div className="absolute -top-1 -right-1 bg-yellow-400 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+        <div className="absolute -top-1 -right-1 bg-yellow-400 text-white text-xs font-bold rounded-full flex items-center justify-center">
           C
         </div>
       )}
       {isViceCaptain && (
-        <div className="absolute -top-1 -right-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+        <div className="absolute -top-1 -right-1 bg-yellow-200 text-yellow-800 text-xs font-bold rounded-full flex items-center justify-center">
           V
         </div>
       )}
 
       {/* Player Info */}
       <div className="text-center w-full">
-        <div className="font-semibold text-sm mb-1 truncate">{player.name}</div>
+        <div className="font-semibold text-sm mb-1 truncate text-wrap">
+          {player.name}
+        </div>
         <div className="text-xs text-gray-600 mb-1 truncate">{player.team}</div>
         <div className="text-lg font-bold text-blue-600">
           {isCaptain
@@ -296,14 +298,14 @@ export default function FormationTeamPrediction({
     const rowClass = "flex justify-center gap-3 flex-wrap";
 
     return (
-      <div className="formation-view bg-gradient-to-b from-green-100 to-green-50 p-6 rounded-lg border">
+      <div className="formation-view bg-gradient-to-b from-green-100 to-green-50 p-6 rounded-lg border sm:flex sm:flex-col sm:items-center">
         <div className="text-center mb-4">
           <h3 className="text-lg font-bold">{formation} Formation</h3>
           <p className="text-sm text-gray-600">
             Optimal Lineup – {lineup.totalPoints.toFixed(1)} predicted points
           </p>
         </div>
-        <div className="space-y-6 content-center">
+        <div className="space-y-20 sm:space-y-12 content-center sm:w-[70%]">
           <div className={rowClass}>
             {fwds.map((player) => (
               <PlayerCard
@@ -430,7 +432,7 @@ export default function FormationTeamPrediction({
       {renderFormationView(optimalLineup)}
 
       {/* Bench */}
-      <div className="mt-6">
+      <div className="mt-6 text-center">
         <h4 className="text-lg font-semibold mb-3">
           Bench ({optimalLineup.bench.length} players)
         </h4>
@@ -438,20 +440,41 @@ export default function FormationTeamPrediction({
           {optimalLineup.bench.map((player) => (
             <div
               key={player.id}
-              className={`p-3 rounded border ${getPositionColor(
+              className={`relative flex items-center p-3 rounded-lg border-2 mx-auto transition-all hover:shadow-lg w-[100px] ${getPositionColor(
                 player.position
-              )} opacity-75 flex flex-col items-center max-w-[140px] min-w-[110px] mx-auto`}
+              )} opacity-75 flex flex-col items-center mx-auto`}
             >
+              {/* Player Info */}
               <div className="text-center w-full">
-                <div className="font-medium text-sm truncate">
+                <div className="font-semibold text-sm mb-1 truncate text-wrap">
                   {player.name}
                 </div>
-                <div className="text-xs text-gray-600 truncate">
+                <div className="text-xs text-gray-600 mb-1 truncate">
                   {player.team}
                 </div>
-                <div className="text-sm font-bold">
+                <div className="text-lg font-bold text-blue-600">
                   {player.predictedPoints.toFixed(1)} pts
                 </div>
+                <div
+                  className={`text-xs ${getConfidenceColor(player.confidence)}`}
+                >
+                  {player.confidence}%
+                </div>
+                {player.fixture && (
+                  <div className="mt-2">
+                    <div className="text-xs font-medium truncate">
+                      {player.fixture.isHome ? "vs" : "@"}{" "}
+                      {player.fixture.opponent}
+                    </div>
+                    <span
+                      className={`inline-block px-1 py-0.5 rounded text-xs ${getDifficultyColor(
+                        player.fixture.difficulty
+                      )}`}
+                    >
+                      {player.fixture.difficulty}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
