@@ -147,7 +147,7 @@ export default function GamePredictions() {
         {predictionsData.predictions.map((prediction) => (
           <div
             key={prediction.id}
-            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow w-full"
           >
             {/* Main prediction display */}
             <div className="flex items-center mb-3">
@@ -155,7 +155,7 @@ export default function GamePredictions() {
                 {/* Home team */}
                 <div className="text-right flex-1">
                   <div className="font-semibold text-lg">
-                    {prediction.homeTeam.name}
+                    {prediction.homeTeam.shortName}
                   </div>
                   <div className="text-sm text-gray-500">
                     <span
@@ -205,7 +205,7 @@ export default function GamePredictions() {
                 {/* Away team */}
                 <div className="text-left flex-1">
                   <div className="font-semibold text-lg">
-                    {prediction.awayTeam.name}
+                    {prediction.awayTeam.shortName}
                   </div>
                   <div className="text-sm text-gray-500">
                     <span
