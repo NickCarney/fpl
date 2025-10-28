@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FPL Wiz",
+  title: "FPL Genie",
   description: "App that provides analysis of fpl teams and leagues",
 };
 
