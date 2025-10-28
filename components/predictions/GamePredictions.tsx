@@ -38,30 +38,106 @@ interface PredictionsData {
   totalMatches: number;
 }
 
+const CACHE_KEY = "fpl_game_predictions";
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour in milliseconds
+
+interface CachedData {
+  data: PredictionsData;
+  timestamp: number;
+  gameweek: number;
+}
+
 export default function GamePredictions() {
   const [predictionsData, setPredictionsData] =
     useState<PredictionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFromCache, setIsFromCache] = useState(false);
 
   useEffect(() => {
-    fetch("/api/predictions/games")
-      .then((res) => {
+    // Try to load from cache first
+    const loadPredictions = async () => {
+      try {
+        const cachedString = localStorage.getItem(CACHE_KEY);
+        const now = Date.now();
+
+        if (cachedString) {
+          const cached: CachedData = JSON.parse(cachedString);
+
+          // Check if cache is still valid (within 1 hour and same gameweek)
+          if (now - cached.timestamp < CACHE_DURATION) {
+            console.log("Loading predictions from cache");
+            setPredictionsData(cached.data);
+            setIsFromCache(true);
+            setLoading(false);
+            return;
+          } else {
+            console.log("Cache expired, fetching fresh data");
+          }
+        }
+
+        // Cache miss or expired - fetch from API
+        console.log("Fetching predictions from API");
+        const res = await fetch("/api/predictions/games");
         if (!res.ok) {
           throw new Error("Failed to fetch game predictions");
         }
-        return res.json();
-      })
-      .then((data) => {
+
+        const data: PredictionsData = await res.json();
+
+        // Store in cache
+        const cacheData: CachedData = {
+          data,
+          timestamp: now,
+          gameweek: data.gameweek,
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
         setPredictionsData(data);
+        setIsFromCache(false);
         setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err: any) {
         console.error("Failed to fetch game predictions:", err);
         setError(err.message);
         setLoading(false);
-      });
+      }
+    };
+
+    loadPredictions();
   }, []);
+
+  const handleRefresh = async () => {
+    // Clear cache and reload
+    localStorage.removeItem(CACHE_KEY);
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log("Manually refreshing predictions");
+      const res = await fetch("/api/predictions/games");
+      if (!res.ok) {
+        throw new Error("Failed to fetch game predictions");
+      }
+
+      const data: PredictionsData = await res.json();
+
+      // Store in cache
+      const cacheData: CachedData = {
+        data,
+        timestamp: Date.now(),
+        gameweek: data.gameweek,
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+
+      setPredictionsData(data);
+      setIsFromCache(false);
+      setLoading(false);
+    } catch (err: any) {
+      console.error("Failed to refresh predictions:", err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -135,12 +211,41 @@ export default function GamePredictions() {
 
   return (
     <div className="game-predictions bg-white rounded-lg shadow-lg p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Score Predictions</h2>
-        <p className="text-gray-600">
-          {predictionsData.gameweekName} - {predictionsData.totalMatches}{" "}
-          fixtures
-        </p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Score Predictions
+          </h2>
+          <p className="text-gray-600">
+            {predictionsData.gameweekName} - {predictionsData.totalMatches}{" "}
+            fixtures
+          </p>
+          {isFromCache && (
+            <p className="text-xs text-gray-500 mt-1">
+              Loaded from cache (refreshes hourly)
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleRefresh}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+          disabled={loading}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          Refresh
+        </button>
       </div>
 
       <div className="space-y-4">

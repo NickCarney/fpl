@@ -13,6 +13,10 @@ interface Team {
   strength_attack_away: number;
   strength_defence_home: number;
   strength_defence_away: number;
+}
+
+interface TeamStats {
+  id: number;
   form: number | null;
   points: number;
   position: number;
@@ -45,6 +49,109 @@ interface HistoricalTeamData {
   position: number;
 }
 
+function calculateTeamStats(fixtures: Fixture[], teams: Team[]): TeamStats[] {
+  const statsMap = new Map<number, TeamStats>();
+
+  // Initialize stats for all teams
+  teams.forEach((team) => {
+    statsMap.set(team.id, {
+      id: team.id,
+      form: null,
+      points: 0,
+      position: 0,
+      played: 0,
+      win: 0,
+      draw: 0,
+      loss: 0,
+      goals_for: 0,
+      goals_against: 0,
+    });
+  });
+
+  // Process finished fixtures
+  const finishedFixtures = fixtures.filter((f) => f.finished && f.team_h_score !== null && f.team_a_score !== null);
+
+  finishedFixtures.forEach((fixture) => {
+    const homeStats = statsMap.get(fixture.team_h);
+    const awayStats = statsMap.get(fixture.team_a);
+
+    if (!homeStats || !awayStats) return;
+
+    const homeScore = fixture.team_h_score!;
+    const awayScore = fixture.team_a_score!;
+
+    // Update played
+    homeStats.played++;
+    awayStats.played++;
+
+    // Update goals
+    homeStats.goals_for += homeScore;
+    homeStats.goals_against += awayScore;
+    awayStats.goals_for += awayScore;
+    awayStats.goals_against += homeScore;
+
+    // Update points and results
+    if (homeScore > awayScore) {
+      homeStats.points += 3;
+      homeStats.win++;
+      awayStats.loss++;
+    } else if (awayScore > homeScore) {
+      awayStats.points += 3;
+      awayStats.win++;
+      homeStats.loss++;
+    } else {
+      homeStats.points += 1;
+      awayStats.points += 1;
+      homeStats.draw++;
+      awayStats.draw++;
+    }
+  });
+
+  // Calculate form (average points from last 5 games)
+  teams.forEach((team) => {
+    const teamFixtures = finishedFixtures
+      .filter((f) => f.team_h === team.id || f.team_a === team.id)
+      .slice(-5); // Last 5 fixtures
+
+    if (teamFixtures.length > 0) {
+      let formPoints = 0;
+      teamFixtures.forEach((fixture) => {
+        const isHome = fixture.team_h === team.id;
+        const teamScore = isHome ? fixture.team_h_score! : fixture.team_a_score!;
+        const oppScore = isHome ? fixture.team_a_score! : fixture.team_h_score!;
+
+        if (teamScore > oppScore) formPoints += 3;
+        else if (teamScore === oppScore) formPoints += 1;
+      });
+
+      const stats = statsMap.get(team.id);
+      if (stats) {
+        stats.form = formPoints / teamFixtures.length;
+      }
+    }
+  });
+
+  // Calculate league positions (sort by points, then goal difference)
+  const statsArray = Array.from(statsMap.values());
+  statsArray.sort((a, b) => {
+    const pointsDiff = b.points - a.points;
+    if (pointsDiff !== 0) return pointsDiff;
+
+    const aGD = a.goals_for - a.goals_against;
+    const bGD = b.goals_for - b.goals_against;
+    const gdDiff = bGD - aGD;
+    if (gdDiff !== 0) return gdDiff;
+
+    return b.goals_for - a.goals_for; // Goals scored as tiebreaker
+  });
+
+  statsArray.forEach((stats, index) => {
+    stats.position = index + 1;
+  });
+
+  return statsArray;
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Fetch bootstrap data for teams and current gameweek
@@ -69,6 +176,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fetch ALL fixtures to calculate team statistics
+    const allFixturesResponse = await fetch(`${FPL_BASE_URL}/fixtures/`);
+    if (!allFixturesResponse.ok) {
+      throw new Error("Failed to fetch all fixtures");
+    }
+    const allFixtures: Fixture[] = await allFixturesResponse.json();
+
+    // Calculate team statistics from finished fixtures
+    const teamStats = calculateTeamStats(allFixtures, teams);
+
     // Fetch fixtures for the target gameweek
     const fixturesResponse = await fetch(
       `${FPL_BASE_URL}/fixtures/?event=${targetEvent.id}`
@@ -85,19 +202,23 @@ export async function GET(request: NextRequest) {
     const historicalData = await fetchHistoricalData();
 
     // Calculate league averages for more realistic predictions
-    const leagueStats = calculateLeagueAverages(teams);
+    const leagueStats = calculateLeagueAverages(teamStats);
 
     // Generate predictions for each fixture
     const gamePredictions = upcomingFixtures
       .map((fixture) => {
         const homeTeam = teams.find((t) => t.id === fixture.team_h);
         const awayTeam = teams.find((t) => t.id === fixture.team_a);
+        const homeStats = teamStats.find((ts) => ts.id === fixture.team_h);
+        const awayStats = teamStats.find((ts) => ts.id === fixture.team_a);
 
-        if (!homeTeam || !awayTeam) return null;
+        if (!homeTeam || !awayTeam || !homeStats || !awayStats) return null;
 
         const prediction = predictScoreWithSimulations(
           homeTeam,
           awayTeam,
+          homeStats,
+          awayStats,
           fixture,
           leagueStats,
           historicalData
@@ -108,23 +229,23 @@ export async function GET(request: NextRequest) {
           homeTeam: {
             name: homeTeam.name,
             shortName: homeTeam.short_name,
-            form: homeTeam.form,
-            position: homeTeam.position,
-            points: homeTeam.points,
-            goalsFor: homeTeam.goals_for || 0,
-            goalsAgainst: homeTeam.goals_against || 0,
-            played: homeTeam.played || 0,
+            form: homeStats.form,
+            position: homeStats.position,
+            points: homeStats.points,
+            goalsFor: homeStats.goals_for,
+            goalsAgainst: homeStats.goals_against,
+            played: homeStats.played,
             strength: homeTeam.strength_overall_home,
           },
           awayTeam: {
             name: awayTeam.name,
             shortName: awayTeam.short_name,
-            form: awayTeam.form,
-            position: awayTeam.position,
-            points: awayTeam.points,
-            goalsFor: awayTeam.goals_for || 0,
-            goalsAgainst: awayTeam.goals_against || 0,
-            played: awayTeam.played || 0,
+            form: awayStats.form,
+            position: awayStats.position,
+            points: awayStats.points,
+            goalsFor: awayStats.goals_for,
+            goalsAgainst: awayStats.goals_against,
+            played: awayStats.played,
             strength: awayTeam.strength_overall_away,
           },
           predictedScore: prediction.score,
@@ -363,8 +484,8 @@ async function fetchHistoricalData(): Promise<Map<string, HistoricalTeamData>> {
   return historicalData;
 }
 
-function calculateLeagueAverages(teams: Team[]) {
-  const playedTeams = teams.filter((t) => t.played > 0);
+function calculateLeagueAverages(teamStats: TeamStats[]) {
+  const playedTeams = teamStats.filter((t) => t.played > 0);
 
   if (playedTeams.length === 0) {
     return {
@@ -375,15 +496,15 @@ function calculateLeagueAverages(teams: Team[]) {
   }
 
   const totalGoalsFor = playedTeams.reduce(
-    (sum, team) => sum + (team.goals_for || 0),
+    (sum, team) => sum + team.goals_for,
     0
   );
   const totalGoalsAgainst = playedTeams.reduce(
-    (sum, team) => sum + (team.goals_against || 0),
+    (sum, team) => sum + team.goals_against,
     0
   );
   const totalGamesPlayed = playedTeams.reduce(
-    (sum, team) => sum + (team.played || 0),
+    (sum, team) => sum + team.played,
     0
   );
 
@@ -402,6 +523,8 @@ function calculateLeagueAverages(teams: Team[]) {
 function predictScoreWithSimulations(
   homeTeam: Team,
   awayTeam: Team,
+  homeStats: TeamStats,
+  awayStats: TeamStats,
   fixture: Fixture,
   leagueStats: any,
   historicalData: Map<string, HistoricalTeamData>
@@ -414,6 +537,8 @@ function predictScoreWithSimulations(
     const result = predictSingleScore(
       homeTeam,
       awayTeam,
+      homeStats,
+      awayStats,
       fixture,
       leagueStats,
       historicalData
@@ -460,6 +585,8 @@ function predictScoreWithSimulations(
 function predictSingleScore(
   homeTeam: Team,
   awayTeam: Team,
+  homeStats: TeamStats,
+  awayStats: TeamStats,
   fixture: Fixture,
   leagueStats: any,
   historicalData: Map<string, HistoricalTeamData>
@@ -469,12 +596,12 @@ function predictSingleScore(
   const awayHistorical = historicalData.get(awayTeam.name);
 
   // Current season data
-  const homeGoalsFor = homeTeam.goals_for || 0;
-  const homeGoalsAgainst = homeTeam.goals_against || 0;
-  const awayGoalsFor = awayTeam.goals_for || 0;
-  const awayGoalsAgainst = awayTeam.goals_against || 0;
-  const homePlayed = Math.max(homeTeam.played || 1, 1);
-  const awayPlayed = Math.max(awayTeam.played || 1, 1);
+  const homeGoalsFor = homeStats.goals_for;
+  const homeGoalsAgainst = homeStats.goals_against;
+  const awayGoalsFor = awayStats.goals_for;
+  const awayGoalsAgainst = awayStats.goals_against;
+  const homePlayed = Math.max(homeStats.played, 1);
+  const awayPlayed = Math.max(awayStats.played, 1);
 
   // Calculate current season rates
   const homeCurrentAttackRate = homeGoalsFor / homePlayed;
@@ -555,20 +682,34 @@ function predictSingleScore(
   homeExpectedGoals = Math.max(0.3, Math.min(3.5, homeExpectedGoals));
   awayExpectedGoals = Math.max(0.3, Math.min(3.5, awayExpectedGoals));
 
-  // Apply form factor
-  if (homeTeam.form !== null && awayTeam.form !== null) {
-    const formImpact = 0.12;
-    const homeFormAdj = 1 + ((homeTeam.form - 3) / 10) * formImpact;
-    const awayFormAdj = 1 + ((awayTeam.form - 3) / 10) * formImpact;
+  // Apply form factor (increased impact from 0.12 to 0.30)
+  if (homeStats.form !== null && awayStats.form !== null) {
+    const formImpact = 0.30;
+    const formDiff = homeStats.form - awayStats.form;
 
-    homeExpectedGoals *= Math.max(0.75, Math.min(1.25, homeFormAdj));
-    awayExpectedGoals *= Math.max(0.75, Math.min(1.25, awayFormAdj));
+    // Scale form adjustments - larger differences have bigger impact
+    const homeFormAdj = 1 + ((homeStats.form - 1.5) / 6) * formImpact;
+    const awayFormAdj = 1 + ((awayStats.form - 1.5) / 6) * formImpact;
+
+    homeExpectedGoals *= Math.max(0.6, Math.min(1.4, homeFormAdj));
+    awayExpectedGoals *= Math.max(0.6, Math.min(1.4, awayFormAdj));
+
+    // Additional boost when form difference is extreme (>1.5 difference)
+    if (Math.abs(formDiff) > 1.5) {
+      if (formDiff > 0) {
+        homeExpectedGoals *= 1.15;
+        awayExpectedGoals *= 0.85;
+      } else {
+        awayExpectedGoals *= 1.15;
+        homeExpectedGoals *= 0.85;
+      }
+    }
   }
 
-  // League position adjustment (include historical context)
-  const positionImpact = 0.04;
-  if (homeTeam.position && awayTeam.position) {
-    const currentPositionDiff = awayTeam.position - homeTeam.position;
+  // League position adjustment (increased impact from 0.04 to 0.10)
+  const positionImpact = 0.10;
+  if (homeStats.position && awayStats.position) {
+    const currentPositionDiff = awayStats.position - homeStats.position;
     let historicalPositionDiff = 0;
 
     if (homeHistorical && awayHistorical) {
@@ -581,13 +722,17 @@ function predictSingleScore(
       currentPositionDiff * seasonWeight +
       historicalPositionDiff * historicalWeight;
 
+    // Scale position impact based on the magnitude of difference
+    const positionScale = Math.min(12, Math.abs(effectivePositionDiff)) / 12;
+
     if (effectivePositionDiff > 0) {
-      homeExpectedGoals *=
-        1 + (positionImpact * Math.min(8, effectivePositionDiff)) / 20;
+      // Home team is higher (better position, lower number)
+      homeExpectedGoals *= 1 + (positionImpact * positionScale);
+      awayExpectedGoals *= 1 - (positionImpact * 0.5 * positionScale);
     } else if (effectivePositionDiff < 0) {
-      awayExpectedGoals *=
-        1 +
-        (positionImpact * Math.min(8, Math.abs(effectivePositionDiff))) / 20;
+      // Away team is higher
+      awayExpectedGoals *= 1 + (positionImpact * positionScale);
+      homeExpectedGoals *= 1 - (positionImpact * 0.5 * positionScale);
     }
   }
 
