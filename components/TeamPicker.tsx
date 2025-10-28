@@ -620,12 +620,18 @@ export default function TeamPicker({
 
     if (draggedIndex === -1 || targetIndex === -1) return;
 
-    // Swap positions
+    // Swap positions - create new objects to avoid mutating state
     const draggedPosition = newPicks[draggedIndex].position;
     const targetPosition = newPicks[targetIndex].position;
 
-    newPicks[draggedIndex].position = targetPosition;
-    newPicks[targetIndex].position = draggedPosition;
+    newPicks[draggedIndex] = {
+      ...newPicks[draggedIndex],
+      position: targetPosition,
+    };
+    newPicks[targetIndex] = {
+      ...newPicks[targetIndex],
+      position: draggedPosition,
+    };
 
     // Validate the formation after the swap
     const validation = validateFormation(newPicks);
@@ -706,10 +712,16 @@ export default function TeamPicker({
     );
 
     if (selectedIndex !== -1 && clickedIndex !== -1) {
-      // Temporarily swap positions
+      // Swap positions - create new objects to avoid mutating state
       const tempPosition = newPicks[selectedIndex].position;
-      newPicks[selectedIndex].position = newPicks[clickedIndex].position;
-      newPicks[clickedIndex].position = tempPosition;
+      newPicks[selectedIndex] = {
+        ...newPicks[selectedIndex],
+        position: newPicks[clickedIndex].position,
+      };
+      newPicks[clickedIndex] = {
+        ...newPicks[clickedIndex],
+        position: tempPosition,
+      };
 
       // Validate the formation
       const validation = validateFormation(newPicks);
