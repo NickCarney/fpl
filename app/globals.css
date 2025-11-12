@@ -3,6 +3,15 @@
 :root {
   --background: rgb(253, 246, 224);
   --foreground: black;
+  --gradient-start: #06b6d4; /* Cyan */
+  --gradient-middle: #10b981; /* Green */
+  --gradient-end: #a855f7; /* Purple */
+  --gradient: linear-gradient(
+    90deg,
+    var(--gradient-start) 0%,
+    var(--gradient-middle) 50%,
+    var(--gradient-end) 100%
+  );
 }
 
 @theme inline {
@@ -10,6 +19,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-gradient-start: var(--gradient-start);
+  --color-gradient-middle: var(--gradient-middle);
+  --color-gradient-end: var(--gradient-end);
 }
 
 @layer base {
@@ -41,7 +53,77 @@
   :root {
     --background: rgb(253, 246, 224);
     --foreground: black;
+    --gradient-start: #06b6d4; /* Cyan */
+    --gradient-middle: #10b981; /* Green */
+    --gradient-end: #a855f7; /* Purple */
+    --gradient: linear-gradient(
+      90deg,
+      var(--gradient-start) 0%,
+      var(--gradient-middle) 50%,
+      var(--gradient-end) 100%
+    );
   }
+}
+
+/* Textarea can use pseudo-elements */
+textarea {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: black;
+  background: transparent;
+  background-clip: padding-box;
+}
+
+textarea::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Input and select need wrapper approach since they can't have pseudo-elements */
+.input-gradient-wrapper {
+  position: relative;
+  display: inline-block;
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--gradient);
+}
+
+.input-gradient-wrapper input,
+.input-gradient-wrapper select {
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--background);
+  color: var(--foreground);
+  width: 100%;
+  outline: none;
+}
+
+/* Fallback: Add gradient outline for standalone inputs */
+input,
+select {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--background);
+  background-clip: padding-box;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--gradient-middle);
 }
 
 body {
@@ -52,11 +134,11 @@ body {
 
 /* Popup overlay and modal styles */
 .popup-overlay {
-  background: #4ade80;
+  background: var(--gradient);
 }
 
 .popup-content {
-  background: #4ade80;
+  background: var(--gradient);
   margin: auto;
   width: 90%;
   max-width: 800px;
@@ -69,9 +151,87 @@ body {
 
 button,
 a {
-  border: 1px solid black;
-  border-radius: 7%;
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 8px;
   color: black;
   cursor: pointer;
-  background-color: #4ade80;
+  background: transparent;
+  background-clip: padding-box;
+}
+
+button::before,
+a::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Apply gradient borders to cards, boxes, and containers */
+.shadow-md,
+.shadow-lg,
+.rounded-lg,
+.border,
+table {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.shadow-md::before,
+.shadow-lg::before,
+.rounded-lg::before,
+.border::before,
+table::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Utility class to add gradient borders to any element */
+.gradient-border {
+  position: relative;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: var(--gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Utility class to exclude gradient borders */
+.no-gradient-border {
+  border: none !important;
+}
+
+.no-gradient-border::before {
+  display: none !important;
 }
