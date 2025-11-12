@@ -22,10 +22,6 @@ interface TeamChips {
   [teamId: number]: string | null;
 }
 
-interface TeamBenchPoints {
-  [teamId: number]: number;
-}
-
 export default function LeagueStandings({
   standings,
   leagueName,
@@ -43,8 +39,6 @@ export default function LeagueStandings({
   const [showCommonLineup, setShowCommonLineup] = useState(true);
   const [teamChips, setTeamChips] = useState<TeamChips>({});
   const [isLoadingChips, setIsLoadingChips] = useState(true);
-  const [teamBenchPoints, setTeamBenchPoints] = useState<TeamBenchPoints>({});
-  const [isLoadingBenchPoints, setIsLoadingBenchPoints] = useState(true);
 
   // Check if user is in the current standings
   const userInStandings = userTeamId
@@ -152,80 +146,6 @@ export default function LeagueStandings({
     }
   }, [standings, currentEvent, shouldShowUserPosition, userPosition]);
 
-  // Fetch bench points for all teams
-  useEffect(() => {
-    const fetchBenchPoints = async () => {
-      setIsLoadingBenchPoints(true);
-      const benchData: TeamBenchPoints = {};
-
-      // Create array of all team IDs to fetch
-      const teamIds = [...standings.map((s) => s.entry)];
-      if (shouldShowUserPosition) {
-        teamIds.push(userPosition.entry);
-      }
-
-      try {
-        // Fetch bench points for all teams in parallel
-        const benchPromises = teamIds.map(async (teamId) => {
-          try {
-            let totalBenchPoints = 0;
-
-            // Fetch picks for all gameweeks to calculate total bench points
-            for (let gw = 1; gw <= currentEvent; gw++) {
-              const response = await fetch(
-                `/api/team/${teamId}/event/${gw}/picks`
-              );
-              if (response.ok) {
-                const data = await response.json();
-                const benchPlayers =
-                  data.picks?.filter((pick: any) => pick.multiplier === 0) ||
-                  [];
-
-                // Calculate bench points for this gameweek
-                const gwBenchPoints = benchPlayers.reduce(
-                  (sum: number, pick: any) => {
-                    const element = elements.find(
-                      (el) => el.id === pick.element
-                    );
-                    if (element && element.total_points) {
-                      return sum + element.total_points;
-                    }
-                    return sum;
-                  },
-                  0
-                );
-
-                totalBenchPoints += gwBenchPoints;
-              }
-            }
-
-            return { teamId, benchPoints: totalBenchPoints };
-          } catch (error) {
-            console.error(
-              `Failed to fetch bench points for team ${teamId}:`,
-              error
-            );
-            return { teamId, benchPoints: 0 };
-          }
-        });
-
-        const results = await Promise.all(benchPromises);
-
-        results.forEach(({ teamId, benchPoints }) => {
-          benchData[teamId] = benchPoints;
-        });
-
-        setTeamBenchPoints(benchData);
-      } catch (error) {
-        console.error("Error fetching bench points:", error);
-      } finally {
-        setIsLoadingBenchPoints(false);
-      }
-    };
-
-    fetchBenchPoints();
-  }, [standings, currentEvent, shouldShowUserPosition, userPosition, elements]);
-
   return (
     <div className="space-y-6">
       {/* League Standings Table */}
@@ -243,7 +163,6 @@ export default function LeagueStandings({
                 <th className="text-center py-2 px-3 border-l">Manager</th>
                 <th className="text-center py-2 px-3 border-l">GW Points</th>
                 <th className="text-center py-2 px-3 border-l">Total</th>
-                <th className="text-center py-2 px-3 border-l">Bench Points</th>
                 <th className="text-center py-2 px-3 border-l">Chip</th>
                 <th className="text-center py-2 px-3 border-l">Movement</th>
               </tr>
@@ -253,8 +172,6 @@ export default function LeagueStandings({
                 const isUserTeam = userTeamId === standing.entry;
                 const movement = standing.last_rank - (index + 1);
                 const activeChip = teamChips[standing.entry];
-                const benchPoints = teamBenchPoints[standing.entry] || 0;
-                const totalWithBench = standing.total + benchPoints;
 
                 return (
                   <tr
@@ -276,13 +193,6 @@ export default function LeagueStandings({
                     </td>
                     <td className="py-3 px-3 text-center font-semibold border-l">
                       {standing.total}
-                    </td>
-                    <td className="py-3 px-3 text-center text-gray-600 border-l">
-                      {isLoadingBenchPoints ? (
-                        <span className="text-gray-400">...</span>
-                      ) : (
-                        benchPoints
-                      )}
                     </td>
                     <td className="py-3 px-3 text-center border-l">
                       {isLoadingChips ? (
