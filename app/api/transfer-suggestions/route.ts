@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       fixtures,
       bankBalance = 0,
       freeTransfers = 1,
-      numberOfTransfers = 3,
+      numberOfTransfers = 1,
     } = body;
 
     if (!teamData || !squadData || !elements) {
@@ -40,6 +40,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Log transfer constraints for debugging
+    console.log("Transfer Analysis Constraints:", {
+      bankBalance,
+      freeTransfers,
+      numberOfTransfers,
+      currentGameweek,
+    });
 
     // Fetch RAG data for enhanced analysis with caching
     let ragData = null;
@@ -192,6 +200,8 @@ CONSTRAINTS:
       gameweekFinished ? "(finished)" : "(ongoing)"
     }
 
+Do not break any contraints (Use more than the bank allows (its okay to have multiple transfers even out), suggestmore than Free Transfers (Without saying you are))
+
 ${ragContext}
 ${externalContext}
 ${playerDatabaseContext}
@@ -221,6 +231,8 @@ IMPORTANT:
 - Use EXACT player names and prices from the AVAILABLE PLAYERS DATABASE above
 - If gameweek is ongoing, consider that players who haven't played yet may still get points
 - Don't criticize players who haven't played yet for having 0 points in current gameweek
+- Don't transfer out players who have played well AND are cheap - these players are not weak. 
+- Take player's price into consideration. A 14mil player averaging 10 is no better (maybe wose) than a 7mil player averaging 5
 
 TASK: Identify the ${numberOfTransfers} weakest players in MY SQUAD and suggest the BEST replacements within budget.
 
@@ -305,7 +317,7 @@ Keep it concise and data-driven. Reference specific stats and trends when availa
         headers: {
           "Content-Type": "text/plain; charset=utf-8",
           "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
+          Connection: "keep-alive",
         },
       });
     } catch (aiError) {

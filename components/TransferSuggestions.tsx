@@ -55,6 +55,11 @@ export default function TransferSuggestions({
   const [isFallback, setIsFallback] = useState(false);
   const [streamedContent, setStreamedContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [transferInfo, setTransferInfo] = useState<{
+    bankBalance: number;
+    freeTransfers: number;
+    numberOfTransfers: number;
+  } | null>(null);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -237,7 +242,29 @@ export default function TransferSuggestions({
       const bankBalance = teamPicks?.entry_history?.bank
         ? teamPicks.entry_history.bank / 10
         : 1.0;
-      const freeTransfers = 1;
+
+      // Calculate free transfers available
+      // If transfers.limit is null, it means unlimited (chip active like wildcard/free hit)
+      // Otherwise, free transfers = limit - made
+      const freeTransfers = teamPicks?.transfers
+        ? teamPicks.transfers.limit === null
+          ? 15 // Unlimited transfers (wildcard/free hit) - suggest full squad refresh
+          : Math.max(0, teamPicks.transfers.limit - teamPicks.transfers.made)
+        : 1; // Default to 1 if no transfer data
+
+      // Number of transfers to suggest should be at most free transfers
+      // But cap at 3 for normal gameweeks to keep suggestions focused
+      const numberOfTransfers =
+        teamPicks?.transfers?.limit === null
+          ? 5 // More suggestions for wildcard/free hit
+          : Math.min(freeTransfers, 3);
+
+      // Store transfer info for display
+      setTransferInfo({
+        bankBalance,
+        freeTransfers,
+        numberOfTransfers,
+      });
 
       // Make streaming request
       const response = await fetch("/api/transfer-suggestions", {
@@ -254,7 +281,7 @@ export default function TransferSuggestions({
           fixtures,
           bankBalance,
           freeTransfers,
-          numberOfTransfers: 3,
+          numberOfTransfers,
         }),
       });
 
@@ -333,19 +360,41 @@ export default function TransferSuggestions({
         className="flex justify-between items-center p-4 cursor-pointer rounded-t-lg transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          Transfer Suggestions
-          {isFallback && (
-            <span className="text-xs text-yellow-800 px-2 py-1 rounded">
-              Basic Mode
-            </span>
+        <div className="flex items-center gap-4 flex-wrap">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            Transfer Suggestions
+            {isFallback && (
+              <span className="text-xs text-yellow-800 px-2 py-1 rounded">
+                Basic Mode
+              </span>
+            )}
+            {/* {isStreaming && (
+              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded animate-pulse">
+                Streaming...
+              </span>
+            )} */}
+          </h3>
+          {transferInfo && (
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900 rounded">
+                <span className="font-semibold">Bank:</span>
+                <span>£{transferInfo.bankBalance.toFixed(1)}m</span>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded">
+                <span className="font-semibold">Free Transfers:</span>
+                <span>
+                  {transferInfo.freeTransfers === 15
+                    ? "Unlimited"
+                    : transferInfo.freeTransfers}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900 rounded">
+                <span className="font-semibold">Suggestions:</span>
+                <span>{transferInfo.numberOfTransfers}</span>
+              </div>
+            </div>
           )}
-          {/* {isStreaming && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded animate-pulse">
-              Streaming...
-            </span>
-          )} */}
-        </h3>
+        </div>
         <div className="flex items-center gap-2">
           {!isCollapsed && (
             <button
@@ -425,7 +474,7 @@ export default function TransferSuggestions({
               {/* Multiple Transfer Suggestions */}
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-semibold mb-3">
-                  💡 Transfer Options ({parsedAnalysis.transfers.length})
+                  Transfer Options ({parsedAnalysis.transfers.length})
                   {/* {isStreaming && parsedAnalysis.transfers.length < 3 && (
                     <span className="text-sm text-blue-600 ml-2">
                       (Loading more options...)
@@ -520,7 +569,12 @@ export default function TransferSuggestions({
                                   Budget:
                                 </span>
                                 <span className="text-sm text-blue-700 ml-1">
-                                  {transfer.budgetImpact}
+                                  {transfer.budgetImpact.slice(0, 1) === "-" ? (
+                                    <>+</>
+                                  ) : (
+                                    <>-</>
+                                  )}
+                                  {parseFloat(transfer.budgetImpact.slice(2))}
                                 </span>
                               </div>
                             )}
