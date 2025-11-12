@@ -227,9 +227,9 @@ export async function generateTransferSuggestions(
   currentGameweek: number,
   gameweekFinished: boolean = false,
   fixtures: any[] = [],
-  bankBalance: number = 0,
-  freeTransfers: number = 3,
-  numberOfTransfers: number = 3
+  bankBalance: number,
+  freeTransfers: number,
+  numberOfTransfers: number
 ): Promise<{
   analysis: string;
   fallback?: boolean;

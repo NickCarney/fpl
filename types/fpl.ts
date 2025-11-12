@@ -145,6 +145,14 @@ export interface TeamPicks {
     points_on_bench: number;
   };
   picks: Pick[];
+  transfers?: {
+    cost: number;
+    status: string;
+    limit: number | null;
+    made: number;
+    bank: number;
+    value: number;
+  };
 }
 
 export interface LeagueStanding {
