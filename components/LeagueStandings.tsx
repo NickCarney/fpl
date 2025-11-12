@@ -234,9 +234,9 @@ export default function LeagueStandings({
             </div>
             <button
               onClick={() => setShowCommonLineup(!showCommonLineup)}
-              className={`px-4 py-2 rounded-md transition-colors ${
+              className={`px-4 py-2 rounded-md transition-all ${
                 showCommonLineup
-                  ? "bg-purple-600 text-white hover:bg-purple-700"
+                  ? "bg-gradient-to-r from-cyan-500 via-green-500 to-purple-500 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }`}
             >

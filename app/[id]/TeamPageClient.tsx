@@ -273,7 +273,7 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
             </div>
             <button
               onClick={() => router.push("/")}
-              className="text-blue-600 hover:text-blue-800 !border-none !bg-transparent"
+              className="text-blue-600 hover:text-blue-800 no-gradient-border"
             >
               Change Team
             </button>
@@ -415,13 +415,14 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
                         Enter different league ID manually
                       </summary>
                       <div className="mt-3 flex flex-col gap-y-4 justify-center items-center">
-                        <input
-                          type="number"
-                          value={leagueId}
-                          onChange={(e) => setLeagueId(e.target.value)}
-                          placeholder="Enter League ID"
-                          className="border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <div className="input-gradient-wrapper">
+                          <input
+                            type="number"
+                            value={leagueId}
+                            onChange={(e) => setLeagueId(e.target.value)}
+                            placeholder="Enter League ID"
+                          />
+                        </div>
                         <button
                           onClick={() => handleLoadLeague()}
                           disabled={!leagueId}
@@ -448,13 +449,14 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
                     Load League Standings
                   </h2>
                   <div className="flex gap-4">
-                    <input
-                      type="number"
-                      value={leagueId}
-                      onChange={(e) => setLeagueId(e.target.value)}
-                      placeholder="Enter League ID"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div className="input-gradient-wrapper flex-1">
+                      <input
+                        type="number"
+                        value={leagueId}
+                        onChange={(e) => setLeagueId(e.target.value)}
+                        placeholder="Enter League ID"
+                      />
+                    </div>
                     <button
                       onClick={() => handleLoadLeague()}
                       disabled={!leagueId}

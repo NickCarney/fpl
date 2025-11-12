@@ -36,7 +36,7 @@ export default function PlayerDetailPopup({
     null
   );
   const [loadingGameweeks, setLoadingGameweeks] = useState(false);
-  const [showGameweeks, setShowGameweeks] = useState(false);
+  const [showGameweeks, setShowGameweeks] = useState(true);
 
   // Load gameweek data when popup opens
   useEffect(() => {

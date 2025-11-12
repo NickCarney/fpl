@@ -176,7 +176,7 @@ export default function TeamInsights({
   };
 
   return (
-    <div className="bg-green-200 rounded-lg border border-blue-200">
+    <div className="bg-green-200 rounded-lg border border-green-200">
       <div
         className="flex justify-between items-center p-4 cursor-pointer rounded-t-lg transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
@@ -184,8 +184,8 @@ export default function TeamInsights({
         <h3 className="text-xl font-bold flex items-center gap-2">
           Team Insights
           {isFallback && (
-            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-              Basic Analysis
+            <span className="text-xs text-yellow-800 px-2 py-1 rounded">
+              Basic Mode
             </span>
           )}
           {/* {isStreaming && (
@@ -202,12 +202,18 @@ export default function TeamInsights({
                 generateInsights();
               }}
               disabled={loading}
-              className="px-3 py-1 text-white rounded-md transition-colors text-sm disabled:opacity-50"
+              className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
             >
-              {loading ? "Analyzing..." : "New analysis"}
+              {loading
+                ? "Analyzing..."
+                : insights
+                ? "New Analysis"
+                : "Analyze Squad"}
             </button>
           )}
-          <button className="p-1">{isCollapsed ? "▼" : "▲"}</button>
+          <button className="hover:bg-green-300 p-1 rounded">
+            {isCollapsed ? "▼" : "▲"}
+          </button>
         </div>
       </div>
 
@@ -243,6 +249,20 @@ export default function TeamInsights({
                   <span>Powered by AI</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {!insights && !streamedContent && !loading && (
+            <div className="text-center py-8">
+              <p className="text-gray-600 mb-4">
+                Get AI-powered insights about your team&apos;s strengths, weaknesses, and performance
+              </p>
+              <button
+                onClick={generateInsights}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+              >
+                Analyze My Squad
+              </button>
             </div>
           )}
         </div>

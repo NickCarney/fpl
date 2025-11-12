@@ -231,7 +231,7 @@ export default function FormationTeamPrediction({
     isViceCaptain: boolean;
   }) => (
     <div
-      className={`relative flex items-center p-3 rounded-lg border-2 mx-auto transition-all hover:shadow-lg w-[100px]
+      className={`relative flex items-center p-3 rounded-lg border-2 mx-auto transition-all hover:shadow-lg w-[100px] ring-1 ring-(-gradient) gradient-border
         ${
           isCaptain
             ? "ring-2 ring-yellow-400"
@@ -253,8 +253,8 @@ export default function FormationTeamPrediction({
       )}
 
       {/* Player Info */}
-      <div className="text-center w-full">
-        <div className="font-semibold text-sm mb-1 truncate text-wrap">
+      <div className="text-center w-full gradient-border">
+        <div className="font-semibold text-sm mb-1 truncate text-wrap gradient-border">
           {player.name}
         </div>
         <div className="text-xs text-gray-600 mb-1 truncate">{player.team}</div>
@@ -440,7 +440,7 @@ export default function FormationTeamPrediction({
           {optimalLineup.bench.map((player) => (
             <div
               key={player.id}
-              className={`relative flex items-center p-3 rounded-lg border-2 mx-auto transition-all hover:shadow-lg w-[100px] ${getPositionColor(
+              className={`relative flex items-center p-3 rounded-lg border-2 mx-auto transition-all hover:shadow-lg w-[100px] gradient-border ${getPositionColor(
                 player.position
               )} opacity-75 flex flex-col items-center mx-auto`}
             >

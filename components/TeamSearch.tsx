@@ -61,16 +61,27 @@ export default function TeamSearch({ onTeamSelect }: TeamSearchProps) {
         <label className="block text-sm font-medium mb-2">
           Search for your team
         </label>
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Enter your FPL team name or manager name..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Type at least 2 characters to search
-        </p>
+        <div className="input-gradient-wrapper w-full">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Enter your FPL team name or manager name..."
+            className="w-full px-3 py-2 w-full rounded-md "
+          />
+        </div>
+        <details className="mt-1">
+          <summary className="text-xs cursor-pointer select-none">
+            Search tips
+          </summary>
+          <div className="text-xs mt-1">
+            <ul className="list-disc list-inside space-y-1">
+              <li>Search by your FPL team name or your actual name</li>
+              <li>Make sure you&apos;re in a public league for search to work</li>
+              <li>Can&apos;t find your team? Use the Team ID option instead</li>
+            </ul>
+          </div>
+        </details>
       </div>
 
       {loading && (
@@ -124,17 +135,6 @@ export default function TeamSearch({ onTeamSelect }: TeamSearchProps) {
           Keep typing to search for teams...
         </div>
       )}
-
-      <div className="text-xs text-gray-600 bg-blue-50 p-3 rounded">
-        <p>
-          <strong>Tips:</strong>
-        </p>
-        <ul className="list-disc list-inside mt-1 space-y-1">
-          <li>Search by your FPL team name or your actual name</li>
-          <li>Make sure you&apos;re in a public league for search to work</li>
-          <li>Can&apos;t find your team? Use the Team ID option instead</li>
-        </ul>
-      </div>
     </div>
   );
 }

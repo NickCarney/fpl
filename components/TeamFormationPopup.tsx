@@ -280,16 +280,16 @@ export default function TeamFormationPopup({
               <div>Form: {stats.form}</div>
               <div className={stats.statusColor}>{stats.minutes}</div>
               {stats.goals > 0 && (
-                <div className="text-green-600">⚽ {stats.goals}</div>
+                <div className="text-green-600">G {stats.goals}</div>
               )}
               {stats.assists > 0 && (
-                <div className="text-blue-600">🅰️ {stats.assists}</div>
+                <div className="text-blue-600">A {stats.assists}</div>
               )}
               {stats.cleanSheets > 0 && (
-                <div className="text-purple-600">🥅 {stats.cleanSheets}</div>
+                <div className="text-purple-600">CS {stats.cleanSheets}</div>
               )}
               {stats.bonus > 0 && (
-                <div className="text-orange-600">⭐ {stats.bonus}</div>
+                <div className="text-orange-600">BP {stats.bonus}</div>
               )}
             </div>
           ) : (
@@ -297,10 +297,10 @@ export default function TeamFormationPopup({
               <div>Form: {stats.form}</div>
               <div>PPG: {stats.ppg}</div>
               <div className="flex justify-center gap-1 text-xs">
-                <span className="text-green-600">⚽{stats.goals}</span>
-                <span className="text-blue-600">🅰️{stats.assists}</span>
+                <span className="text-green-600">G{stats.goals}</span>
+                <span className="text-blue-600">A{stats.assists}</span>
                 {stats.cleanSheets > 0 && (
-                  <span className="text-purple-600">🥅{stats.cleanSheets}</span>
+                  <span className="text-purple-600">CS{stats.cleanSheets}</span>
                 )}
               </div>
             </div>
@@ -627,12 +627,12 @@ export default function TeamFormationPopup({
                           : `${stats.minutes} total`}
                         {stats.isGameweek && stats.goals > 0 && (
                           <span className="ml-1 text-green-600">
-                            ⚽{stats.goals}
+                            G {stats.goals}
                           </span>
                         )}
                         {stats.isGameweek && stats.assists > 0 && (
                           <span className="ml-1 text-blue-600">
-                            🅰️{stats.assists}
+                            A {stats.assists}
                           </span>
                         )}
                       </div>

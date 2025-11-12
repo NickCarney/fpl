@@ -47,9 +47,7 @@ export default function Home() {
           </button>
           <button
             className={`px-3 py-2 rounded text-sm ${
-              loginMode === "search"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200"
+              loginMode === "search" ? "bg-blue-600 text-white" : "bg-gray-200"
             }`}
             onClick={() => setLoginMode("search")}
           >
@@ -57,9 +55,7 @@ export default function Home() {
           </button>
           <button
             className={`px-3 py-2 rounded text-sm ${
-              loginMode === "league"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200"
+              loginMode === "league" ? "bg-blue-600 text-white" : "bg-gray-200"
             }`}
             onClick={() => setLoginMode("league")}
           >
@@ -106,13 +102,15 @@ export default function Home() {
               }}
               className="flex flex-col gap-2"
             >
-              <input
-                type="text"
-                value={leagueLoginId}
-                onChange={(e) => setLeagueLoginId(e.target.value)}
-                placeholder="Enter League ID or URL: 724869"
-                className="border border-gray-300 rounded-md px-3 py-2"
-              />
+              <div className="input-gradient-wrapper">
+                <input
+                  type="text"
+                  value={leagueLoginId}
+                  onChange={(e) => setLeagueLoginId(e.target.value)}
+                  placeholder="Enter League ID or URL: 724869"
+                  className="rounded-md px-3 py-2 w-full"
+                />
+              </div>
               <button
                 type="submit"
                 className="bg-blue-600 text-white rounded-md px-4 py-2"

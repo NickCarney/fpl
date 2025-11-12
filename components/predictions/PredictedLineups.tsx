@@ -119,14 +119,14 @@ export default function PredictedLineups() {
     const fwd = players.filter((p) => p.position === "FWD");
 
     return (
-      <div className="formation-display bg-green-50 rounded-lg p-4 min-h-[300px] relative">
+      <div className="formation-display bg-green-50 rounded-lg p-4 min-h-fit relative">
         <div className="text-center font-semibold mb-2">{lineup.team}</div>
-        <div className="text-xs text-gray-600 text-center mb-4">
+        <div className="text-xs text-gray-600 text-center">
           {lineup.formation}
         </div>
 
         {/* Formation Layout */}
-        <div className="formation-grid h-64 relative">
+        <div className="formation-grid h-72 relative">
           {/* Forwards */}
           <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex space-x-2">
             {fwd.map((player) => (
@@ -149,7 +149,7 @@ export default function PredictedLineups() {
           </div>
 
           {/* Goalkeeper */}
-          <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
+          <div className="absolute top-56 left-1/2 transform -translate-x-1/2">
             {gk.map((player) => (
               <PlayerCard key={player.id} player={player} />
             ))}
@@ -207,7 +207,7 @@ export default function PredictedLineups() {
   };
 
   return (
-    <div className="predicted-lineups bg-white rounded-lg shadow-lg p-6">
+    <div className="predicted-lineups rounded-lg shadow-lg p-6">
       <div className="mb-6 text-center">
         <h2 className="text-2xl font-bold text-gray-900">Predicted Lineups</h2>
         <p className="text-gray-600">
@@ -219,7 +219,7 @@ export default function PredictedLineups() {
         {lineupsData.fixtures.map((fixtureLineup, index) => (
           <div
             key={fixtureLineup.fixture.id}
-            className="fixture-container border border-gray-200 rounded-lg p-4"
+            className="fixture-container border border-gray-200 rounded-lg p-4 no-gradient-border "
           >
             <div className="fixture-header text-center mb-6">
               <h3 className="text-xl font-semibold">

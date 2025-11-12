@@ -88,27 +88,29 @@ export default function SeasonHistory({ history, chips }: SeasonHistoryProps) {
 
       {/* Toggle */}
       <div className="flex justify-center mb-6">
-        <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1">
-          <button
-            onClick={() => setViewMode("yourTeam")}
-            className={`px-6 py-2 rounded-md transition-colors ${
-              viewMode === "yourTeam"
-                ? "bg-blue-600 text-white"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            Your Team
-          </button>
-          <button
-            onClick={() => setViewMode("premierLeague")}
-            className={`px-6 py-2 rounded-md transition-colors ${
-              viewMode === "premierLeague"
-                ? "bg-blue-600 text-white"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
-          >
-            Premier League
-          </button>
+        <div className="inline-flex rounded-lg border-2p-[2px] no-gradient-border ">
+          <div className="inline-flex rounded-lg dark:bg-gray-900 p-1 no-gradient-border ">
+            <button
+              onClick={() => setViewMode("yourTeam")}
+              className={`px-6 py-2 rounded-md transition-all no-gradient-border  ${
+                viewMode === "yourTeam"
+                  ? "text-white !border-b-2 !rounded-none !border-purple-600"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 bg-transparent"
+              }`}
+            >
+              Your Team
+            </button>
+            <button
+              onClick={() => setViewMode("premierLeague")}
+              className={`px-6 py-2 rounded-md transition-all no-gradient-border  ${
+                viewMode === "premierLeague"
+                  ? "text-white !border-b-2 !rounded-none !border-cyan-600"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 bg-transparent"
+              }`}
+            >
+              Premier League
+            </button>
+          </div>
         </div>
       </div>
 
@@ -621,28 +623,28 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
                 )
               )}
               {/* Stats columns */}
-              <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 Top Scorer
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 W
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 D
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 L
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 xG For
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 xG Ag
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 Pts
               </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-blue-100 dark:bg-blue-900">
+              <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 Form
               </th>
               {/* Upcoming fixtures */}
@@ -692,29 +694,29 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
                 {/* Stats columns */}
                 <td
                   ref={index === 0 ? statsRef : null}
-                  className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs bg-blue-50 dark:bg-blue-950"
+                  className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950"
                 >
                   {stat.topScorer}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.wins}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.draws}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.losses}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.xgFor}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.xgAgainst}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center font-bold bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center font-bold bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.points}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-center text-xs bg-blue-50 dark:bg-blue-950">
+                <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-center text-xs bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.form || "-"}
                 </td>
                 {/* Upcoming fixtures */}

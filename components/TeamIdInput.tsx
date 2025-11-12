@@ -18,7 +18,7 @@ export default function TeamIdInput({ onTeamIdSubmit }: TeamIdInputProps) {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6  rounded-lg shadow-md">
+    <div className="max-w-md mx-auto p-6  rounded-lg shadow-md no-gradient-border">
       <h2 className="text-2xl font-bold mb-4 text-center">
         Enter Your FPL Team ID
       </h2>
@@ -27,15 +27,17 @@ export default function TeamIdInput({ onTeamIdSubmit }: TeamIdInputProps) {
           <label htmlFor="teamId" className="block text-sm font-medium  mb-2">
             Team ID
           </label>
-          <input
-            type="number"
-            id="teamId"
-            value={teamId}
-            onChange={(e) => setTeamId(e.target.value)}
-            placeholder="e.g. 3584215"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-            required
-          />
+          <div className="input-gradient-wrapper w-full">
+            <input
+              type="number"
+              id="teamId"
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              placeholder="e.g. 3584215"
+              className="w-full"
+              required
+            />
+          </div>
           <details className="mt-1">
             <summary className="text-xs cursor-pointer select-none">
               Where do I find my team ID?

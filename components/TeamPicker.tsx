@@ -79,102 +79,106 @@ const PlayerCard = ({
   if (isFormationView && !isBench) {
     // Formation view for starting XI - MATCH CurrentSquad
     return (
-      <div
-        draggable
-        onDragStart={() => onDragStart(player, pick, false)}
-        onDrop={() => onDrop(pick)}
-        onDragOver={onDragOver}
-        onClick={() => onClick(pick)}
-        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto scrolly ${
-          isSelected
-            ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
-            : canBeReplaced
-            ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
-            : pick.is_captain
-            ? "border-yellow-400"
-            : pick.is_vice_captain
-            ? "border-yellow-300"
-            : "border-green-300"
-        } ${className}`}
-      >
-        {/* Player Name and Team */}
-        <div className="text-center mb-2">
-          <h3 className="font-semibold text-sm leading-tight">
-            {player.web_name}
-          </h3>
-          <p className="text-xs ">
-            {team.short_name} - {position.singular_name_short}
-          </p>
-        </div>
-
-        {/* Stats */}
-        <div className="text-center mb-2">
-          <p className="text-sm font-bold text-green-700">
-            {player.total_points}pts
-            <span className="text-xs text-gray-500 block">Season</span>
-          </p>
-          <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
-        </div>
-
-        {/* Form and Minutes */}
-        <div className="text-center text-xs mb-2">
-          <div>Form: {player.form}</div>
-          <div className="text-gray-700">{player.minutes} mins</div>
-          <div className="mt-1">
-            <div>PPG: {player.points_per_game}</div>
-            <div className="flex justify-center gap-1 text-xs">
-              <span className="text-green-600">⚽{player.goals_scored}</span>
-              <span className="text-blue-600">🅰️{player.assists}</span>
-              {player.clean_sheets > 0 && (
-                <span className="text-purple-600">🥅{player.clean_sheets}</span>
-              )}
-            </div>
+      <div className="gradient-border rounded-lg p-0">
+        <div
+          draggable
+          onDragStart={() => onDragStart(player, pick, false)}
+          onDrop={() => onDrop(pick)}
+          onDragOver={onDragOver}
+          onClick={() => onClick(pick)}
+          className={`relative flex flex-col p-3 rounded-lg transition-all cursor-pointer w-24 h-32 overflow-y-auto scrolly bg-green-300 ${
+            isSelected
+              ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
+              : canBeReplaced
+              ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
+              : pick.is_captain
+              ? "border-yellow-400"
+              : pick.is_vice_captain
+              ? "border-yellow-300"
+              : "border-green-300"
+          } ${className}`}
+        >
+          {/* Player Name and Team */}
+          <div className="text-center mb-2">
+            <h3 className="font-semibold text-sm leading-tight">
+              {player.web_name}
+            </h3>
+            <p className="text-xs ">
+              {team.short_name} - {position.singular_name_short}
+            </p>
           </div>
-          {/* Fixture info */}
-          {nextFixture && (
-            <div
-              className={`text-xs mt-1 px-1 py-0.5 rounded ${
-                fixtureDifficulty <= 2
-                  ? "bg-green-100 text-green-700"
-                  : fixtureDifficulty <= 3
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-red-100 text-red-700"
-              }`}
-            >
-              {fixtureText} ({fixtureDifficulty})
-            </div>
-          )}
-        </div>
 
-        {/* Captain/Vice-Captain Badges */}
-        <div className="flex justify-center gap-1 mt-auto">
-          {pick.is_captain && (
-            <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
-              C
-            </span>
-          )}
-          {pick.is_vice_captain && (
-            <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
-              V
-            </span>
-          )}
-          {pick.multiplier > 1 && (
-            <span className="px-2 py-1 text-xs rounded">
-              {pick.multiplier}x
-            </span>
-          )}
-          {/* Captain select button (optional, keep if you want quick selection) */}
-          {!pick.is_captain && !pick.is_vice_captain && !isBench && (
-            <span
-              className="px-2 py-1 bg-gray-200 text-xs rounded font-bold cursor-pointer hover:bg-yellow-200"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCaptainSelect(pick);
-              }}
-            >
-              +
-            </span>
-          )}
+          {/* Stats */}
+          <div className="text-center mb-2">
+            <p className="text-sm font-bold text-green-700">
+              {player.total_points}pts
+              <span className="text-xs text-gray-500 block">Season</span>
+            </p>
+            <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
+          </div>
+
+          {/* Form and Minutes */}
+          <div className="text-center text-xs mb-2">
+            <div>Form: {player.form}</div>
+            <div className="text-gray-700">{player.minutes} mins</div>
+            <div className="mt-1">
+              <div>PPG: {player.points_per_game}</div>
+              <div className="flex justify-center gap-1 text-xs">
+                <span className="text-green-600">G{player.goals_scored}</span>
+                <span className="text-blue-600">A{player.assists}</span>
+                {player.clean_sheets > 0 && (
+                  <span className="text-purple-600">
+                    CS{player.clean_sheets}
+                  </span>
+                )}
+              </div>
+            </div>
+            {/* Fixture info */}
+            {nextFixture && (
+              <div
+                className={`text-xs mt-1 px-1 py-0.5 rounded ${
+                  fixtureDifficulty <= 2
+                    ? "bg-green-100 text-green-700"
+                    : fixtureDifficulty <= 3
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {fixtureText} ({fixtureDifficulty})
+              </div>
+            )}
+          </div>
+
+          {/* Captain/Vice-Captain Badges */}
+          <div className="flex justify-center gap-1 mt-auto">
+            {pick.is_captain && (
+              <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+                C
+              </span>
+            )}
+            {pick.is_vice_captain && (
+              <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+                V
+              </span>
+            )}
+            {pick.multiplier > 1 && (
+              <span className="px-2 py-1 text-xs rounded">
+                {pick.multiplier}x
+              </span>
+            )}
+            {/* Captain select button (optional, keep if you want quick selection) */}
+            {!pick.is_captain && !pick.is_vice_captain && !isBench && (
+              <span
+                className="px-2 py-1 bg-gray-200 text-xs rounded font-bold cursor-pointer hover:bg-yellow-200"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCaptainSelect(pick);
+                }}
+              >
+                +
+              </span>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -188,13 +192,13 @@ const PlayerCard = ({
       onDrop={() => onDrop(pick)}
       onDragOver={onDragOver}
       onClick={() => onClick(pick)}
-      className={`relative p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg ${
+      className={`relative p-3 rounded-lg cursor-pointer ${
         isSelected
-          ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
+          ? "ring-1 ring-blue-300 bg-green-300"
           : canBeReplaced
-          ? "border-orange-400 bg-orange-50 ring-2 ring-orange-300"
+          ? "ring-1 ring-orange-300"
           : isBench
-          ? "border-gray-300 bg-gray-50"
+          ? "border-gray-300"
           : "border-green-300"
       } ${pick.is_captain ? "ring-2 ring-yellow-400" : ""} ${
         pick.is_vice_captain ? "ring-2 ring-yellow-300" : ""
@@ -894,8 +898,8 @@ export default function TeamPicker({
       </div>
 
       {/* Starting XI */}
-      <div className="border rounded-lg p-4">
-        <h3 className="text-lg font-semibold mb-4">
+      <div className="border rounded-lg p-4 flex justify-center flex-col no-gradient-border">
+        <h3 className="text-lg font-semibold mb-4 text-center">
           Starting XI ({startingXI.length}/11)
         </h3>
 

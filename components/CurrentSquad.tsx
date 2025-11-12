@@ -607,124 +607,130 @@ export default function CurrentSquad({
       return (
         <div
           key={pick.element}
-          onClick={() => handlePlayerClick(pick)}
-          className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-32 overflow-y-auto scrolly ${
-            pick.is_captain
-              ? "border-yellow-400"
-              : pick.is_vice_captain
-              ? " border-yellow-300"
-              : isNewSuggestion
-              ? "border-green-500 bg-green-50"
-              : isBenchedSuggestion
-              ? "border-orange-400 bg-orange-50"
-              : " border-green-300"
-          }`}
+          className="gradient-border rounded-lg w-24 h-32"
         >
-          {/* Suggestion indicators */}
-          {isNewSuggestion && (
-            <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              ↑
-            </div>
-          )}
-          {isBenchedSuggestion && (
-            <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              ↓
-            </div>
-          )}
-          {isTransferIn && (
-            <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              ⚡
-            </div>
-          )}
-          {/* Player Name and Team */}
-          <div className="text-center mb-2">
-            <h3 className="font-semibold text-sm leading-tight">
-              {player.web_name}
-            </h3>
-            <p className="text-xs ">
-              {team?.short_name} - {position?.singular_name_short}
-            </p>
-          </div>
-
-          {/* Stats - Updated to use getPlayerStats */}
-          <div className="text-center mb-2">
-            <p className={`text-sm font-bold ${stats.statusColor}`}>
-              {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
-              <span className="text-xs text-gray-500 block">
-                {stats.isGameweek ? `GW${currentEvent}` : "Season"}
-              </span>
-            </p>
-            <p className="text-xs ">£{stats.price}m</p>
-          </div>
-
-          {/* Form and Minutes - Updated */}
-          <div className="text-center text-xs  mb-2">
-            <div>Form: {stats.form}</div>
-            <div className={stats.statusColor}>{stats.minutes}</div>
-            {stats.isGameweek && (
-              <div className="mt-1">
-                {stats.goals > 0 && (
-                  <div className="text-green-600">⚽ {stats.goals}</div>
-                )}
-                {stats.assists > 0 && (
-                  <div className="text-blue-600">🅰️ {stats.assists}</div>
-                )}
-                {stats.cleanSheets > 0 && (
-                  <div className="text-purple-600">🥅 {stats.cleanSheets}</div>
-                )}
-                {stats.bonus > 0 && (
-                  <div className="text-orange-600">⭐ {stats.bonus}</div>
-                )}
+          <div
+            onClick={() => handlePlayerClick(pick)}
+            className={`relative flex flex-col p-3 rounded-lg transition-all cursor-pointer w-full h-full overflow-y-auto scrolly bg-green-300 ${
+              pick.is_captain
+                ? "ring-1 ring-yellow-400"
+                : pick.is_vice_captain
+                ? "ring-1 ring-yellow-300"
+                : isNewSuggestion
+                ? "ring-1 ring-green-500"
+                : isBenchedSuggestion
+                ? "ring-1 ring-orange-400"
+                : ""
+            }`}
+          >
+            {/* Suggestion indicators */}
+            {isNewSuggestion && (
+              <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                ↑
               </div>
             )}
-            {!stats.isGameweek && (
-              <div className="mt-1">
-                <div>PPG: {stats.ppg}</div>
-                <div className="flex justify-center gap-1 text-xs">
-                  <span className="text-green-600">⚽{stats.goals}</span>
-                  <span className="text-blue-600">🅰️{stats.assists}</span>
+            {isBenchedSuggestion && (
+              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                ↓
+              </div>
+            )}
+            {isTransferIn && (
+              <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                ⚡
+              </div>
+            )}
+            {/* Player Name and Team */}
+            <div className="text-center mb-2">
+              <h3 className="font-semibold text-sm leading-tight">
+                {player.web_name}
+              </h3>
+              <p className="text-xs ">
+                {team?.short_name} - {position?.singular_name_short}
+              </p>
+            </div>
+
+            {/* Stats - Updated to use getPlayerStats */}
+            <div className="text-center mb-2">
+              <p className={`text-sm font-bold ${stats.statusColor}`}>
+                {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
+                <span className="text-xs text-gray-500 block">
+                  {stats.isGameweek ? `GW${currentEvent}` : "Season"}
+                </span>
+              </p>
+              <p className="text-xs ">£{stats.price}m</p>
+            </div>
+
+            {/* Form and Minutes - Updated */}
+            <div className="text-center text-xs  mb-2">
+              <div>Form: {stats.form}</div>
+              <div className={stats.statusColor}>{stats.minutes}</div>
+              {stats.isGameweek && (
+                <div className="mt-1">
+                  {stats.goals > 0 && (
+                    <div className="text-green-600">G {stats.goals}</div>
+                  )}
+                  {stats.assists > 0 && (
+                    <div className="text-blue-600">A {stats.assists}</div>
+                  )}
                   {stats.cleanSheets > 0 && (
-                    <span className="text-purple-600">
-                      🥅{stats.cleanSheets}
-                    </span>
+                    <div className="text-purple-600">
+                      CS {stats.cleanSheets}
+                    </div>
+                  )}
+                  {stats.bonus > 0 && (
+                    <div className="text-orange-600">BP {stats.bonus}</div>
                   )}
                 </div>
-              </div>
-            )}
-            {/* Show fixture info when in suggested lineup mode */}
-            {showSuggestedLineup && fixtureInfo && (
-              <div
-                className={`text-xs mt-1 px-1 py-0.5 rounded ${
-                  fixtureInfo.difficulty <= 2
-                    ? "bg-green-100 text-green-700"
-                    : fixtureInfo.difficulty <= 3
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-red-100 text-red-700"
-                }`}
-              >
-                GW{nextGameweekId}: {fixtureInfo.isHome ? "vs" : "@"}{" "}
-                {fixtureInfo.opponent}
-              </div>
-            )}
-          </div>
+              )}
+              {!stats.isGameweek && (
+                <div className="mt-1">
+                  <div>PPG: {stats.ppg}</div>
+                  <div className="flex justify-center gap-1 text-xs">
+                    <span className="text-green-600">G{stats.goals}</span>
+                    <span className="text-blue-600">A{stats.assists}</span>
+                    {stats.cleanSheets > 0 && (
+                      <span className="text-purple-600">
+                        CS{stats.cleanSheets}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* Show fixture info when in suggested lineup mode */}
+              {showSuggestedLineup && fixtureInfo && (
+                <div
+                  className={`text-xs mt-1 px-1 py-0.5 rounded ${
+                    fixtureInfo.difficulty <= 2
+                      ? "bg-green-100 text-green-700"
+                      : fixtureInfo.difficulty <= 3
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  GW{nextGameweekId}: {fixtureInfo.isHome ? "vs" : "@"}{" "}
+                  {fixtureInfo.opponent}
+                </div>
+              )}
+            </div>
 
-          {/* Captain/Vice-Captain Badges */}
-          <div className="flex justify-center gap-1 mt-auto">
-            {pick.is_captain && (
-              <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
-                C
-              </span>
-            )}
-            {pick.is_vice_captain && (
-              <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
-                V
-              </span>
-            )}
-            {pick.multiplier > 1 && (
-              <span className="px-2 py-1  text-xs rounded">
-                {pick.multiplier}x
-              </span>
-            )}
+            {/* Captain/Vice-Captain Badges */}
+            <div className="flex justify-center gap-1 mt-auto">
+              {pick.is_captain && (
+                <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+                  C
+                </span>
+              )}
+              {pick.is_vice_captain && (
+                <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+                  V
+                </span>
+              )}
+              {pick.multiplier > 1 && (
+                <span className="px-2 py-1  text-xs rounded">
+                  {pick.multiplier}x
+                </span>
+              )}
+            </div>
           </div>
         </div>
       );
@@ -735,7 +741,7 @@ export default function CurrentSquad({
       <div
         key={pick.element}
         onClick={() => handlePlayerClick(pick)}
-        className={`relative p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg ${
+        className={`relative p-3 rounded-lg border cursor-pointer transition-all  ${
           isBench ? " border-gray-300" : " border-gray-200"
         } ${pick.is_captain ? "ring-2 ring-yellow-400" : ""} ${
           pick.is_vice_captain ? "ring-2 ring-yellow-200" : ""
@@ -783,18 +789,18 @@ export default function CurrentSquad({
             {stats.isGameweek && (
               <>
                 {stats.goals > 0 && (
-                  <span className="ml-1 text-green-600">⚽{stats.goals}</span>
+                  <span className="ml-1 text-green-600">G{stats.goals}</span>
                 )}
                 {stats.assists > 0 && (
-                  <span className="ml-1 text-blue-600">🅰️{stats.assists}</span>
+                  <span className="ml-1 text-blue-600">A{stats.assists}</span>
                 )}
                 {stats.cleanSheets > 0 && (
                   <span className="ml-1 text-purple-600">
-                    🥅{stats.cleanSheets}
+                    CS{stats.cleanSheets}
                   </span>
                 )}
                 {stats.bonus > 0 && (
-                  <span className="ml-1 text-orange-600">⭐{stats.bonus}</span>
+                  <span className="ml-1 text-orange-600">B{stats.bonus}</span>
                 )}
               </>
             )}
@@ -802,14 +808,14 @@ export default function CurrentSquad({
               <>
                 | PPG: {stats.ppg}
                 {stats.goals > 0 && (
-                  <span className="ml-1 text-green-600">⚽{stats.goals}</span>
+                  <span className="ml-1 text-green-600">G{stats.goals}</span>
                 )}
                 {stats.assists > 0 && (
-                  <span className="ml-1 text-blue-600">🅰️{stats.assists}</span>
+                  <span className="ml-1 text-blue-600">A{stats.assists}</span>
                 )}
                 {stats.cleanSheets > 0 && (
                   <span className="ml-1 text-purple-600">
-                    🥅{stats.cleanSheets}
+                    CS{stats.cleanSheets}
                   </span>
                 )}
               </>
@@ -1044,7 +1050,7 @@ export default function CurrentSquad({
       : Number(displayedStarterPoints) + manualBenchPointsSum;
 
   return (
-    <div className=" p-6 rounded-lg">
+    <div className="no-gradient-border p-6 rounded-lg">
       <div className="flex items-center mb-6 justify-center flex-col">
         <h2 className="text-2xl font-bold">Current Squad</h2>
         <div className="flex items-center gap-4 flex-col pt-2">
@@ -1109,20 +1115,20 @@ export default function CurrentSquad({
 
           {/* Suggested Lineup Info */}
           {showSuggestedLineup && (
-            <div className=" border border-blue-200 rounded-lg p-3 w-full">
+            <div className="rounded-lg p-3 w-full ">
               <div className="text-center">
                 <h4 className="font-semibold text-blue-800 mb-2">
                   Gameweek {suggestedLineup.nextGameweekId} Prediction:{" "}
                   {suggestedLineup.formation.name}
                   {suggestedTransfer && (
                     <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
-                      ⚡ With Transfer
+                      With Transfer
                     </span>
                   )}
                 </h4>
 
                 {/* Captain and Vice-Captain Display */}
-                <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                <div className="mb-3 p-2 rounded no-gradient-border ">
                   <div className="text-sm text-yellow-800">
                     <span className="font-semibold">Captain: </span>
                     <span className="font-medium">
@@ -1178,7 +1184,7 @@ export default function CurrentSquad({
                   </div>
                 ) : (
                   <p className="text-sm text-green-700">
-                    ✅ Your current lineup looks optimal for GW
+                    Your current lineup looks optimal for GW
                     {suggestedLineup.nextGameweekId}!
                   </p>
                 )}
@@ -1236,7 +1242,7 @@ export default function CurrentSquad({
         {isFormationView ? (
           <>
             {/* Football Pitch Background */}
-            <div className="bg-gradient-to-b from-green-400 to-green-500 p-6 rounded-lg relative overflow-hidden">
+            <div className="no-gradient-border bg-gradient-to-b from-green-400 to-green-500 p-6 rounded-lg relative overflow-hidden">
               {/* Vertical Stripes - Center 60% only */}
               <div className="absolute inset-0">
                 <div className="flex h-full">
