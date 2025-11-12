@@ -819,16 +819,16 @@ function generateDetailedReasoning(
     );
   }
 
-  // Form analysis
-  if (
-    homeTeam.form !== null &&
-    awayTeam.form !== null &&
-    Math.abs(homeTeam.form - awayTeam.form) > 1
-  ) {
-    const betterTeam =
-      homeTeam.form > awayTeam.form ? homeTeam.short_name : awayTeam.short_name;
-    reasons.push(`${betterTeam} in better recent form`);
-  }
+  // Form analysis - form property not available on Team type
+  // if (
+  //   homeTeam.form !== null &&
+  //   awayTeam.form !== null &&
+  //   Math.abs(homeTeam.form - awayTeam.form) > 1
+  // ) {
+  //   const betterTeam =
+  //     homeTeam.form > awayTeam.form ? homeTeam.short_name : awayTeam.short_name;
+  //   reasons.push(`${betterTeam} in better recent form`);
+  // }
 
   reasons.push("Home advantage (+15%) and historical data factored in");
 
