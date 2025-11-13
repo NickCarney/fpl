@@ -1,34 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 
-// We'll use a sample of popular league IDs to search through
-// In production, you'd want to maintain a database of teams or use FPL's search if available
-const POPULAR_LEAGUE_IDS = [
-  314, // Official FPL league
-  633, // Another popular league
-  724869, // Example league
-  // Add more popular league IDs here
-];
+interface TeamEntry {
+  id: number;
+  name: string;
+  playerName: string;
+  nameLower: string;
+  playerNameLower: string;
+}
 
-async function fetchTeamsFromLeague(leagueId: number) {
+// Cache for the teams data - loaded once and reused
+let teamsCache: TeamEntry[] | null = null;
+
+// Simple CSV parser that handles quoted fields with commas
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  // Push the last field
+  result.push(current);
+
+  return result;
+}
+
+function loadTeamsData(): TeamEntry[] {
+  if (teamsCache) {
+    return teamsCache;
+  }
+
   try {
-    const response = await fetch(
-      `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/`,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      }
-    );
+    const filePath = join(process.cwd(), "data", "fpl_teams.csv");
+    const fileContent = readFileSync(filePath, "utf-8");
+    const lines = fileContent.split("\n");
 
-    if (!response.ok) {
-      return [];
+    // Skip header and parse CSV
+    const teams: TeamEntry[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // Parse CSV line with proper handling of quoted fields
+      const parts = parseCSVLine(line);
+      if (parts.length >= 4) {
+        const id = parseInt(parts[0], 10);
+        const teamName = parts[1];
+        const firstName = parts[2];
+        const lastName = parts[3];
+        const playerName = `${firstName} ${lastName}`;
+
+        // Skip invalid entries (no ID or empty team name)
+        if (id && teamName) {
+          teams.push({
+            id,
+            name: teamName,
+            playerName,
+            nameLower: teamName.toLowerCase(),
+            playerNameLower: playerName.toLowerCase(),
+          });
+        }
+      }
     }
 
-    const data = await response.json();
-    return data.standings?.results || [];
+    teamsCache = teams;
+    console.log(`Loaded ${teams.length} teams into cache`);
+    return teams;
   } catch (error) {
-    console.error(`Failed to fetch league ${leagueId}:`, error);
+    console.error("Failed to load teams data:", error);
     return [];
   }
 }
@@ -45,49 +97,38 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Fetch teams from multiple leagues
-    const allTeamsPromises = POPULAR_LEAGUE_IDS.map(fetchTeamsFromLeague);
-    const leagueResults = await Promise.allSettled(allTeamsPromises);
+    const teams = loadTeamsData();
 
-    // Combine all teams and remove duplicates
-    const allTeams = new Map();
-
-    leagueResults.forEach((result) => {
-      if (result.status === "fulfilled") {
-        result.value.forEach((team: any) => {
-          if (team.entry && team.entry_name && team.player_name) {
-            allTeams.set(team.entry, {
-              id: team.entry,
-              name: team.entry_name,
-              playerName: team.player_name,
-              rank: team.rank || 0,
-            });
-          }
-        });
-      }
-    });
-
-    // Convert to array and filter by search query
-    const teamsArray = Array.from(allTeams.values());
-
-    const results = teamsArray
+    // Fast in-memory search
+    const results = teams
       .filter(
-        (team: any) =>
-          team.name.toLowerCase().includes(query) ||
-          team.playerName.toLowerCase().includes(query)
+        (team) =>
+          team.nameLower.includes(query) || team.playerNameLower.includes(query)
       )
-      .sort((a: any, b: any) => {
+      .sort((a, b) => {
         // Prioritize exact matches at the beginning
-        const aNameMatch = a.name.toLowerCase().startsWith(query);
-        const bNameMatch = b.name.toLowerCase().startsWith(query);
+        const aNameMatch = a.nameLower.startsWith(query);
+        const bNameMatch = b.nameLower.startsWith(query);
 
         if (aNameMatch && !bNameMatch) return -1;
         if (!aNameMatch && bNameMatch) return 1;
 
-        // Then sort by rank (lower is better)
-        return a.rank - b.rank;
+        // Then prioritize player name matches
+        const aPlayerMatch = a.playerNameLower.startsWith(query);
+        const bPlayerMatch = b.playerNameLower.startsWith(query);
+
+        if (aPlayerMatch && !bPlayerMatch) return -1;
+        if (!aPlayerMatch && bPlayerMatch) return 1;
+
+        // Finally sort by ID (lower IDs are typically older/more established teams)
+        return a.id - b.id;
       })
-      .slice(0, 50); // Return more results
+      .slice(0, 50)
+      .map((team) => ({
+        id: team.id,
+        name: team.name,
+        playerName: team.playerName,
+      }));
 
     return NextResponse.json({
       results,
