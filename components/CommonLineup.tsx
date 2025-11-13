@@ -190,41 +190,40 @@ export default function CommonLineup({
       <div
         key={element.id}
         onClick={() => handlePlayerClick(playerCount)}
-        className="relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-28 h-36 overflow-y-auto bg-white border-purple-300 scrolly"
+        className="relative flex flex-col p-1 md:p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-16 md:w-28 h-auto md:h-36 bg-white border-purple-300"
       >
         {/* Popularity indicator */}
-        <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold">
+        <div className="absolute -top-1 -right-1 bg-purple-500 text-white text-[8px] md:text-xs rounded-full w-4 md:w-6 h-4 md:h-6 flex items-center justify-center font-bold">
           {count}
         </div>
 
         {/* Player Name and Team */}
-        <div className="text-center mb-2">
-          <h3 className="font-semibold text-sm leading-tight">
+        <div className="text-center mb-0.5 md:mb-2">
+          <h3 className="font-semibold text-[10px] md:text-sm leading-tight">
             {element.web_name}
           </h3>
-          <p className="text-xs text-gray-600">
+          <p className="text-[8px] md:text-xs text-gray-600">
             {team?.short_name} - {position?.singular_name_short}
           </p>
         </div>
 
         {/* Stats */}
-        <div className="text-center mb-2">
-          <p className="text-sm font-bold text-green-700">
+        <div className="text-center mb-0.5 md:mb-2">
+          <p className="text-[10px] md:text-sm font-bold text-green-700">
             {element.total_points}pts
           </p>
-          <p className="text-xs text-gray-600">
+          <p className="text-[8px] md:text-xs text-gray-600">
             £{(element.now_cost / 10).toFixed(1)}m
           </p>
         </div>
 
         {/* Popularity percentage */}
-        <div className="text-center text-xs text-purple-600 mb-2">
-          <div className="font-semibold">{percentage.toFixed(0)}% owned</div>
-          <div>Form: {element.form}</div>
+        <div className="text-center text-[10px] md:text-xs text-purple-600 mb-0.5 md:mb-2">
+          <div className="font-semibold">{percentage.toFixed(0)}%</div>
         </div>
 
-        {/* Show teams that own this player (truncated) */}
-        <div className="text-center text-xs text-gray-500 mb-1">
+        {/* Show teams that own this player (truncated) - hidden on mobile */}
+        {/* <div className="hidden md:block text-center text-xs text-gray-500 mb-1">
           {showCount && playerCount.teams.length > 0 && (
             <div title={`Owned by: ${playerCount.teams.join(", ")}`}>
               {playerCount.teams.length > 2
@@ -234,13 +233,13 @@ export default function CommonLineup({
                 : playerCount.teams.join(", ")}
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Ownership indicator bar */}
         <div className="mt-auto">
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-200 rounded-full h-1 md:h-2">
             <div
-              className="bg-purple-500 h-2 rounded-full"
+              className="bg-purple-500 h-1 md:h-2 rounded-full"
               style={{ width: `${Math.min(100, percentage)}%` }}
             ></div>
           </div>
@@ -290,10 +289,10 @@ export default function CommonLineup({
           </div>
 
           {/* Players positioned in formation */}
-          <div className="relative z-10 space-y-8">
+          <div className="relative z-10 space-y-8 md:space-y-8">
             {/* Forwards */}
             {commonLineup.forwards.length > 0 && (
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                 {commonLineup.forwards.map((playerCount) =>
                   renderPlayer(playerCount)
                 )}
@@ -302,7 +301,7 @@ export default function CommonLineup({
 
             {/* Midfielders */}
             {commonLineup.midfielders.length > 0 && (
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                 {commonLineup.midfielders.map((playerCount) =>
                   renderPlayer(playerCount)
                 )}
@@ -311,7 +310,7 @@ export default function CommonLineup({
 
             {/* Defenders */}
             {commonLineup.defenders.length > 0 && (
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                 {commonLineup.defenders.map((playerCount) =>
                   renderPlayer(playerCount)
                 )}
@@ -320,7 +319,7 @@ export default function CommonLineup({
 
             {/* Goalkeepers */}
             {commonLineup.goalkeepers.length > 0 && (
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                 {commonLineup.goalkeepers.map((playerCount) =>
                   renderPlayer(playerCount)
                 )}

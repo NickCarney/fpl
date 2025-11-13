@@ -244,7 +244,7 @@ export default function TeamFormationPopup({
       <div
         key={pick.element}
         onClick={() => handlePlayerClick(pick)}
-        className={`relative flex flex-col p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-24 h-36 overflow-y-auto scrolly ${
+        className={`relative flex flex-col p-1 md:p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-16 md:w-24 h-20 md:h-36 ${
           pick.is_captain
             ? "border-yellow-400"
             : pick.is_vice_captain
@@ -253,33 +253,32 @@ export default function TeamFormationPopup({
         }`}
       >
         {/* Player Name and Team */}
-        <div className="text-center mb-2">
-          <h3 className="font-semibold text-sm leading-tight">
+        <div className="text-center mb-0.5 md:mb-2">
+          <h3 className="font-semibold text-[10px] md:text-sm leading-tight">
             {player.web_name}
           </h3>
-          <p className="text-xs text-gray-600">
+          <p className="text-[8px] md:text-xs text-gray-600">
             {team?.short_name} - {position?.singular_name_short}
           </p>
         </div>
 
         {/* Stats */}
-        <div className="text-center mb-2">
-          <p className={`text-sm font-bold ${stats.statusColor}`}>
+        <div className="text-center ">
+          <p
+            className={`text-[10px] md:text-sm font-bold ${stats.statusColor}`}
+          >
             {stats.points}
-            <span className="text-xs text-gray-500 block">
-              {stats.isGameweek ? `GW${currentEvent}` : "Season"}
-            </span>
           </p>
-          <p className="text-xs text-gray-600">£{stats.price}m</p>
+          <p className="text-[8px] md:text-xs text-gray-600">£{stats.price}m</p>
         </div>
 
-        {/* Additional Stats */}
-        <div className="text-center text-xs text-gray-600 mb-2">
+        {/* Additional Stats - Hidden on mobile */}
+        <div className="hidden md:block text-center text-xs text-gray-600 mb-2">
           {stats.isGameweek ? (
             <div>
               <div>Form: {stats.form}</div>
               <div className={stats.statusColor}>{stats.minutes}</div>
-              {stats.goals > 0 && (
+              {/* {stats.goals > 0 && (
                 <div className="text-green-600">G {stats.goals}</div>
               )}
               {stats.assists > 0 && (
@@ -290,7 +289,7 @@ export default function TeamFormationPopup({
               )}
               {stats.bonus > 0 && (
                 <div className="text-orange-600">BP {stats.bonus}</div>
-              )}
+              )} */}
             </div>
           ) : (
             <div>
@@ -308,20 +307,15 @@ export default function TeamFormationPopup({
         </div>
 
         {/* Captain/Vice-Captain Badges */}
-        <div className="flex justify-center gap-1 mt-auto">
+        <div className="flex justify-center gap-0.5 md:gap-1 mt-auto">
           {pick.is_captain && (
-            <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+            <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-400 text-[8px] md:text-xs rounded font-bold">
               C
             </span>
           )}
           {pick.is_vice_captain && (
-            <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+            <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-200 text-[8px] md:text-xs rounded font-bold">
               V
-            </span>
-          )}
-          {pick.multiplier > 1 && (
-            <span className="px-2 py-1 bg-gray-200 text-xs rounded">
-              {pick.multiplier}x
             </span>
           )}
         </div>
@@ -544,24 +538,24 @@ export default function TeamFormationPopup({
               </div>
 
               {/* Players positioned in formation */}
-              <div className="relative z-10 space-y-8">
+              <div className="relative z-10 space-y-4 sm:space-y-12 md:space-y-20">
                 {/* Forwards */}
                 {forwards.length > 0 && (
-                  <div className="flex justify-center gap-4">
+                  <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                     {forwards.map((pick) => renderPlayer(pick))}
                   </div>
                 )}
 
                 {/* Midfielders */}
                 {midfielders.length > 0 && (
-                  <div className="flex justify-center gap-4">
+                  <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                     {midfielders.map((pick) => renderPlayer(pick))}
                   </div>
                 )}
 
                 {/* Defenders */}
                 {defenders.length > 0 && (
-                  <div className="flex justify-center gap-4">
+                  <div className="flex justify-center gap-1 md:gap-4 flex-wrap">
                     {defenders.map((pick) => renderPlayer(pick))}
                   </div>
                 )}

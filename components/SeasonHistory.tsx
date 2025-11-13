@@ -300,14 +300,20 @@ interface UpcomingFixturesProps {
 }
 
 function UpcomingFixtures({ fixtures, teams }: UpcomingFixturesProps) {
-  // Get upcoming fixtures (not finished) for the current/next gameweek
+  // Find the current or next gameweek
+  const nextGameweek = Math.min(
+    ...fixtures
+      .filter((f) => !f.finished && f.kickoff_time && f.event)
+      .map((f) => f.event!)
+  );
+
+  // Get upcoming fixtures for only the current/next gameweek
   const upcomingFixtures = fixtures
-    .filter((f) => !f.finished && f.kickoff_time)
+    .filter((f) => !f.finished && f.kickoff_time && f.event === nextGameweek)
     .sort(
       (a, b) =>
         new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
-    )
-    .slice(0, 15); // Show next 15 fixtures
+    );
 
   const getTeam = (teamId: number) => {
     return teams.find((t) => t.id === teamId);
@@ -355,8 +361,10 @@ function UpcomingFixtures({ fixtures, teams }: UpcomingFixturesProps) {
 
   return (
     <div>
-      <h3 className="text-xl font-semibold mb-4">Upcoming Fixtures</h3>
-      <div className="space-y-6">
+      <h3 className="text-xl font-semibold mb-4 text-center">
+        Gameweek {nextGameweek} Fixtures
+      </h3>
+      <div className="space-y-6 text-center">
         {Object.entries(fixturesByDate).map(([date, dateFixtures]) => (
           <div key={date}>
             <h4 className="text-lg font-semibold mb-3">{date}</h4>
@@ -374,7 +382,7 @@ function UpcomingFixtures({ fixtures, teams }: UpcomingFixturesProps) {
                   >
                     {/* Home Team */}
                     <div className="flex items-center justify-end flex-1 space-x-3">
-                      <span className="font-medium text-right">
+                      <span className="font-medium text-right hidden sm:visible">
                         {homeTeam.name}
                       </span>
                       <div
@@ -404,14 +412,14 @@ function UpcomingFixtures({ fixtures, teams }: UpcomingFixturesProps) {
                     {/* Away Team */}
                     <div className="flex items-center justify-start flex-1 space-x-3">
                       <div
-                        className="w-12 h-12 rounded-md flex items-center justify-center text-white font-bold text-xs"
+                        className="w-12 h-12 rounded-md flex items-center justify-center text-white font-bold text-xs "
                         style={{
                           backgroundColor: getTeamColor(awayTeam.short_name),
                         }}
                       >
                         {awayTeam.short_name}
                       </div>
-                      <span className="font-medium text-left">
+                      <span className="font-medium text-left hidden sm:visible">
                         {awayTeam.name}
                       </span>
                     </div>
@@ -446,6 +454,32 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
       tableRef.current.scrollLeft = scrollPosition;
     }
   }, [fixtures, teams]);
+
+  const getTeamColor = (shortName: string) => {
+    const colorMap: Record<string, string> = {
+      ARS: "#EF0107",
+      AVL: "#95BFE5",
+      BOU: "#DA291C",
+      BRE: "#E30613",
+      BHA: "#0057B8",
+      CHE: "#034694",
+      CRY: "#1B458F",
+      EVE: "#003399",
+      FUL: "#000000",
+      IPS: "#0033A0",
+      LEI: "#003090",
+      LIV: "#C8102E",
+      MCI: "#6CABDD",
+      MUN: "#DA291C",
+      NEW: "#241F20",
+      NFO: "#DD0000",
+      SOU: "#D71920",
+      TOT: "#132257",
+      WHU: "#7A263A",
+      WOL: "#FDB913",
+    };
+    return colorMap[shortName] || "#666666";
+  };
 
   // Find the last finished gameweek
   const lastFinishedGW = Math.max(
@@ -547,7 +581,12 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
     );
 
     if (!fixture)
-      return { content: "-", bgColor: "bg-gray-100 dark:bg-gray-700" };
+      return {
+        content: "-",
+        bgColor: "bg-gray-100 dark:bg-gray-700",
+        opponent: null,
+        isHome: false,
+      };
 
     const isHome = fixture.team_h === teamId;
     const opponent = teams.find(
@@ -573,6 +612,8 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
         content: `${opponent?.short_name || ""}${isHome ? " (H)" : " (A)"}`,
         score: `${teamScore}-${opponentScore}`,
         bgColor,
+        opponent,
+        isHome,
       };
     } else {
       // Show fixture difficulty with new colors
@@ -597,6 +638,8 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
       return {
         content: `${opponent?.short_name || ""}${isHome ? " (H)" : " (A)"}`,
         bgColor,
+        opponent,
+        isHome,
       };
     }
   };
@@ -611,17 +654,6 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
               <th className="sticky left-0 z-10 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 px-3 py-2 text-left">
                 Team
               </th>
-              {/* Played fixtures */}
-              {Array.from({ length: lastFinishedGW }, (_, i) => i + 1).map(
-                (gw) => (
-                  <th
-                    key={`played-${gw}`}
-                    className="border border-gray-300 dark:border-gray-600 px-2 py-2 min-w-[80px]"
-                  >
-                    GW{gw}
-                  </th>
-                )
-              )}
               {/* Stats columns */}
               <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 Top Scorer
@@ -636,17 +668,22 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
                 L
               </th>
               <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
-                xG For
-              </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
-                xG Ag
-              </th>
-              <th className="border border-gray-300 dark:border-gray-600 px-2 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 Pts
               </th>
               <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 bg-gradient-to-r from-cyan-100 via-green-100 to-purple-100 dark:from-cyan-900 dark:via-green-900 dark:to-purple-900">
                 Form
               </th>
+              {/* Played fixtures */}
+              {Array.from({ length: lastFinishedGW }, (_, i) => i + 1).map(
+                (gw) => (
+                  <th
+                    key={`played-${gw}`}
+                    className="border border-gray-300 dark:border-gray-600 px-2 py-2 min-w-[80px]"
+                  >
+                    GW{gw}
+                  </th>
+                )
+              )}
               {/* Upcoming fixtures */}
               {Array.from(
                 { length: 38 - lastFinishedGW },
@@ -670,27 +707,6 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
                 <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 px-3 py-2 font-semibold">
                   {stat.team.short_name}
                 </td>
-                {/* Played fixtures */}
-                {Array.from({ length: lastFinishedGW }, (_, i) => i + 1).map(
-                  (gw) => {
-                    const cell = getFixtureCell(stat.team.id, gw);
-                    return (
-                      <td
-                        key={`played-${gw}`}
-                        className={`border border-gray-300 dark:border-gray-600 px-2 py-2 ${cell.bgColor} text-center`}
-                      >
-                        <div className="text-xs whitespace-nowrap">
-                          {cell.content}
-                        </div>
-                        {cell.score && (
-                          <div className="text-xs font-bold mt-1">
-                            {cell.score}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  }
-                )}
                 {/* Stats columns */}
                 <td
                   ref={index === 0 ? statsRef : null}
@@ -707,18 +723,60 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
                 <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.losses}
                 </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
-                  {stat.xgFor}
-                </td>
-                <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
-                  {stat.xgAgainst}
-                </td>
                 <td className="border border-gray-300 dark:border-gray-600 px-2 py-2 text-center font-bold bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.points}
                 </td>
                 <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-center text-xs bg-gradient-to-r from-cyan-50 via-green-50 to-purple-50 dark:from-cyan-950 dark:via-green-950 dark:to-purple-950">
                   {stat.form || "-"}
                 </td>
+                {/* Played fixtures */}
+                {Array.from({ length: lastFinishedGW }, (_, i) => i + 1).map(
+                  (gw) => {
+                    const cell = getFixtureCell(stat.team.id, gw);
+                    return (
+                      <td
+                        key={`played-${gw}`}
+                        className={`border border-gray-300 dark:border-gray-600 px-2 py-2 ${cell.bgColor} text-center`}
+                      >
+                        {/* Desktop view - show full text */}
+                        <div className="hidden md:block">
+                          <div className="text-xs whitespace-nowrap">
+                            {cell.content}
+                          </div>
+                          {cell.score && (
+                            <div className="text-xs font-bold mt-1">
+                              {cell.score}
+                            </div>
+                          )}
+                        </div>
+                        {/* Mobile view - show team badge icon */}
+                        <div className="md:hidden flex flex-col items-center justify-center">
+                          {cell.opponent ? (
+                            <>
+                              <div
+                                className="w-7 h-7 rounded flex items-center justify-center text-white font-bold text-[8px]"
+                                style={{
+                                  backgroundColor: getTeamColor(
+                                    cell.opponent.short_name
+                                  ),
+                                }}
+                              >
+                                {cell.opponent.short_name}
+                              </div>
+                              {cell.score && (
+                                <div className="text-[9px] font-bold mt-0.5">
+                                  {cell.score}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs">-</span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  }
+                )}
                 {/* Upcoming fixtures */}
                 {Array.from(
                   { length: 38 - lastFinishedGW },
@@ -730,14 +788,41 @@ function FixturesTable({ fixtures, teams, elements }: FixturesTableProps) {
                       key={`upcoming-${gw}`}
                       className={`border border-gray-300 dark:border-gray-600 px-2 py-2 ${cell.bgColor} text-center`}
                     >
-                      <div className="text-xs whitespace-nowrap">
-                        {cell.content}
-                      </div>
-                      {cell.score && (
-                        <div className="text-xs font-bold mt-1">
-                          {cell.score}
+                      {/* Desktop view - show full text */}
+                      <div className="hidden md:block">
+                        <div className="text-xs whitespace-nowrap">
+                          {cell.content}
                         </div>
-                      )}
+                        {cell.score && (
+                          <div className="text-xs font-bold mt-1">
+                            {cell.score}
+                          </div>
+                        )}
+                      </div>
+                      {/* Mobile view - show team badge icon */}
+                      <div className="md:hidden flex flex-col items-center justify-center">
+                        {cell.opponent ? (
+                          <>
+                            <div
+                              className="w-7 h-7 rounded flex items-center justify-center text-white font-bold text-[8px]"
+                              style={{
+                                backgroundColor: getTeamColor(
+                                  cell.opponent.short_name
+                                ),
+                              }}
+                            >
+                              {cell.opponent.short_name}
+                            </div>
+                            {cell.score && (
+                              <div className="text-[9px] font-bold mt-0.5">
+                                {cell.score}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs">-</span>
+                        )}
+                      </div>
                     </td>
                   );
                 })}

@@ -79,14 +79,14 @@ const PlayerCard = ({
   if (isFormationView && !isBench) {
     // Formation view for starting XI - MATCH CurrentSquad
     return (
-      <div className="gradient-border rounded-lg p-0">
+      <div className="gradient-border rounded-lg p-0 w-16 md:w-24 h-20 md:h-32">
         <div
           draggable
           onDragStart={() => onDragStart(player, pick, false)}
           onDrop={() => onDrop(pick)}
           onDragOver={onDragOver}
           onClick={() => onClick(pick)}
-          className={`relative flex flex-col p-3 rounded-lg transition-all cursor-pointer w-24 h-32 overflow-y-auto scrolly bg-green-300 ${
+          className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 overflow-y-auto overflow-x-hidden ${
             isSelected
               ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
               : canBeReplaced
@@ -99,26 +99,27 @@ const PlayerCard = ({
           } ${className}`}
         >
           {/* Player Name and Team */}
-          <div className="text-center mb-2">
-            <h3 className="font-semibold text-sm leading-tight">
+          <div className="text-center mb-0.5 md:mb-2">
+            <h3 className="font-semibold text-[10px] md:text-sm leading-tight">
               {player.web_name}
             </h3>
-            <p className="text-xs ">
+            <p className="text-[8px] md:text-xs ">
               {team.short_name} - {position.singular_name_short}
             </p>
           </div>
 
           {/* Stats */}
-          <div className="text-center mb-2">
-            <p className="text-sm font-bold text-green-700">
+          <div className="text-center mb-0.5 md:mb-2">
+            <p className="text-[10px] md:text-sm font-bold text-green-700">
               {player.total_points}pts
-              <span className="text-xs text-gray-500 block">Season</span>
             </p>
-            <p className="text-xs ">£{(player.now_cost / 10).toFixed(1)}m</p>
+            <p className="text-[8px] md:text-xs ">
+              £{(player.now_cost / 10).toFixed(1)}m
+            </p>
           </div>
 
-          {/* Form and Minutes */}
-          <div className="text-center text-xs mb-2">
+          {/* Form and Minutes - Hidden on mobile */}
+          <div className="hidden md:block text-center text-xs mb-2">
             <div>Form: {player.form}</div>
             <div className="text-gray-700">{player.minutes} mins</div>
             <div className="mt-1">
@@ -150,26 +151,21 @@ const PlayerCard = ({
           </div>
 
           {/* Captain/Vice-Captain Badges */}
-          <div className="flex justify-center gap-1 mt-auto">
+          <div className="flex justify-center gap-0.5 md:gap-1 mt-auto">
             {pick.is_captain && (
-              <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+              <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-400 text-[8px] md:text-xs rounded font-bold">
                 C
               </span>
             )}
             {pick.is_vice_captain && (
-              <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+              <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-200 text-[8px] md:text-xs rounded font-bold">
                 V
-              </span>
-            )}
-            {pick.multiplier > 1 && (
-              <span className="px-2 py-1 text-xs rounded">
-                {pick.multiplier}x
               </span>
             )}
             {/* Captain select button (optional, keep if you want quick selection) */}
             {!pick.is_captain && !pick.is_vice_captain && !isBench && (
               <span
-                className="px-2 py-1 bg-gray-200 text-xs rounded font-bold cursor-pointer hover:bg-yellow-200"
+                className="hidden md:inline px-2 py-1 bg-gray-200 text-xs rounded font-bold cursor-pointer hover:bg-yellow-200"
                 onClick={(e) => {
                   e.stopPropagation();
                   onCaptainSelect(pick);
@@ -324,6 +320,9 @@ export default function TeamPicker({
   );
   const [selectedPlayerToBuy, setSelectedPlayerToBuy] =
     useState<Element | null>(null);
+
+  // State for collapsible instructions
+  const [showInstructions, setShowInstructions] = useState(false);
 
   const nextGameweek = events.find((event) => event.is_next);
   const nextGameweekId = nextGameweek?.id || currentEvent + 1;
@@ -936,11 +935,11 @@ export default function TeamPicker({
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white rounded-full"></div>
               </div>
               {/* Formation Layout */}
-              <div className="relative z-10 space-y-20 sm:space-y-12">
+              <div className="relative z-10 space-y-4 sm:space-y-12 md:space-y-20">
                 {/* Forwards */}
                 {forwards.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center">
+                    <div className="flex gap-1 md:gap-4 justify-center">
                       {forwards.map((pick) => {
                         const player = getPlayer(pick.element);
                         const team = getTeam(player?.team || 0);
@@ -977,7 +976,7 @@ export default function TeamPicker({
                 {/* Midfielders */}
                 {midfielders.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center flex-wrap">
+                    <div className="flex gap-1 md:gap-4 justify-center flex-wrap">
                       {midfielders.map((pick) => {
                         const player = getPlayer(pick.element);
                         const team = getTeam(player?.team || 0);
@@ -1014,7 +1013,7 @@ export default function TeamPicker({
                 {/* Defenders */}
                 {defenders.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center flex-wrap">
+                    <div className="flex gap-1 md:gap-4 justify-center flex-wrap">
                       {defenders.map((pick) => {
                         const player = getPlayer(pick.element);
                         const team = getTeam(player?.team || 0);
@@ -1129,72 +1128,82 @@ export default function TeamPicker({
       </div>
 
       {/* Bench */}
-      <div className="border rounded-lg p-4">
+      <div className="border rounded-lg p-4 no-gradient-border">
         <h3 className="text-lg font-semibold mb-4">Bench ({bench.length}/4)</h3>
-        <div className="max-h-64 overflow-y-auto scrolly">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {bench.map((pick) => {
-              const player = getPlayer(pick.element);
-              const team = getTeam(player?.team || 0);
-              const position = getPosition(player?.element_type || 0);
-              const nextFixture = player ? getNextFixture(player) : null;
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {bench.map((pick) => {
+            const player = getPlayer(pick.element);
+            const team = getTeam(player?.team || 0);
+            const position = getPosition(player?.element_type || 0);
+            const nextFixture = player ? getNextFixture(player) : null;
 
-              if (!player || !team || !position) return null;
+            if (!player || !team || !position) return null;
 
-              return (
-                <PlayerCard
-                  key={pick.element}
-                  pick={pick}
-                  player={player}
-                  team={team}
-                  position={position}
-                  nextFixture={nextFixture}
-                  isFormationView={false}
-                  isBench={true}
-                  isSelected={selectedPlayer?.element === pick.element}
-                  canBeReplaced={!!selectedPlayerToBuy}
-                  onDragStart={handleDragStart}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onClick={handlePlayerClick}
-                  onCaptainSelect={handleCaptainSelect}
-                />
-              );
-            })}
-          </div>
+            return (
+              <PlayerCard
+                key={pick.element}
+                pick={pick}
+                player={player}
+                team={team}
+                position={position}
+                nextFixture={nextFixture}
+                isFormationView={false}
+                isBench={true}
+                isSelected={selectedPlayer?.element === pick.element}
+                canBeReplaced={!!selectedPlayerToBuy}
+                onDragStart={handleDragStart}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onClick={handlePlayerClick}
+                onCaptainSelect={handleCaptainSelect}
+              />
+            );
+          })}
         </div>
       </div>
 
       {/* Instructions */}
-      <div className="border border-blue-200 rounded-lg p-4">
-        <h4 className="font-semibold text-blue-800 mb-2">How to use:</h4>
-        <ul className="text-sm text-blue-700 space-y-1">
-          <li>
-            • <strong>Drag & Drop:</strong> Drag players between starting XI and
-            bench to swap positions
-          </li>
-          <li>
-            • <strong>Click to Select:</strong> Click a player to select them
-            (blue highlight), then click another player to swap them with
-            formation validation
-          </li>
-          <li>
-            • <strong>Captain Selection:</strong> Click the + button in the
-            corner to cycle through captain and no selection
-          </li>
-          <li>
-            • <strong>Formation Rules:</strong> Must have exactly 1 GK, at least
-            3 DEF, 3 MID, and 1 FWD in starting XI
-          </li>
-          <li>
-            • <strong>Formation View:</strong> See your team layout on a
-            football pitch
-          </li>
-          <li>
-            • <strong>Player Browser:</strong> Browse available players below to
-            replace current squad members
-          </li>
-        </ul>
+      <div className="border border-blue-200 rounded-lg">
+        <div
+          className="flex justify-between items-center p-4 cursor-pointer hover:bg-blue-50 transition-colors rounded-t-lg"
+          onClick={() => setShowInstructions(!showInstructions)}
+        >
+          <h4 className="font-semibold text-blue-800">How to use</h4>
+          <button className="text-blue-800">
+            {showInstructions ? "▲" : "▼"}
+          </button>
+        </div>
+        {showInstructions && (
+          <div className="px-4 pb-4 border-t border-blue-200">
+            <ul className="text-sm text-blue-700 space-y-1 mt-2">
+              <li>
+                • <strong>Drag & Drop:</strong> Drag players between starting XI
+                and bench to swap positions
+              </li>
+              <li>
+                • <strong>Click to Select:</strong> Click a player to select
+                them (blue highlight), then click another player to swap them
+                with formation validation
+              </li>
+              <li>
+                • <strong>Captain Selection:</strong> Click the + button in the
+                corner to cycle through captain and no selection
+              </li>
+              <li>
+                • <strong>Formation Rules:</strong> Must have exactly 1 GK, at
+                least 3 DEF, 3 MID, and 1 FWD in starting XI
+              </li>
+              <li>
+                • <strong>Formation View:</strong> See your team layout on a
+                football pitch
+              </li>
+              <li>
+                • <strong>Player Browser:</strong> Browse available players
+                below to replace current squad members
+              </li>
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Player Browser Toggle */}

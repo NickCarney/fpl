@@ -53,6 +53,7 @@ export default function GamePredictions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFromCache, setIsFromCache] = useState(false);
+  const [showPredictionMethod, setShowPredictionMethod] = useState(false);
 
   useEffect(() => {
     // Try to load from cache first
@@ -212,7 +213,7 @@ export default function GamePredictions() {
   return (
     <div className="game-predictions bg-white rounded-lg shadow-lg p-6">
       <div className="mb-6 flex justify-between items-start">
-        <div>
+        <div className="">
           <h2 className="text-2xl font-bold text-gray-900">
             Score Predictions
           </h2>
@@ -220,13 +221,13 @@ export default function GamePredictions() {
             {predictionsData.gameweekName} - {predictionsData.totalMatches}{" "}
             fixtures
           </p>
-          {isFromCache && (
+          {/* {isFromCache && (
             <p className="text-xs text-gray-500 mt-1">
               Loaded from cache (refreshes hourly)
             </p>
-          )}
+          )} */}
         </div>
-        <button
+        {/* <button
           onClick={handleRefresh}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
           disabled={loading}
@@ -245,7 +246,7 @@ export default function GamePredictions() {
             />
           </svg>
           Refresh
-        </button>
+        </button> */}
       </div>
 
       <div className="space-y-4">
@@ -262,19 +263,25 @@ export default function GamePredictions() {
                   <div className="font-semibold text-lg">
                     {prediction.homeTeam.shortName}
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500 flex justify-end flex-wrap">
                     <span
                       className={getPositionColor(prediction.homeTeam.position)}
                     >
                       {prediction.homeTeam.position}
+                      {prediction.awayTeam.position > 3 && <span>th</span>}
+                      {prediction.awayTeam.position == 3 && <span>rd</span>}
+                      {prediction.awayTeam.position == 2 && <span>nd</span>}
+                      {prediction.awayTeam.position == 1 && <span>st</span>}
                     </span>
-                    <span className="mx-1">•</span>
-                    <span>{prediction.homeTeam.points} pts</span>
+                    ,
+                    <span className="text-nowrap">
+                      {prediction.homeTeam.points} pts
+                    </span>
                     {prediction.homeTeam.form !== null && (
-                      <>
+                      <div className="hidden sm:visible">
                         <span className="mx-1">•</span>
                         <span>Form: {prediction.homeTeam.form}</span>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -312,19 +319,25 @@ export default function GamePredictions() {
                   <div className="font-semibold text-lg">
                     {prediction.awayTeam.shortName}
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500  flex flex-wrap">
                     <span
                       className={getPositionColor(prediction.awayTeam.position)}
                     >
                       {prediction.awayTeam.position}
+                      {prediction.awayTeam.position > 3 && <span>th</span>}
+                      {prediction.awayTeam.position == 3 && <span>rd</span>}
+                      {prediction.awayTeam.position == 2 && <span>nd</span>}
+                      {prediction.awayTeam.position == 1 && <span>st</span>}
                     </span>
-                    <span className="mx-1">•</span>
-                    <span>{prediction.awayTeam.points} pts</span>
+                    ,
+                    <div className="text-nowrap">
+                      <span>{prediction.awayTeam.points} pts</span>
+                    </div>
                     {prediction.awayTeam.form !== null && (
-                      <>
+                      <div className="hidden sm:visible">
                         <span className="mx-1">•</span>
                         <span>Form: {prediction.awayTeam.form}</span>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -403,22 +416,37 @@ export default function GamePredictions() {
         ))}
       </div>
 
-      <div className="mt-6 text-sm text-gray-500 bg-blue-50 p-4 rounded-lg">
-        <p>
-          <strong>Prediction Method:</strong> Scores are predicted using:
-        </p>
-        <ul className="list-disc list-inside mt-2 space-y-1">
-          <li>Team strength ratings (attack/defense, home/away)</li>
-          <li>Current form and league position</li>
-          <li>Goals scored/conceded averages</li>
-          <li>Home advantage factor (30% boost)</li>
-          <li>FPL difficulty ratings</li>
-        </ul>
-        <p className="mt-2">
-          <strong>Note:</strong> These are statistical predictions and actual
-          results may vary significantly due to team news, tactics, and match
-          circumstances.
-        </p>
+      <div className="mt-6 border border-blue-200 rounded-lg bg-blue-50">
+        <div
+          className="flex justify-between items-center p-4 cursor-pointer hover:bg-blue-100 transition-colors rounded-t-lg"
+          onClick={() => setShowPredictionMethod(!showPredictionMethod)}
+        >
+          <h4 className="font-semibold text-blue-800">Prediction Method</h4>
+          <button className="text-blue-800">
+            {showPredictionMethod ? "▲" : "▼"}
+          </button>
+        </div>
+        {showPredictionMethod && (
+          <div className="px-4 pb-4 border-t border-blue-200">
+            <div className="text-sm text-gray-700 mt-3">
+              <p className="mb-2">
+                <strong>Scores are predicted using:</strong>
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Team strength ratings (attack/defense, home/away)</li>
+                <li>Current form and league position</li>
+                <li>Goals scored/conceded averages</li>
+                <li>Home advantage factor (30% boost)</li>
+                <li>FPL difficulty ratings</li>
+              </ul>
+              <p className="mt-3">
+                <strong>Note:</strong> These are statistical predictions and
+                actual results may vary significantly due to team news, tactics,
+                and match circumstances.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -357,11 +357,11 @@ export default function TransferSuggestions({
     <div className="bg-green-200 rounded-lg border border-green-200">
       {/* Header with collapse button */}
       <div
-        className="flex justify-between items-center p-4 cursor-pointer rounded-t-lg transition-colors"
+        className="flex flex-wrap justify-between items-center gap-2 p-4 cursor-pointer rounded-t-lg transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <div className="flex items-center gap-4 flex-wrap">
-          <h3 className="text-xl font-bold flex items-center gap-2">
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap">
+          <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
             Transfer Suggestions
             {isFallback && (
               <span className="text-xs text-yellow-800 px-2 py-1 rounded">
@@ -375,12 +375,12 @@ export default function TransferSuggestions({
             )} */}
           </h3>
           {transferInfo && (
-            <div className="flex items-center gap-3 text-sm">
-              <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900 rounded">
+            <div className="flex items-center gap-2 text-xs md:text-sm flex-wrap">
+              <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900 rounded whitespace-nowrap">
                 <span className="font-semibold">Bank:</span>
                 <span>£{transferInfo.bankBalance.toFixed(1)}m</span>
               </div>
-              <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded">
+              <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded whitespace-nowrap">
                 <span className="font-semibold">Free Transfers:</span>
                 <span>
                   {transferInfo.freeTransfers === 15
@@ -388,7 +388,7 @@ export default function TransferSuggestions({
                     : transferInfo.freeTransfers}
                 </span>
               </div>
-              <div className="flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900 rounded">
+              <div className="flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900 rounded whitespace-nowrap">
                 <span className="font-semibold">Suggestions:</span>
                 <span>{transferInfo.numberOfTransfers}</span>
               </div>

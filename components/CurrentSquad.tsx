@@ -607,11 +607,11 @@ export default function CurrentSquad({
       return (
         <div
           key={pick.element}
-          className="gradient-border rounded-lg w-24 h-32"
+          className="gradient-border rounded-lg w-16 md:w-24 h-20 md:h-32"
         >
           <div
             onClick={() => handlePlayerClick(pick)}
-            className={`relative flex flex-col p-3 rounded-lg transition-all cursor-pointer w-full h-full overflow-y-auto scrolly bg-green-300 ${
+            className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 overflow-y-auto overflow-x-hidden ${
               pick.is_captain
                 ? "ring-1 ring-yellow-400"
                 : pick.is_vice_captain
@@ -625,43 +625,40 @@ export default function CurrentSquad({
           >
             {/* Suggestion indicators */}
             {isNewSuggestion && (
-              <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↑
               </div>
             )}
             {isBenchedSuggestion && (
-              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↓
               </div>
             )}
             {isTransferIn && (
-              <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+              <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ⚡
               </div>
             )}
             {/* Player Name and Team */}
-            <div className="text-center mb-2">
-              <h3 className="font-semibold text-sm leading-tight">
+            <div className="text-center mb-0.5 md:mb-2">
+              <h3 className="font-semibold text-[10px] md:text-sm leading-tight">
                 {player.web_name}
               </h3>
-              <p className="text-xs ">
+              <p className="text-[8px] md:text-xs ">
                 {team?.short_name} - {position?.singular_name_short}
               </p>
             </div>
 
             {/* Stats - Updated to use getPlayerStats */}
-            <div className="text-center mb-2">
-              <p className={`text-sm font-bold ${stats.statusColor}`}>
+            <div className="text-center mb-0.5 md:mb-2">
+              <p className={`text-[10px] md:text-sm font-bold ${stats.statusColor}`}>
                 {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
-                <span className="text-xs text-gray-500 block">
-                  {stats.isGameweek ? `GW${currentEvent}` : "Season"}
-                </span>
               </p>
-              <p className="text-xs ">£{stats.price}m</p>
+              <p className="text-[8px] md:text-xs ">£{stats.price}m</p>
             </div>
 
-            {/* Form and Minutes - Updated */}
-            <div className="text-center text-xs  mb-2">
+            {/* Form and Minutes - Updated - Hidden on mobile, shown on desktop */}
+            <div className="hidden md:block text-center text-xs mb-2">
               <div>Form: {stats.form}</div>
               <div className={stats.statusColor}>{stats.minutes}</div>
               {stats.isGameweek && (
@@ -714,20 +711,15 @@ export default function CurrentSquad({
             </div>
 
             {/* Captain/Vice-Captain Badges */}
-            <div className="flex justify-center gap-1 mt-auto">
+            <div className="flex justify-center gap-0.5 md:gap-1 mt-auto">
               {pick.is_captain && (
-                <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+                <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-400 text-[8px] md:text-xs rounded font-bold">
                   C
                 </span>
               )}
               {pick.is_vice_captain && (
-                <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+                <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-200 text-[8px] md:text-xs rounded font-bold">
                   V
-                </span>
-              )}
-              {pick.multiplier > 1 && (
-                <span className="px-2 py-1  text-xs rounded">
-                  {pick.multiplier}x
                 </span>
               )}
             </div>
@@ -1275,11 +1267,11 @@ export default function CurrentSquad({
               </div>
 
               {/* Formation Layout */}
-              <div className="relative z-10 space-y-20 sm:space-y-12">
+              <div className="relative z-10 space-y-4 sm:space-y-12 md:space-y-20">
                 {/* Forwards */}
                 {forwards.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center flex-wrap">
+                    <div className="flex gap-1 md:gap-4 justify-center flex-wrap">
                       {forwards.map((pick) => renderPlayer(pick, false, true))}
                     </div>
                   </div>
@@ -1288,7 +1280,7 @@ export default function CurrentSquad({
                 {/* Midfielders */}
                 {midfielders.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center flex-wrap">
+                    <div className="flex gap-1 md:gap-4 justify-center flex-wrap">
                       {midfielders.map((pick) =>
                         renderPlayer(pick, false, true)
                       )}
@@ -1299,7 +1291,7 @@ export default function CurrentSquad({
                 {/* Defenders */}
                 {defenders.length > 0 && (
                   <div className="flex justify-center">
-                    <div className="flex gap-4 justify-center flex-wrap">
+                    <div className="flex gap-1 md:gap-4 justify-center flex-wrap">
                       {defenders.map((pick) => renderPlayer(pick, false, true))}
                     </div>
                   </div>

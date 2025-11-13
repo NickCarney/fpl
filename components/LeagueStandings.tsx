@@ -158,13 +158,21 @@ export default function LeagueStandings({
           <table className="w-full text-sm border-spacing-x-[50%] text-center">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 px-3">Rank</th>
-                <th className="text-center py-2 px-3 border-l">Team</th>
-                <th className="text-center py-2 px-3 border-l">Manager</th>
-                <th className="text-center py-2 px-3 border-l">GW Points</th>
-                <th className="text-center py-2 px-3 border-l">Total</th>
-                <th className="text-center py-2 px-3 border-l">Chip</th>
-                <th className="text-center py-2 px-3 border-l">Movement</th>
+                <th className="text-left py-2 px-1 md:px-3">Rank</th>
+                <th className="text-center py-2 px-1 md:px-3 border-l">Team</th>
+                <th className="text-center py-2 px-1 md:px-3 border-l hidden md:table-cell">
+                  Manager
+                </th>
+                <th className="text-center py-2 px-1 md:px-3 border-l">GW</th>
+                <th className="text-center py-2 px-1 md:px-3 border-l">
+                  Total
+                </th>
+                <th className="text-center py-2 px-1 md:px-3 border-l hidden md:table-cell">
+                  Chip
+                </th>
+                <th className="text-center py-2 px-1 md:px-3 border-l hidden md:table-cell">
+                  Movement
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -177,24 +185,27 @@ export default function LeagueStandings({
                   <tr
                     key={standing.entry}
                     onClick={() => handleTeamClick(standing, index)}
-                    className={`border-b hover:bg-gray-50 cursor-pointer transition-colors ${
+                    className={`border-b hover:bg-gray-50 cursor-pointer transition-colors h-12 ${
                       isUserTeam ? "bg-blue-50 font-semibold" : ""
                     }`}
                   >
-                    <td className="py-3 px-3">{index + 1}</td>
-                    <td className="py-3 px-3 text-blue-600 hover:text-blue-800 font-medium border-l">
+                    <td className="py-2 px-1 md:py-3 md:px-3">{index + 1}</td>
+                    <td className="py-2 px-1 md:py-3 md:px-3 text-blue-600 hover:text-blue-800 font-medium border-l text-xs md:text-sm">
                       {standing.entry_name}
                     </td>
-                    <td className="py-3 px-3 border-l">
+                    <td className="py-2 px-1 md:py-3 md:px-3 border-l hidden md:table-cell">
                       {standing.player_name}
                     </td>
-                    <td className="py-3 px-3 text-center border-l">
+                    <td className="py-2 px-1 md:py-3 md:px-3 text-center border-l">
                       {standing.event_total}
                     </td>
-                    <td className="py-3 px-3 text-center font-semibold border-l">
+                    <td className="py-2 px-1 md:py-3 md:px-3 text-center font-semibold border-l">
                       {standing.total}
                     </td>
-                    <td className="py-3 px-3 text-center border-l">
+                    <td
+                      className="py-2 px-1 md:py-3 md:px-3 text-center border-l hidden md:table-cell relative overflow-visible"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {isLoadingChips ? (
                         <span className="text-gray-400 text-xs">...</span>
                       ) : activeChip ? (
@@ -203,7 +214,7 @@ export default function LeagueStandings({
                         <span className="text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center border-l">
+                    <td className="py-2 px-1 md:py-3 md:px-3 text-center border-l hidden md:table-cell">
                       {movement > 0 && (
                         <span className="text-green-600 text-xs">
                           ↑ {movement}

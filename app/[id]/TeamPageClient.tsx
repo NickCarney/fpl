@@ -389,26 +389,28 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
               teamInfo.leagues?.classic &&
               teamInfo.leagues.classic.length > 0 && (
                 <div className="p-6 rounded-lg flex justify-center">
-                  <div className="mb-4 flex justify-center flex-col">
+                  <div className="mb-4 flex justify-center flex-col ">
                     <label className="block text-sm font-medium mb-2 text-center">
                       Your Leagues
                     </label>
-                    <select
-                      value={
-                        leagueStandings
-                          ? leagueStandings.league.id.toString()
-                          : leagueId
-                      }
-                      onChange={(e) => handleLeagueSelection(e.target.value)}
-                      className="px-3 py-2 border rounded-md focus:outline-none"
-                    >
-                      <option value="">Select a league</option>
-                      {teamInfo.leagues.classic.map((league: any) => (
-                        <option key={league.id} value={league.id}>
-                          {league.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="input-gradient-wrapper">
+                      <select
+                        value={
+                          leagueStandings
+                            ? leagueStandings.league.id.toString()
+                            : leagueId
+                        }
+                        onChange={(e) => handleLeagueSelection(e.target.value)}
+                        className="px-3 py-2 border rounded-md focus:outline-none"
+                      >
+                        <option value="">Select a league</option>
+                        {teamInfo.leagues.classic.map((league: any) => (
+                          <option key={league.id} value={league.id}>
+                            {league.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     {/* Manual league ID input - collapsible */}
                     <details className="mb-4 pt-2 text-center">
                       <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-800">

@@ -126,30 +126,30 @@ export default function PredictedLineups() {
         </div>
 
         {/* Formation Layout */}
-        <div className="formation-grid h-72 relative">
+        <div className="formation-grid h-48 md:h-72 relative">
           {/* Forwards */}
-          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 flex space-x-2">
+          <div className="absolute top-1 md:top-2 left-1/2 transform -translate-x-1/2 flex space-x-1 md:space-x-2">
             {fwd.map((player) => (
               <PlayerCard key={player.id} player={player} />
             ))}
           </div>
 
           {/* Midfielders */}
-          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 flex space-x-2">
+          <div className="absolute top-14 md:top-20 left-1/2 transform -translate-x-1/2 flex space-x-1 md:space-x-2">
             {mid.map((player) => (
               <PlayerCard key={player.id} player={player} />
             ))}
           </div>
 
           {/* Defenders */}
-          <div className="absolute top-38 left-1/2 transform -translate-x-1/2 flex space-x-2">
+          <div className="absolute top-28 md:top-38 left-1/2 transform -translate-x-1/2 flex space-x-1 md:space-x-2">
             {def.map((player) => (
               <PlayerCard key={player.id} player={player} />
             ))}
           </div>
 
           {/* Goalkeeper */}
-          <div className="absolute top-56 left-1/2 transform -translate-x-1/2">
+          <div className="absolute top-40 md:top-56 left-1/2 transform -translate-x-1/2">
             {gk.map((player) => (
               <PlayerCard key={player.id} player={player} />
             ))}
@@ -161,6 +161,16 @@ export default function PredictedLineups() {
 
   const PlayerCard = ({ player }: { player: Player }) => {
     const [showTooltip, setShowTooltip] = useState(false);
+    const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+    }, [timeoutId]);
 
     const getInjuryIndicatorColor = (chanceOfPlaying: number) => {
       if (chanceOfPlaying >= 75) return "bg-yellow-500";
@@ -168,38 +178,72 @@ export default function PredictedLineups() {
       return "bg-red-500";
     };
 
+    const handleClick = () => {
+      // Clear any existing timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      // Show tooltip
+      setShowTooltip(true);
+
+      // Set new timeout to hide after 3 seconds
+      const newTimeoutId = setTimeout(() => {
+        setShowTooltip(false);
+        setTimeoutId(null);
+      }, 3000);
+
+      setTimeoutId(newTimeoutId);
+    };
+
+    const handleMouseEnter = () => {
+      // Don't override click-triggered tooltip
+      if (!timeoutId) {
+        setShowTooltip(true);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      // Only hide on mouse leave if not click-triggered
+      if (!timeoutId) {
+        setShowTooltip(false);
+      }
+    };
+
     return (
       <div className="text-center relative">
         <div
-          className={`w-16 h-12 rounded text-xs p-1 ${getPositionColor(
+          className={`w-12 md:w-16 h-10 md:h-12 rounded text-[9px] md:text-xs p-0.5 md:p-1 ${getPositionColor(
             player.position
-          )} flex flex-col justify-center items-center shadow-sm relative`}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
+          )} flex flex-col justify-center items-center shadow-sm relative cursor-pointer`}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleClick}
         >
-          <div className="font-semibold truncate w-full">{player.name}</div>
-          <div className="text-xs opacity-75">{player.position}</div>
+          <div className="font-semibold truncate w-full text-[8px] md:text-xs">{player.name}</div>
+          <div className="text-[7px] md:text-xs opacity-75">{player.position}</div>
 
           {/* Injury indicator dot */}
           {player.chanceOfPlaying !== null && player.chanceOfPlaying < 100 && (
             <div
-              className={`absolute -top-1 -right-1 w-3 h-3 ${getInjuryIndicatorColor(
+              className={`absolute -top-0.5 md:-top-1 -right-0.5 md:-right-1 w-2 md:w-3 h-2 md:h-3 ${getInjuryIndicatorColor(
                 player.chanceOfPlaying
               )} rounded-full border border-white`}
             ></div>
           )}
 
           {/* Tooltip */}
-          {showTooltip &&
-            player.chanceOfPlaying !== null &&
-            player.chanceOfPlaying < 100 && (
-              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                Chance of playing: {player.chanceOfPlaying}%
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
-              </div>
-            )}
+          {showTooltip && (
+            <div className="absolute -top-8 md:-top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+              <div className="font-semibold">{player.name}</div>
+              {player.chanceOfPlaying !== null && player.chanceOfPlaying < 100 && (
+                <div className="text-[10px]">Chance of playing: {player.chanceOfPlaying}%</div>
+              )}
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-gray-900"></div>
+            </div>
+          )}
         </div>
-        <div className="text-xs mt-1 space-y-0.5">
+        <div className="hidden md:block text-xs mt-1 space-y-0.5">
           <div>Form: {player.form}</div>
         </div>
       </div>

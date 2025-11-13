@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Element, Team, ElementType } from "@/types/fpl";
+import PlayerDetailPopup from "./PlayerDetailPopup";
 import {
   ScatterChart,
   Scatter,
@@ -52,6 +53,11 @@ export default function PlayerStats({
   const [xAxisStat, setXAxisStat] = useState<keyof Element>("now_cost");
   const [yAxisStat, setYAxisStat] = useState<keyof Element>("total_points");
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [selectedPlayer, setSelectedPlayer] = useState<{
+    player: Element;
+    team: Team;
+    position: ElementType;
+  } | null>(null);
 
   // Fetch fixtures when component mounts
   useEffect(() => {
@@ -120,6 +126,19 @@ export default function PlayerStats({
 
   const getPosition = (elementTypeId: number) => {
     return elementTypes.find((type) => type.id === elementTypeId);
+  };
+
+  const handlePlayerClick = (element: Element) => {
+    const team = getTeam(element.team);
+    const position = getPosition(element.element_type);
+
+    if (team && position) {
+      setSelectedPlayer({ player: element, team, position });
+    }
+  };
+
+  const closePopup = () => {
+    setSelectedPlayer(null);
   };
 
   const filteredAndSortedElements = elements
@@ -436,9 +455,9 @@ export default function PlayerStats({
 
       {/* Chart Controls */}
       {viewMode === "chart" && (
-        <div className="mb-6 p-4 bg-green-500 rounded-lg ">
+        <div className="mb-6 p-4 rounded-lg no-gradient-border">
           <div className="flex justify-center flex-col sm:flex-row gap-x-24 gap-y-2">
-            <div className="text-center">
+            <div className="text-center input-gradient-wrapper">
               <label className="block text-sm font-medium mb-2">
                 Chart Type
               </label>
@@ -453,7 +472,7 @@ export default function PlayerStats({
               </select>
             </div>
 
-            <div className="text-center">
+            <div className="text-center input-gradient-wrapper">
               <label className="block text-sm font-medium mb-2">
                 Player Limit
               </label>
@@ -472,7 +491,7 @@ export default function PlayerStats({
 
             {(chartType === "scatter" || chartType === "bar") && (
               <>
-                <div className="text-center">
+                <div className="text-center input-gradient-wrapper">
                   <label className="block text-sm font-medium mb-2">
                     {chartType === "scatter" ? "X-Axis" : "Statistic"}
                   </label>
@@ -492,7 +511,7 @@ export default function PlayerStats({
                 </div>
 
                 {chartType === "scatter" && (
-                  <div className="text-center">
+                  <div className="text-center input-gradient-wrapper">
                     <label className="block text-sm font-medium mb-2">
                       Y-Axis
                     </label>
@@ -519,7 +538,7 @@ export default function PlayerStats({
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-x-12 gap-y-2 items-center flex-col sm:flex-row justify-center">
-        <div className="">
+        <div className="input-gradient-wrapper">
           <select
             value={selectedPosition || ""}
             onChange={(e) =>
@@ -538,7 +557,7 @@ export default function PlayerStats({
           </select>
         </div>
 
-        <div className="w-fit">
+        <div className="w-fit input-gradient-wrapper">
           <input
             type="text"
             value={searchTerm}
@@ -548,7 +567,7 @@ export default function PlayerStats({
           />
         </div>
 
-        <div className="">
+        <div className="input-gradient-wrapper">
           <select
             value={selectedTeam || ""}
             onChange={(e) =>
@@ -611,7 +630,11 @@ export default function PlayerStats({
                 const nextFixtures = getNext5Fixtures(element.team);
 
                 return (
-                  <tr key={element.id} className="border-b">
+                  <tr
+                    key={element.id}
+                    className="border-b hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handlePlayerClick(element)}
+                  >
                     <td className="py-3 text-center">
                       <div>
                         <div className="font-medium">{element.web_name}</div>
@@ -675,6 +698,25 @@ export default function PlayerStats({
         <div className="text-center py-8 ">
           No players found matching your criteria
         </div>
+      )}
+
+      {/* Help text */}
+      {viewMode === "table" && filteredAndSortedElements.length > 0 && (
+        <div className="mt-4 text-center text-sm text-gray-500">
+          Click on any player to view detailed statistics
+        </div>
+      )}
+
+      {/* Player Detail Popup */}
+      {selectedPlayer && (
+        <PlayerDetailPopup
+          player={selectedPlayer.player}
+          team={selectedPlayer.team}
+          position={selectedPlayer.position}
+          teams={teams}
+          isOpen={!!selectedPlayer}
+          onClose={closePopup}
+        />
       )}
     </div>
   );
