@@ -77,7 +77,9 @@ export default function TeamSearch({ onTeamSelect }: TeamSearchProps) {
           <div className="text-xs mt-1">
             <ul className="list-disc list-inside space-y-1">
               <li>Search by your FPL team name or your actual name</li>
-              <li>Make sure you&apos;re in a public league for search to work</li>
+              <li>
+                Make sure you&apos;re in a public league for search to work
+              </li>
               <li>Can&apos;t find your team? Use the Team ID option instead</li>
             </ul>
           </div>
@@ -98,11 +100,11 @@ export default function TeamSearch({ onTeamSelect }: TeamSearchProps) {
       )}
 
       {searchTerm.length >= 2 && !loading && (
-        <div className="max-h-80 overflow-y-auto border rounded-md">
+        <div className="max-h-80 overflow-y-auto border rounded-md no-gradient-border">
           {searchResults.length > 0 ? (
             <ul>
               {searchResults.map((team) => (
-                <li key={team.id} className="border-b last:border-b-0">
+                <li key={team.id} className="no-gradient-border">
                   <button
                     className="w-full text-left px-3 py-3 hover:bg-blue-50 focus:bg-blue-50 transition-colors"
                     onClick={() => onTeamSelect(team.id, team.name)}
