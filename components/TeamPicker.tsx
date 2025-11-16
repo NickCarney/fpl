@@ -300,6 +300,7 @@ export default function TeamPicker({
   teamId,
 }: TeamPickerProps) {
   const [currentPicks, setCurrentPicks] = useState<Pick[]>(picks);
+  const [originalPicks] = useState<Pick[]>(picks); // Store original picks to track changes
   const [isFormationView, setIsFormationView] = useState(true);
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [draggedPlayer, setDraggedPlayer] = useState<DraggedPlayer | null>(
@@ -355,6 +356,77 @@ export default function TeamPicker({
   const getTeam = (teamId: number) => teams.find((team) => team.id === teamId);
   const getPosition = (elementTypeId: number) =>
     elementTypes.find((type) => type.id === elementTypeId);
+
+  // Calculate dynamic transfer stats
+  const calculateTransferStats = () => {
+    const originalPlayerIds = new Set(originalPicks.map((p) => p.element));
+    const currentPlayerIds = new Set(currentPicks.map((p) => p.element));
+
+    // Find players that were transferred out (in original but not in current)
+    const actualTransfersOut = originalPicks.filter(
+      (p) => !currentPlayerIds.has(p.element)
+    );
+
+    // Find players that were transferred in (in current but not in original)
+    const actualTransfersIn = currentPicks.filter(
+      (p) => !originalPlayerIds.has(p.element)
+    );
+
+    const numTransfers = actualTransfersOut.length; // Should equal actualTransfersIn.length
+
+    // Calculate budget change (money spent on new players - money gained from sold players)
+    let budgetChange = 0;
+    actualTransfersOut.forEach((pick) => {
+      const player = getPlayer(pick.element);
+      // When selling, we get the selling_price (which is the price we can sell at)
+      budgetChange += pick.selling_price || player?.now_cost || 0;
+    });
+    actualTransfersIn.forEach((pick) => {
+      const player = getPlayer(pick.element);
+      // When buying, we pay the current price
+      budgetChange -= player?.now_cost || 0;
+    });
+
+    // Calculate current team value (sum of all player prices)
+    const currentTeamValue = currentPicks.reduce((sum, pick) => {
+      const player = getPlayer(pick.element);
+      return sum + (player?.now_cost || 0);
+    }, 0);
+
+    // Calculate original budget and team value from teamInfo
+    const originalBudget = teamInfo?.last_deadline_bank || 0;
+    const originalTeamValue = teamInfo?.last_deadline_value || 0;
+
+    // New budget = original budget + budget change
+    const newBudget = originalBudget + budgetChange;
+
+    // Free transfers calculation - use same logic as TransferSuggestions
+    const originalFreeTransfers = teamPicks?.transfers
+      ? teamPicks.transfers.limit === null
+        ? 999 // Unlimited (wildcard/free hit)
+        : teamPicks.transfers.limit - teamPicks.transfers.made // Don't use Math.max here, made might include transfers from this session
+      : 1; // Default to 1 free transfer
+
+    const freeTransfersRemaining = Math.max(
+      0,
+      originalFreeTransfers - numTransfers
+    );
+    const extraTransfers = Math.max(0, numTransfers - originalFreeTransfers);
+    const transferCost = extraTransfers * 4;
+
+    return {
+      numTransfers,
+      budgetChange,
+      newBudget,
+      currentTeamValue,
+      freeTransfersRemaining,
+      originalFreeTransfers,
+      transferCost,
+      extraTransfers,
+    };
+  };
+
+  const transferStats = calculateTransferStats();
 
   useEffect(() => {
     async function fetchTeamInfo() {
@@ -860,22 +932,65 @@ export default function TeamPicker({
         <p className="text-gray-600">
           Drag players between starting XI and bench to optimize your lineup
         </p>
-        {teamInfo && (
-          <div className="mt-2 flex justify-center gap-6 text-sm text-gray-800">
-            <span>
-              <strong>Budget:</strong> £
-              {(teamInfo.last_deadline_bank / 10).toFixed(1)}m
+        {(teamInfo || teamPicks) && (
+          <div className="mt-2 flex justify-center gap-3 md:gap-6 text-xs md:text-sm text-gray-800 flex-wrap">
+            {teamInfo && (
+              <>
+                <span
+                  className={
+                    transferStats.budgetChange !== 0 ? "font-semibold" : ""
+                  }
+                >
+                  <strong>Budget:</strong> £
+                  {(transferStats.newBudget / 10).toFixed(1)}m
+                  {transferStats.budgetChange !== 0 && (
+                    <span
+                      className={
+                        transferStats.budgetChange > 0
+                          ? "text-green-600 ml-1"
+                          : "text-red-600 ml-1"
+                      }
+                    >
+                      ({transferStats.budgetChange > 0 ? "+" : ""}
+                      {(transferStats.budgetChange / 10).toFixed(1)}m)
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={
+                    transferStats.numTransfers > 0 ? "font-semibold" : ""
+                  }
+                >
+                  <strong>Team Value:</strong> £
+                  {(transferStats.currentTeamValue / 10).toFixed(1)}m
+                </span>
+              </>
+            )}
+            <span
+              className={transferStats.numTransfers > 0 ? "font-semibold" : ""}
+            >
+              <strong>Free Transfers:</strong>{" "}
+              {transferStats.originalFreeTransfers === 999
+                ? "Unlimited"
+                : `${transferStats.freeTransfersRemaining}/${transferStats.originalFreeTransfers}`}
+              {transferStats.numTransfers > 0 && (
+                <span className="text-blue-600 ml-1">
+                  ({transferStats.numTransfers} made)
+                </span>
+              )}
             </span>
-            <span>
-              <strong>Team Value:</strong> £
-              {(teamInfo.last_deadline_value / 10).toFixed(1)}m
-            </span>
+            {transferStats.transferCost > 0 && (
+              <span className="font-semibold text-red-600">
+                <strong>Points Cost:</strong> -{transferStats.transferCost}pts (
+                {transferStats.extraTransfers} × 4pts)
+              </span>
+            )}
           </div>
         )}
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-2 w-full">
+      <div className="flex items-center justify-center gap-2 w-full flex-wrap">
         {/* <span className="text-sm ">View:</span> */}
         <button
           onClick={() => setIsFormationView(true)}
@@ -894,6 +1009,17 @@ export default function TeamPicker({
         >
           List
         </button>
+        {transferStats.numTransfers > 0 && (
+          <button
+            onClick={() => {
+              setCurrentPicks(originalPicks);
+              setSelectedPlayerToBuy(null);
+            }}
+            className="px-4 py-1 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+          >
+            Reset Transfers ({transferStats.numTransfers})
+          </button>
+        )}
       </div>
 
       {/* Starting XI */}
