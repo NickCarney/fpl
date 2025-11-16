@@ -89,10 +89,10 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.toLowerCase().trim();
 
-  if (!query || query.length < 2) {
+  if (!query || query.length < 1) {
     return NextResponse.json({
       results: [],
-      message: "Please enter at least 2 characters to search",
+      message: "Please enter at least 1 characters to search",
     });
   }
 
