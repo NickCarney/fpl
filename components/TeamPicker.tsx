@@ -309,7 +309,7 @@ export default function TeamPicker({
   const [selectedPlayer, setSelectedPlayer] = useState<Pick | null>(null);
 
   // New state for player browser
-  const [showPlayerBrowser, setShowPlayerBrowser] = useState(false);
+  const [showPlayerBrowser, setShowPlayerBrowser] = useState(true);
   const [browserPosition, setBrowserPosition] = useState<number | null>(null);
   const [browserTeam, setBrowserTeam] = useState<number | null>(null);
   const [browserSearchTerm, setBrowserSearchTerm] = useState("");
@@ -751,6 +751,12 @@ export default function TeamPicker({
 
   // Handle player click for selection
   const handlePlayerClick = (pick: Pick) => {
+    // Get the player's position to filter the browser
+    const clickedPlayer = getPlayer(pick.element);
+    if (clickedPlayer) {
+      setBrowserPosition(clickedPlayer.element_type);
+    }
+
     // If a player is selected for buying, replace the clicked player
     if (selectedPlayerToBuy) {
       handlePlayerReplacement(pick.element, selectedPlayerToBuy);
@@ -1087,7 +1093,11 @@ export default function TeamPicker({
                             isSelected={
                               selectedPlayer?.element === pick.element
                             }
-                            canBeReplaced={!!selectedPlayerToBuy}
+                            canBeReplaced={
+                              !!selectedPlayerToBuy &&
+                              selectedPlayerToBuy.element_type ===
+                                player.element_type
+                            }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
@@ -1124,7 +1134,11 @@ export default function TeamPicker({
                             isSelected={
                               selectedPlayer?.element === pick.element
                             }
-                            canBeReplaced={!!selectedPlayerToBuy}
+                            canBeReplaced={
+                              !!selectedPlayerToBuy &&
+                              selectedPlayerToBuy.element_type ===
+                                player.element_type
+                            }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
@@ -1161,7 +1175,11 @@ export default function TeamPicker({
                             isSelected={
                               selectedPlayer?.element === pick.element
                             }
-                            canBeReplaced={!!selectedPlayerToBuy}
+                            canBeReplaced={
+                              !!selectedPlayerToBuy &&
+                              selectedPlayerToBuy.element_type ===
+                                player.element_type
+                            }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
@@ -1198,7 +1216,11 @@ export default function TeamPicker({
                             isSelected={
                               selectedPlayer?.element === pick.element
                             }
-                            canBeReplaced={!!selectedPlayerToBuy}
+                            canBeReplaced={
+                              !!selectedPlayerToBuy &&
+                              selectedPlayerToBuy.element_type ===
+                                player.element_type
+                            }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
@@ -1240,7 +1262,10 @@ export default function TeamPicker({
                   isFormationView={false}
                   isBench={false}
                   isSelected={selectedPlayer?.element === pick.element}
-                  canBeReplaced={!!selectedPlayerToBuy}
+                  canBeReplaced={
+                    !!selectedPlayerToBuy &&
+                    selectedPlayerToBuy.element_type === player.element_type
+                  }
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -1276,7 +1301,10 @@ export default function TeamPicker({
                 isFormationView={false}
                 isBench={true}
                 isSelected={selectedPlayer?.element === pick.element}
-                canBeReplaced={!!selectedPlayerToBuy}
+                canBeReplaced={
+                  !!selectedPlayerToBuy &&
+                  selectedPlayerToBuy.element_type === player.element_type
+                }
                 onDragStart={handleDragStart}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -1312,6 +1340,17 @@ export default function TeamPicker({
                 with formation validation
               </li>
               <li>
+                • <strong>Position Filtering:</strong> When you click a player,
+                the browser below automatically filters to show only players in
+                the same position
+              </li>
+              <li>
+                • <strong>Position Highlighting:</strong> When you select a
+                player from the browser, all players in your squad with the same
+                position are highlighted (orange), showing valid substitution
+                targets
+              </li>
+              <li>
                 • <strong>Captain Selection:</strong> Click the + button in the
                 corner to cycle through captain and no selection
               </li>
@@ -1322,10 +1361,6 @@ export default function TeamPicker({
               <li>
                 • <strong>Formation View:</strong> See your team layout on a
                 football pitch
-              </li>
-              <li>
-                • <strong>Player Browser:</strong> Browse available players
-                below to replace current squad members
               </li>
             </ul>
           </div>
