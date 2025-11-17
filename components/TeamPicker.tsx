@@ -749,6 +749,24 @@ export default function TeamPicker({
     };
   };
 
+  // Check if two players can be swapped while maintaining valid formation
+  const canSwapPlayers = (pick1: Pick, pick2: Pick): boolean => {
+    const newPicks = [...currentPicks];
+    const index1 = newPicks.findIndex((p) => p.element === pick1.element);
+    const index2 = newPicks.findIndex((p) => p.element === pick2.element);
+
+    if (index1 === -1 || index2 === -1) return false;
+
+    // Swap positions
+    const tempPosition = newPicks[index1].position;
+    newPicks[index1] = { ...newPicks[index1], position: newPicks[index2].position };
+    newPicks[index2] = { ...newPicks[index2], position: tempPosition };
+
+    // Validate the formation
+    const validation = validateFormation(newPicks);
+    return validation.isValid;
+  };
+
   // Handle player click for selection
   const handlePlayerClick = (pick: Pick) => {
     // Get the player's position to filter the browser
@@ -1080,6 +1098,15 @@ export default function TeamPicker({
                           ? getNextFixture(player)
                           : null;
                         if (!player || !team || !position) return null;
+                        const canBeReplacedForTransfer =
+                          !!selectedPlayerToBuy &&
+                          selectedPlayerToBuy.element_type ===
+                            player.element_type;
+                        const canBeReplacedForSwap =
+                          !!selectedPlayer &&
+                          !selectedPlayerToBuy &&
+                          selectedPlayer.element !== pick.element &&
+                          canSwapPlayers(selectedPlayer, pick);
                         return (
                           <PlayerCard
                             key={pick.element}
@@ -1094,9 +1121,7 @@ export default function TeamPicker({
                               selectedPlayer?.element === pick.element
                             }
                             canBeReplaced={
-                              !!selectedPlayerToBuy &&
-                              selectedPlayerToBuy.element_type ===
-                                player.element_type
+                              canBeReplacedForTransfer || canBeReplacedForSwap
                             }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
@@ -1121,6 +1146,15 @@ export default function TeamPicker({
                           ? getNextFixture(player)
                           : null;
                         if (!player || !team || !position) return null;
+                        const canBeReplacedForTransfer =
+                          !!selectedPlayerToBuy &&
+                          selectedPlayerToBuy.element_type ===
+                            player.element_type;
+                        const canBeReplacedForSwap =
+                          !!selectedPlayer &&
+                          !selectedPlayerToBuy &&
+                          selectedPlayer.element !== pick.element &&
+                          canSwapPlayers(selectedPlayer, pick);
                         return (
                           <PlayerCard
                             key={pick.element}
@@ -1135,9 +1169,7 @@ export default function TeamPicker({
                               selectedPlayer?.element === pick.element
                             }
                             canBeReplaced={
-                              !!selectedPlayerToBuy &&
-                              selectedPlayerToBuy.element_type ===
-                                player.element_type
+                              canBeReplacedForTransfer || canBeReplacedForSwap
                             }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
@@ -1162,6 +1194,15 @@ export default function TeamPicker({
                           ? getNextFixture(player)
                           : null;
                         if (!player || !team || !position) return null;
+                        const canBeReplacedForTransfer =
+                          !!selectedPlayerToBuy &&
+                          selectedPlayerToBuy.element_type ===
+                            player.element_type;
+                        const canBeReplacedForSwap =
+                          !!selectedPlayer &&
+                          !selectedPlayerToBuy &&
+                          selectedPlayer.element !== pick.element &&
+                          canSwapPlayers(selectedPlayer, pick);
                         return (
                           <PlayerCard
                             key={pick.element}
@@ -1176,9 +1217,7 @@ export default function TeamPicker({
                               selectedPlayer?.element === pick.element
                             }
                             canBeReplaced={
-                              !!selectedPlayerToBuy &&
-                              selectedPlayerToBuy.element_type ===
-                                player.element_type
+                              canBeReplacedForTransfer || canBeReplacedForSwap
                             }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
@@ -1203,6 +1242,15 @@ export default function TeamPicker({
                           ? getNextFixture(player)
                           : null;
                         if (!player || !team || !position) return null;
+                        const canBeReplacedForTransfer =
+                          !!selectedPlayerToBuy &&
+                          selectedPlayerToBuy.element_type ===
+                            player.element_type;
+                        const canBeReplacedForSwap =
+                          !!selectedPlayer &&
+                          !selectedPlayerToBuy &&
+                          selectedPlayer.element !== pick.element &&
+                          canSwapPlayers(selectedPlayer, pick);
                         return (
                           <PlayerCard
                             key={pick.element}
@@ -1217,9 +1265,7 @@ export default function TeamPicker({
                               selectedPlayer?.element === pick.element
                             }
                             canBeReplaced={
-                              !!selectedPlayerToBuy &&
-                              selectedPlayerToBuy.element_type ===
-                                player.element_type
+                              canBeReplacedForTransfer || canBeReplacedForSwap
                             }
                             onDragStart={handleDragStart}
                             onDrop={handleDrop}
@@ -1251,6 +1297,15 @@ export default function TeamPicker({
 
               if (!player || !team || !position) return null;
 
+              const canBeReplacedForTransfer =
+                !!selectedPlayerToBuy &&
+                selectedPlayerToBuy.element_type === player.element_type;
+              const canBeReplacedForSwap =
+                !!selectedPlayer &&
+                !selectedPlayerToBuy &&
+                selectedPlayer.element !== pick.element &&
+                canSwapPlayers(selectedPlayer, pick);
+
               return (
                 <PlayerCard
                   key={pick.element}
@@ -1263,8 +1318,7 @@ export default function TeamPicker({
                   isBench={false}
                   isSelected={selectedPlayer?.element === pick.element}
                   canBeReplaced={
-                    !!selectedPlayerToBuy &&
-                    selectedPlayerToBuy.element_type === player.element_type
+                    canBeReplacedForTransfer || canBeReplacedForSwap
                   }
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
@@ -1290,6 +1344,15 @@ export default function TeamPicker({
 
             if (!player || !team || !position) return null;
 
+            const canBeReplacedForTransfer =
+              !!selectedPlayerToBuy &&
+              selectedPlayerToBuy.element_type === player.element_type;
+            const canBeReplacedForSwap =
+              !!selectedPlayer &&
+              !selectedPlayerToBuy &&
+              selectedPlayer.element !== pick.element &&
+              canSwapPlayers(selectedPlayer, pick);
+
             return (
               <PlayerCard
                 key={pick.element}
@@ -1302,8 +1365,7 @@ export default function TeamPicker({
                 isBench={true}
                 isSelected={selectedPlayer?.element === pick.element}
                 canBeReplaced={
-                  !!selectedPlayerToBuy &&
-                  selectedPlayerToBuy.element_type === player.element_type
+                  canBeReplacedForTransfer || canBeReplacedForSwap
                 }
                 onDragStart={handleDragStart}
                 onDrop={handleDrop}
@@ -1335,19 +1397,21 @@ export default function TeamPicker({
                 and bench to swap positions
               </li>
               <li>
-                • <strong>Click to Select:</strong> Click a player to select
-                them (blue highlight), then click another player to swap them
-                with formation validation
+                • <strong>Click to Swap (Substitutions):</strong> Click a player
+                to select them (blue highlight), then click another player to
+                swap. Valid swap targets are highlighted (orange) based on
+                formation rules - you can swap different positions if it maintains
+                a valid formation!
               </li>
               <li>
                 • <strong>Position Filtering:</strong> When you click a player,
                 the browser below automatically filters to show only players in
-                the same position
+                the same position for transfers
               </li>
               <li>
-                • <strong>Position Highlighting:</strong> When you select a
+                • <strong>Transfer Highlighting:</strong> When you select a
                 player from the browser, all players in your squad with the same
-                position are highlighted (orange), showing valid substitution
+                position are highlighted (orange), showing valid transfer
                 targets
               </li>
               <li>
@@ -1475,7 +1539,6 @@ export default function TeamPicker({
                 {getFilteredAvailablePlayers().map((element) => {
                   const team = getTeam(element.team);
                   const position = getPosition(element.element_type);
-                  const nextFixture = getNextFixture(element);
                   const isSelected = selectedPlayerToBuy?.id === element.id;
 
                   return (
