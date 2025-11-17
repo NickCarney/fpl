@@ -759,7 +759,10 @@ export default function TeamPicker({
 
     // Swap positions
     const tempPosition = newPicks[index1].position;
-    newPicks[index1] = { ...newPicks[index1], position: newPicks[index2].position };
+    newPicks[index1] = {
+      ...newPicks[index1],
+      position: newPicks[index2].position,
+    };
     newPicks[index2] = { ...newPicks[index2], position: tempPosition };
 
     // Validate the formation
@@ -1364,9 +1367,7 @@ export default function TeamPicker({
                 isFormationView={false}
                 isBench={true}
                 isSelected={selectedPlayer?.element === pick.element}
-                canBeReplaced={
-                  canBeReplacedForTransfer || canBeReplacedForSwap
-                }
+                canBeReplaced={canBeReplacedForTransfer || canBeReplacedForSwap}
                 onDragStart={handleDragStart}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -1400,8 +1401,8 @@ export default function TeamPicker({
                 • <strong>Click to Swap (Substitutions):</strong> Click a player
                 to select them (blue highlight), then click another player to
                 swap. Valid swap targets are highlighted (orange) based on
-                formation rules - you can swap different positions if it maintains
-                a valid formation!
+                formation rules - you can swap different positions if it
+                maintains a valid formation!
               </li>
               <li>
                 • <strong>Position Filtering:</strong> When you click a player,
@@ -1462,7 +1463,7 @@ export default function TeamPicker({
 
           {/* Browser Filters */}
           <div className="mb-4 flex flex-wrap gap-4 items-center justify-center">
-            <div>
+            <div className="input-gradient-wrapper">
               <select
                 value={browserPosition || ""}
                 onChange={(e) =>
@@ -1481,7 +1482,7 @@ export default function TeamPicker({
               </select>
             </div>
 
-            <div>
+            <div className="input-gradient-wrapper">
               <input
                 type="text"
                 value={browserSearchTerm}
@@ -1491,7 +1492,7 @@ export default function TeamPicker({
               />
             </div>
 
-            <div>
+            <div className="input-gradient-wrapper">
               <select
                 value={browserTeam || ""}
                 onChange={(e) =>
@@ -1512,7 +1513,7 @@ export default function TeamPicker({
           </div>
 
           {/* Browser Table */}
-          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+          <div className="overflow-x-auto max-h-96 overflow-y-auto overflow-x-hidden">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-100">
                 <tr className="border-b">

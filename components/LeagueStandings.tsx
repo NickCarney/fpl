@@ -155,7 +155,7 @@ export default function LeagueStandings({
         </h2>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-spacing-x-[50%] text-center">
+          <table className="w-full text-sm border-spacing-x-[50%] text-center overflow-x-hidden">
             <thead>
               <tr className="border-b">
                 <th className="text-left py-2 px-1 md:px-3">Rank</th>
