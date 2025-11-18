@@ -444,11 +444,6 @@ export default function TransferSuggestions({
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-semibold mb-3 flex items-center gap-2">
                   📊 AI Squad Analysis
-                  {!isFallback && (
-                    <span className="text-xs text-blue-800 bg-blue-100 px-2 py-1 rounded">
-                      RAG Enhanced
-                    </span>
-                  )}
                   {/* {isStreaming && (
                     <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
                   )} */}
