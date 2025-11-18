@@ -3,11 +3,10 @@ import OpenAI from "openai";
 import { ragCache } from "@/lib/rag-cache";
 import { RAG_CONFIG } from "@/lib/rag-config";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
   try {
     const body = await request.json();
     const {

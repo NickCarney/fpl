@@ -3,10 +3,6 @@ import OpenAI from "openai";
 import { ragCache } from "@/lib/rag-cache";
 import { RAG_CONFIG } from "@/lib/rag-config";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 interface TransferRequest {
   teamData: any;
   squadData: any;
@@ -20,6 +16,10 @@ interface TransferRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
   try {
     const body: TransferRequest = await request.json();
     const {
