@@ -1,5 +1,7 @@
-const sql = require('mssql');
-require('dotenv').config();
+import sql from 'mssql';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // SQL Server configuration
 const config = {
