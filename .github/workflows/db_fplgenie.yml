@@ -1,7 +1,7 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy Node.js app to Azure Web App - fplGenie
+name: Build and deploy Node.js app to Azure Web App - fplgenie
 
 on:
   push:
@@ -23,14 +23,17 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: Zip artifact for deployment
-        run: zip -r release.zip . -x '*.git*' -x 'data/*' -x 'node_modules/*' -x '.next/cache/*'
+      - name: npm install, build, and test
+        run: |
+          npm install
+          npm run build --if-present
+          npm run test --if-present
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: release.zip
+          path: .
 
   deploy:
     runs-on: ubuntu-latest
@@ -44,30 +47,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-
-      - name: Unzip artifact for deployment
-        run: unzip release.zip -d deploy
       
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_53759D81E18847CCA976D5225FD42E3A }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C312EB2AA83142B991F85A8907E4F0FE }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_78CD7E7E11D64807ACC71E2437DC9553 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8A52F670421843B5BC8A41615AD740EF }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B614AA6EF7F44EA7967413E30B26E595 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1A5794080FFD445F96A3C9E2EEBBB603 }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'fpl'
-          package: deploy
-
-      - name: Set startup command
-        uses: azure/cli@v2
-        with:
-          inlineScript: |
-            az webapp config set \
-              --name fpl \
-              --resource-group fpl-resources \
-              --startup-file "node_modules/.bin/next start"
+          app-name: 'fplgenie'
+          slot-name: 'Production'
+          package: .
           
