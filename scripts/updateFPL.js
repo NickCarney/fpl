@@ -79,6 +79,7 @@ async function upsertTeams(pool, teams) {
         .input('name', sql.NVarChar, team.name)
         .input('short_name', sql.NVarChar, team.short_name)
         .input('code', sql.Int, team.code)
+        .input('position', sql.Int, team.position)
         .input('strength', sql.Int, team.strength)
         .input('strength_overall_home', sql.Int, team.strength_overall_home)
         .input('strength_overall_away', sql.Int, team.strength_overall_away)
@@ -95,6 +96,7 @@ async function upsertTeams(pool, teams) {
               name = @name,
               short_name = @short_name,
               code = @code,
+              position = @position,
               strength = @strength,
               strength_overall_home = @strength_overall_home,
               strength_overall_away = @strength_overall_away,
@@ -105,10 +107,10 @@ async function upsertTeams(pool, teams) {
               pulse_id = @pulse_id,
               last_updated = GETUTCDATE()
           WHEN NOT MATCHED THEN
-            INSERT (id, name, short_name, code, strength, strength_overall_home,
+            INSERT (id, name, short_name, code, position, strength, strength_overall_home,
                     strength_overall_away, strength_attack_home, strength_attack_away,
                     strength_defence_home, strength_defence_away, pulse_id)
-            VALUES (@id, @name, @short_name, @code, @strength, @strength_overall_home,
+            VALUES (@id, @name, @short_name, @code, @position, @strength, @strength_overall_home,
                     @strength_overall_away, @strength_attack_home, @strength_attack_away,
                     @strength_defence_home, @strength_defence_away, @pulse_id);
         `);
