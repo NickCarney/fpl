@@ -11,6 +11,7 @@ CREATE TABLE dbo.teams (
     name NVARCHAR(100) NOT NULL,
     short_name NVARCHAR(10) NOT NULL,
     code INT NOT NULL,
+    position INT,
     strength INT,
     strength_overall_home INT,
     strength_overall_away INT,
