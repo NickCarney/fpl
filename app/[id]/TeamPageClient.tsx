@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import CurrentSquad from "@/components/CurrentSquad";
-import PlayerStats from "@/components/PlayerStats";
+import Stats from "@/components/Stats";
 import LeagueStandings from "@/components/LeagueStandings";
 import SeasonHistory from "@/components/SeasonHistory";
 import TeamPicker from "@/components/TeamPicker";
@@ -312,7 +312,7 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
                 : "border-transparent  hover:"
             }`}
           >
-            Player Stats
+            Stats
           </button>
           <button
             onClick={() => setActiveTab("league")}
@@ -375,7 +375,7 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
         )}
 
         {activeTab === "stats" && bootstrapData && (
-          <PlayerStats
+          <Stats
             elements={bootstrapData.elements}
             teams={bootstrapData.teams}
             elementTypes={bootstrapData.element_types}
