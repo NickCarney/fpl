@@ -12,6 +12,7 @@ import {
 } from "@/types/fpl";
 import { getTeamPicks } from "@/lib/fpl-api";
 import PlayerDetailPopup from "./PlayerDetailPopup";
+import PointsBreakdownModal from "./PointsBreakdownModal";
 
 interface TeamFormationPopupProps {
   teamId: number;
@@ -66,6 +67,12 @@ export default function TeamFormationPopup({
   } | null>(null);
   const [showGameweekStats, setShowGameweekStats] = useState(true);
   const [gameweekData, setGameweekData] = useState<{ [key: number]: any }>({});
+  const [pointsBreakdownPlayer, setPointsBreakdownPlayer] = useState<{
+    playerId: number;
+    playerName: string;
+    points: number | string;
+    position: number;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen && teamId) {
@@ -144,6 +151,36 @@ export default function TeamFormationPopup({
 
   const closePlayerPopup = () => {
     setSelectedPlayer(null);
+  };
+
+  const handlePointsClick = (e: React.MouseEvent, player: Element, stats: any) => {
+    console.log("Points clicked!", player.web_name, stats.points);
+    e.preventDefault();
+    e.stopPropagation(); // Prevent triggering the player card click
+    if (showGameweekStats) {
+      console.log("Opening points breakdown for", player.web_name);
+      // Extract numeric points or pass the string if it's YTP/DNP
+      let pointsValue: number | string = stats.points;
+
+      // If stats.points is a string like "7pts", extract the number
+      if (typeof stats.points === 'string' && stats.points.endsWith('pts')) {
+        const numericPoints = parseInt(stats.points.replace('pts', ''));
+        pointsValue = isNaN(numericPoints) ? stats.points : numericPoints;
+      }
+
+      setPointsBreakdownPlayer({
+        playerId: player.id,
+        playerName: player.web_name,
+        points: pointsValue,
+        position: player.element_type,
+      });
+    } else {
+      console.log("Not showing gameweek stats, points not clickable");
+    }
+  };
+
+  const closePointsBreakdown = () => {
+    setPointsBreakdownPlayer(null);
   };
 
   // Group players by position for formation display
@@ -243,7 +280,14 @@ export default function TeamFormationPopup({
     return (
       <div
         key={pick.element}
-        onClick={() => handlePlayerClick(pick)}
+        onClick={(e) => {
+          // Check if the click came from the points element
+          const target = e.target as HTMLElement;
+          if (target.classList.contains('points-clickable')) {
+            return; // Don't open player detail if clicking on points
+          }
+          handlePlayerClick(pick);
+        }}
         className={`relative flex flex-col p-1 md:p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-16 md:w-24 h-20 md:h-36 ${
           pick.is_captain
             ? "border-yellow-400"
@@ -263,9 +307,13 @@ export default function TeamFormationPopup({
         </div>
 
         {/* Stats */}
-        <div className="text-center ">
+        <div className="text-center relative z-10">
           <p
-            className={`text-[10px] md:text-sm font-bold ${stats.statusColor}`}
+            onClick={(e) => handlePointsClick(e, player, stats)}
+            className={`points-clickable text-[10px] md:text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
+              showGameweekStats ? "hover:text-blue-600" : ""
+            }`}
+            title={showGameweekStats ? "Click to see points breakdown" : ""}
           >
             {stats.points}
           </p>
@@ -657,6 +705,19 @@ export default function TeamFormationPopup({
           onClose={closePlayerPopup}
           isCaptain={selectedPlayer.pick.is_captain}
           isViceCaptain={selectedPlayer.pick.is_vice_captain}
+        />
+      )}
+
+      {/* Points Breakdown Modal */}
+      {pointsBreakdownPlayer && (
+        <PointsBreakdownModal
+          playerId={pointsBreakdownPlayer.playerId}
+          playerName={pointsBreakdownPlayer.playerName}
+          gameweek={currentEvent}
+          totalPoints={pointsBreakdownPlayer.points}
+          isOpen={!!pointsBreakdownPlayer}
+          onClose={closePointsBreakdown}
+          playerPosition={pointsBreakdownPlayer.position}
         />
       )}
     </>
