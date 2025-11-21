@@ -5,6 +5,7 @@ import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
 import PlayerDetailPopup from "./PlayerDetailPopup";
 import TeamInsights from "./TeamInsights";
 import TransferSuggestions from "./TransferSuggestions";
+import PointsBreakdownModal from "./PointsBreakdownModal";
 import {
   getTeamNews,
   getFixtures,
@@ -44,6 +45,12 @@ export default function CurrentSquad({
     position: ElementType;
   } | null>(null);
   const [gameweekData, setGameweekData] = useState<{ [key: number]: any }>({});
+  const [pointsBreakdownPlayer, setPointsBreakdownPlayer] = useState<{
+    playerId: number;
+    playerName: string;
+    points: number | string;
+    position: number;
+  } | null>(null);
 
   // Add function to fetch gameweek data for a player
   const fetchPlayerGameweekData = async (playerId: number) => {
@@ -554,6 +561,31 @@ export default function CurrentSquad({
     setSelectedPlayer(null);
   };
 
+  const handlePointsClick = (e: React.MouseEvent, player: Element, stats: any) => {
+    e.stopPropagation(); // Prevent triggering the player card click
+    if (showGameweekStats) {
+      // Extract numeric points or pass the string if it's YTP/DNP
+      let pointsValue: number | string = stats.points;
+
+      // If stats.points is a string like "7pts", extract the number
+      if (typeof stats.points === 'string' && stats.points.endsWith('pts')) {
+        const numericPoints = parseInt(stats.points.replace('pts', ''));
+        pointsValue = isNaN(numericPoints) ? stats.points : numericPoints;
+      }
+
+      setPointsBreakdownPlayer({
+        playerId: player.id,
+        playerName: player.web_name,
+        points: pointsValue,
+        position: player.element_type,
+      });
+    }
+  };
+
+  const closePointsBreakdown = () => {
+    setPointsBreakdownPlayer(null);
+  };
+
   const renderPlayer = (
     pick: Pick,
     isBench: boolean = false,
@@ -649,11 +681,17 @@ export default function CurrentSquad({
               </p>
             </div>
 
-            {/* Stats - Updated to use getPlayerStats */}
+            {/* Stats - Updated to use getPlayerStats - Points are now clickable */}
             <div className="text-center mb-0.5 md:mb-2">
-              <p className={`text-[10px] md:text-sm font-bold ${stats.statusColor}`}>
+              <div
+                onClick={(e) => handlePointsClick(e, player, stats)}
+                className={`text-[10px] md:text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
+                  showGameweekStats ? "hover:text-blue-600" : ""
+                }`}
+                title={showGameweekStats ? "Click to see points breakdown" : ""}
+              >
                 {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
-              </p>
+              </div>
               <p className="text-[8px] md:text-xs ">£{stats.price}m</p>
             </div>
 
@@ -765,12 +803,18 @@ export default function CurrentSquad({
             </p>
           </div>
           <div className="text-right">
-            <p className={`text-sm font-bold ${stats.statusColor}`}>
+            <div
+              onClick={(e) => handlePointsClick(e, player, stats)}
+              className={`text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
+                showGameweekStats ? "hover:text-blue-600" : ""
+              }`}
+              title={showGameweekStats ? "Click to see points breakdown" : ""}
+            >
               {stats.points}
               <span className="text-xs text-gray-500 block">
                 {stats.isGameweek ? `GW${currentEvent}` : "Season"}
               </span>
-            </p>
+            </div>
             <p className="text-xs ">£{stats.price}m</p>
           </div>
         </div>
@@ -1380,6 +1424,19 @@ export default function CurrentSquad({
           onClose={closePopup}
           isCaptain={selectedPlayer.pick.is_captain}
           isViceCaptain={selectedPlayer.pick.is_vice_captain}
+        />
+      )}
+
+      {/* Points Breakdown Modal */}
+      {pointsBreakdownPlayer && (
+        <PointsBreakdownModal
+          playerId={pointsBreakdownPlayer.playerId}
+          playerName={pointsBreakdownPlayer.playerName}
+          gameweek={currentEvent}
+          totalPoints={pointsBreakdownPlayer.points}
+          isOpen={!!pointsBreakdownPlayer}
+          onClose={closePointsBreakdown}
+          playerPosition={pointsBreakdownPlayer.position}
         />
       )}
     </div>
