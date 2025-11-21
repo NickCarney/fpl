@@ -33,6 +33,14 @@ interface Fixture {
   finished: boolean;
 }
 
+// Filter interface
+interface PlayerFilter {
+  id: string;
+  stat: keyof Element | "now_cost";
+  operator: "gt" | "lt" | "eq" | "gte" | "lte";
+  value: number | "";
+}
+
 export default function PlayerStats({
   elements,
   teams,
@@ -58,6 +66,8 @@ export default function PlayerStats({
     team: Team;
     position: ElementType;
   } | null>(null);
+  const [filters, setFilters] = useState<PlayerFilter[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Fetch fixtures when component mounts
   useEffect(() => {
@@ -141,6 +151,27 @@ export default function PlayerStats({
     setSelectedPlayer(null);
   };
 
+  // Filter management functions
+  const addFilter = () => {
+    const newFilter: PlayerFilter = {
+      id: Date.now().toString(),
+      stat: "total_points",
+      operator: "gte",
+      value: "",
+    };
+    setFilters([...filters, newFilter]);
+  };
+
+  const removeFilter = (id: string) => {
+    setFilters(filters.filter((f) => f.id !== id));
+  };
+
+  const updateFilter = (id: string, field: keyof PlayerFilter, value: any) => {
+    setFilters(
+      filters.map((f) => (f.id === id ? { ...f, [field]: value } : f))
+    );
+  };
+
   const filteredAndSortedElements = elements
     .filter((element) => {
       const matchesPosition =
@@ -152,7 +183,45 @@ export default function PlayerStats({
         element.web_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         element.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         element.second_name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesPosition && matchesTeam && matchesSearch;
+
+      // Apply custom filters
+      const matchesCustomFilters = filters.every((filter) => {
+        // Skip filter if value is empty
+        if (filter.value === "") {
+          return true;
+        }
+
+        let elementValue = element[filter.stat as keyof Element];
+
+        // Handle price - divide by 10 to get actual price
+        if (filter.stat === "now_cost") {
+          elementValue = (elementValue as number) / 10;
+        }
+
+        const value =
+          typeof elementValue === "string"
+            ? parseFloat(elementValue)
+            : (elementValue as number);
+
+        switch (filter.operator) {
+          case "gt":
+            return value > filter.value;
+          case "lt":
+            return value < filter.value;
+          case "eq":
+            return value === filter.value;
+          case "gte":
+            return value >= filter.value;
+          case "lte":
+            return value <= filter.value;
+          default:
+            return true;
+        }
+      });
+
+      return (
+        matchesPosition && matchesTeam && matchesSearch && matchesCustomFilters
+      );
     })
     .sort((a, b) => {
       let aValue: number, bValue: number;
@@ -535,6 +604,157 @@ export default function PlayerStats({
           </div>
         </div>
       )}
+
+      {/* Advanced Find Player Section */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <span>Find Players</span>
+          <span className="text-sm">{showFilters ? "▲" : "▼"}</span>
+        </button>
+
+        {showFilters && (
+          <div className="mt-4 p-4 border border-gray-300 rounded-lg bg-gray-50">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Find Players By Stats</h3>
+              <button
+                onClick={addFilter}
+                className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+              >
+                + Add Filter
+              </button>
+            </div>
+
+            {filters.length === 0 ? (
+              <p className="text-gray-600 text-sm text-center py-4">
+                No filters applied. Click &quot;Add Filter&quot; to start
+                filtering players.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filters.map((filter) => (
+                  <div
+                    key={filter.id}
+                    className="bg-white p-4 rounded-md border border-gray-200 shadow-sm"
+                  >
+                    <div className="grid grid-cols-12 gap-3 items-center">
+                      {/* Stat Selection - Takes more space */}
+                      <div className="col-span-5">
+                        <select
+                          value={filter.stat}
+                          onChange={(e) =>
+                            updateFilter(filter.id, "stat", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-blue-400 appearance-none cursor-pointer"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                            backgroundPosition: "right 0.5rem center",
+                            backgroundRepeat: "no-repeat",
+                            backgroundSize: "1.5em 1.5em",
+                            paddingRight: "2.5rem",
+                          }}
+                        >
+                          <option value="total_points">Total Points</option>
+                          <option value="goals_scored">Goals</option>
+                          <option value="assists">Assists</option>
+                          <option value="now_cost">Price</option>
+                          <option value="minutes">Minutes</option>
+                          <option value="clean_sheets">Clean Sheets</option>
+                          <option value="bonus">Bonus Points</option>
+                          <option value="bps">BPS</option>
+                          <option value="saves">Saves</option>
+                          <option value="yellow_cards">Yellow Cards</option>
+                          <option value="red_cards">Red Cards</option>
+                          <option value="form">Form</option>
+                          <option value="ict_index">ICT Index</option>
+                          <option value="selected_by_percent">
+                            Selected %
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Operator Selection */}
+                      <div className="col-span-3">
+                        <select
+                          value={filter.operator}
+                          onChange={(e) =>
+                            updateFilter(filter.id, "operator", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-blue-400 appearance-none cursor-pointer"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                            backgroundPosition: "right 0.5rem center",
+                            backgroundRepeat: "no-repeat",
+                            backgroundSize: "1.5em 1.5em",
+                            paddingRight: "2.5rem",
+                          }}
+                        >
+                          <option value="gte">≥ Greater or equal</option>
+                          <option value="lte">≤ Less or equal</option>
+                          <option value="gt">&gt; Greater than</option>
+                          <option value="lt">&lt; Less than</option>
+                          <option value="eq">= Equal to</option>
+                        </select>
+                      </div>
+
+                      {/* Value Input */}
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          value={filter.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateFilter(
+                              filter.id,
+                              "value",
+                              val === "" ? "" : parseFloat(val)
+                            );
+                          }}
+                          step={
+                            filter.stat === "now_cost"
+                              ? 0.1
+                              : filter.stat === "form" ||
+                                filter.stat === "ict_index" ||
+                                filter.stat === "selected_by_percent"
+                              ? 0.1
+                              : 1
+                          }
+                          placeholder="Enter value"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-blue-400"
+                        />
+                      </div>
+
+                      {/* Remove Button */}
+                      <div className="col-span-1 flex justify-end">
+                        <button
+                          onClick={() => removeFilter(filter.id)}
+                          className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                          title="Remove filter"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-x-12 gap-y-2 items-center flex-col sm:flex-row justify-center">
