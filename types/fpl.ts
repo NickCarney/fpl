@@ -41,6 +41,7 @@ export interface Team {
   name: string;
   short_name: string;
   code: number;
+  position: number;
   strength: number;
   strength_overall_home: number;
   strength_overall_away: number;
