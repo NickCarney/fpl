@@ -11,6 +11,18 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  LineChart,
+  Line,
+  Area,
+  AreaChart,
 } from "recharts";
 
 interface TeamStatsProps {
@@ -24,6 +36,8 @@ interface Fixture {
   id: number;
   team_h: number;
   team_a: number;
+  team_h_score: number;
+  team_a_score: number;
   team_h_difficulty: number;
   team_a_difficulty: number;
   event: number;
@@ -236,7 +250,9 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
     | "clean_sheets"
   >("position");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [viewMode, setViewMode] = useState<"table" | "chart">("table");
+  const [viewMode, setViewMode] = useState<
+    "table" | "performance" | "efficiency" | "strength" | "form"
+  >("table");
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [hoveredTeam, setHoveredTeam] = useState<any | null>(null);
   // Fetch fixtures when component mounts
@@ -265,20 +281,13 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
         (sum, player) => sum + player.total_points,
         0
       );
-      const goalsScored = teamPlayers.reduce(
-        (sum, player) => sum + player.goals_scored,
-        0
-      );
       const assists = teamPlayers.reduce(
         (sum, player) => sum + player.assists,
         0
       );
       const cleanSheets = teamPlayers.reduce(
-        (sum, player) => sum + player.clean_sheets,
-        0
-      );
-      const goalsConceded = teamPlayers.reduce(
-        (sum, player) => sum + player.goals_conceded,
+        (max, player) =>
+          player.clean_sheets > max ? player.clean_sheets : max,
         0
       );
       const yellowCards = teamPlayers.reduce(
@@ -289,6 +298,23 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
         (sum, player) => sum + player.red_cards,
         0
       );
+
+      // Calculate actual goals scored and conceded from fixtures
+      const finishedFixtures = fixtures.filter((f) => f.finished);
+      let goalsScored = 0;
+      let goalsConceded = 0;
+
+      finishedFixtures.forEach((fixture) => {
+        if (fixture.team_h === team.id) {
+          // Team played at home
+          goalsScored += fixture.team_h_score || 0;
+          goalsConceded += fixture.team_a_score || 0;
+        } else if (fixture.team_a === team.id) {
+          // Team played away
+          goalsScored += fixture.team_a_score || 0;
+          goalsConceded += fixture.team_h_score || 0;
+        }
+      });
 
       return {
         id: team.id,
@@ -423,12 +449,37 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
     </th>
   );
 
-  const chartData = sortedTeamStats.map((team) => ({
+  // Prepare various chart data
+  const performanceData = sortedTeamStats.map((team) => ({
     name: team.short_name,
     "Total Points": team.total_points,
     "Goals Scored": team.goals_scored,
     Assists: team.assists,
     "Clean Sheets": team.clean_sheets,
+  }));
+
+  const efficiencyData = sortedTeamStats.map((team) => ({
+    name: team.short_name,
+    "Goals Scored": team.goals_scored,
+    "Goals Conceded": team.goals_conceded,
+    "Goal Difference": team.goals_scored - team.goals_conceded,
+    "Clean Sheets": team.clean_sheets,
+  }));
+
+  const strengthRadarData = sortedTeamStats.slice(0, 6).map((team) => ({
+    team: team.short_name,
+    "Attack Home": team.strength_attack_home,
+    "Attack Away": team.strength_attack_away,
+    "Defence Home": team.strength_defence_home,
+    "Defence Away": team.strength_defence_away,
+    Overall: team.strength,
+  }));
+
+  const formData = sortedTeamStats.map((team) => ({
+    name: team.short_name,
+    position: team.position,
+    points: team.total_points,
+    goals: team.goals_scored,
   }));
 
   return (
@@ -439,54 +490,258 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
 
       {/* View Mode Toggle */}
       <div className="mb-6">
-        <div className="flex gap-2 justify-center">
+        <div className="flex gap-2 justify-center flex-wrap">
           <button
             onClick={() => setViewMode("table")}
-            className={`px-3 rounded-md font-medium ${
-              viewMode === "table" ? "text-white bg-green-600" : "text-gray-700"
+            className={`px-3 py-2 rounded-md font-medium text-sm ${
+              viewMode === "table"
+                ? "text-white bg-green-600"
+                : "text-gray-700 bg-gray-100"
             }`}
           >
-            Table View
+            📊 Table
           </button>
           <button
-            onClick={() => setViewMode("chart")}
-            className={`px-3 rounded-md font-medium ${
-              viewMode === "chart" ? "text-white bg-green-600" : "text-gray-700"
+            onClick={() => setViewMode("performance")}
+            className={`px-3 py-2 rounded-md font-medium text-sm ${
+              viewMode === "performance"
+                ? "text-white bg-green-600"
+                : "text-gray-700 bg-gray-100"
             }`}
           >
-            Chart View
+            📈 Performance
+          </button>
+          <button
+            onClick={() => setViewMode("efficiency")}
+            className={`px-3 py-2 rounded-md font-medium text-sm ${
+              viewMode === "efficiency"
+                ? "text-white bg-green-600"
+                : "text-gray-700 bg-gray-100"
+            }`}
+          >
+            ⚡ Efficiency
+          </button>
+          <button
+            onClick={() => setViewMode("strength")}
+            className={`px-3 py-2 rounded-md font-medium text-sm ${
+              viewMode === "strength"
+                ? "text-white bg-green-600"
+                : "text-gray-700 bg-gray-100"
+            }`}
+          >
+            💪 Strength
+          </button>
+          <button
+            onClick={() => setViewMode("form")}
+            className={`px-3 py-2 rounded-md font-medium text-sm ${
+              viewMode === "form"
+                ? "text-white bg-green-600"
+                : "text-gray-700 bg-gray-100"
+            }`}
+          >
+            🎯 Form Analysis
           </button>
         </div>
       </div>
 
       {/* Content */}
-      {viewMode === "chart" ? (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-4 text-center">
-            Team Performance Comparison
-          </h3>
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="name"
-                  angle={-45}
-                  textAnchor="end"
-                  height={100}
-                />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="Total Points" fill="#3b82f6" />
-                <Bar dataKey="Goals Scored" fill="#ef4444" />
-                <Bar dataKey="Assists" fill="#22c55e" />
-                <Bar dataKey="Clean Sheets" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
+      {viewMode === "performance" ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              Team Performance Overview
+            </h3>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={performanceData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Total Points" fill="#3b82f6" />
+                  <Bar dataKey="Goals Scored" fill="#ef4444" />
+                  <Bar dataKey="Assists" fill="#22c55e" />
+                  <Bar dataKey="Clean Sheets" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      ) : (
+      ) : viewMode === "efficiency" ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              Offensive vs Defensive Efficiency
+            </h3>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={efficiencyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="Goals Scored"
+                    stackId="1"
+                    stroke="#22c55e"
+                    fill="#22c55e"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="Goals Conceded"
+                    stackId="2"
+                    stroke="#ef4444"
+                    fill="#ef4444"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              Goal Difference Distribution
+            </h3>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={efficiencyData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Goal Difference" fill="#8b5cf6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      ) : viewMode === "strength" ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              Team Strength Comparison (Top 6)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {strengthRadarData.map((teamData) => (
+                <div key={teamData.team} className="h-80">
+                  <h4 className="text-center font-medium mb-2">
+                    {teamData.team}
+                  </h4>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart
+                      data={[
+                        { stat: "Attack Home", value: teamData["Attack Home"] },
+                        { stat: "Attack Away", value: teamData["Attack Away"] },
+                        {
+                          stat: "Defence Home",
+                          value: teamData["Defence Home"],
+                        },
+                        {
+                          stat: "Defence Away",
+                          value: teamData["Defence Away"],
+                        },
+                        { stat: "Overall", value: teamData["Overall"] },
+                      ]}
+                    >
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="stat" />
+                      <PolarRadiusAxis angle={90} domain={[0, 5]} />
+                      <Radar
+                        name={teamData.team}
+                        dataKey="value"
+                        stroke="#3b82f6"
+                        fill="#3b82f6"
+                        fillOpacity={0.6}
+                      />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : viewMode === "form" ? (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              League Position vs Total Points
+            </h3>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    type="number"
+                    dataKey="position"
+                    name="Position"
+                    reversed
+                    domain={[1, 20]}
+                  />
+                  <YAxis type="number" dataKey="points" name="Points" />
+                  <ZAxis type="number" dataKey="goals" range={[50, 400]} />
+                  <Tooltip cursor={{ strokeDasharray: "3 3" }} />
+                  <Legend />
+                  <Scatter name="Teams" data={formData} fill="#3b82f6" />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              Points Progression
+            </h3>
+            <div className="h-96">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={formData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="points"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="goals"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      ) : viewMode === "table" ? (
         /* Stats Table */
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -581,7 +836,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       {/* Strength Tooltip */}
       {hoveredTeam && (
