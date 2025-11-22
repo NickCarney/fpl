@@ -129,6 +129,7 @@ const StrengthTooltip = ({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
       onMouseEnter={() => setHoveredTeam(team)}
+      onMouseLeave={() => setHoveredTeam(null)}
     >
       <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-4 min-w-[280px] pointer-events-auto">
         <div className="mb-3 pb-2 border-b border-gray-200">
