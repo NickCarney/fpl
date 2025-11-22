@@ -16,6 +16,7 @@ import {
 interface TeamStatsProps {
   teams: Team[];
   elements: Element[];
+  setHoveredTeam: any;
 }
 
 // Add this interface for fixture data
@@ -29,6 +30,203 @@ interface Fixture {
   finished: boolean;
 }
 
+// Strength Tooltip Component
+const StrengthTooltip = ({
+  team,
+  isVisible,
+  setHoveredTeam,
+}: {
+  team: {
+    name: string;
+    strength: number;
+    strength_overall_home: number;
+    strength_overall_away: number;
+    strength_attack_home: number;
+    strength_attack_away: number;
+    strength_defence_home: number;
+    strength_defence_away: number;
+  };
+  isVisible: boolean;
+  setHoveredTeam: any;
+}) => {
+  if (!isVisible) return null;
+
+  const getStrengthColor = (value: number) => {
+    if (value >= 1300) return "text-green-600 font-semibold";
+    if (value >= 1200) return "text-green-500";
+    if (value >= 1100) return "text-yellow-600";
+    if (value >= 1000) return "text-orange-500";
+    if (value == 5) return "text-green-600 font-semibold";
+    if (value == 4) return "text-green-200";
+    if (value == 3) return "text-green-500";
+    if (value == 2) return "text-orange-500";
+    return "text-red-500";
+  };
+
+  const getStrengthLabel = (value: number) => {
+    if (value >= 1300) return "Excellent";
+    if (value >= 1200) return "Strong";
+    if (value >= 1100) return "Average";
+    if (value >= 1000) return "Below Avg";
+    if (value == 5) return "Top Tier";
+    if (value == 4) return "Above Avg";
+    if (value == 3) return "Average";
+    if (value == 2) return "Below Avg";
+    return "Weak";
+  };
+
+  const StrengthBar = ({
+    value,
+    max = 1500,
+  }: {
+    value: number;
+    max?: number;
+  }) => {
+    const percentage = (value / max) * 100;
+    return (
+      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${
+            value >= 1300
+              ? "bg-green-600"
+              : value >= 1200
+              ? "bg-green-500"
+              : value >= 1100
+              ? "bg-yellow-500"
+              : value >= 1000
+              ? "bg-orange-600"
+              : value == 5
+              ? "bg-green-600"
+              : value == 4
+              ? "bg-green-300"
+              : value == 3
+              ? "bg-yellow-500"
+              : value == 2
+              ? "bg-orange-500"
+              : "bg-red-500"
+          }`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+      onMouseEnter={() => setHoveredTeam(team)}
+    >
+      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-4 min-w-[280px] pointer-events-auto">
+        <div className="mb-3 pb-2 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-1 flex-col">
+            <h2> {team.name}</h2>
+            <span className="text-sm font-semibold text-gray-700">
+              Overall Strength
+            </span>
+            <span
+              className={`text-lg font-bold ${getStrengthColor(team.strength)}`}
+            >
+              {team.strength}
+            </span>
+          </div>
+          <div className="text-xs text-gray-500 mb-2">
+            {getStrengthLabel(team.strength)}
+          </div>
+          <StrengthBar value={team.strength} max={5} />
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <div className="text-xs font-semibold text-gray-600 mb-2">
+              Home Performance
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Overall</span>
+                <span
+                  className={`font-semibold ${getStrengthColor(
+                    team.strength_overall_home
+                  )}`}
+                >
+                  {team.strength_overall_home}
+                </span>
+              </div>
+              <StrengthBar value={team.strength_overall_home} />
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Attack</span>
+                <span
+                  className={`font-semibold ${getStrengthColor(
+                    team.strength_attack_home
+                  )}`}
+                >
+                  {team.strength_attack_home}
+                </span>
+              </div>
+              <StrengthBar value={team.strength_attack_home} />
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Defence</span>
+                <span
+                  className={`font-semibold ${getStrengthColor(
+                    team.strength_defence_home
+                  )}`}
+                >
+                  {team.strength_defence_home}
+                </span>
+              </div>
+              <StrengthBar value={team.strength_defence_home} />
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-gray-100">
+            <div className="text-xs font-semibold text-gray-600 mb-2">
+              Away Performance
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Overall</span>
+                <span
+                  className={`font-semibold ${getStrengthColor(
+                    team.strength_overall_away
+                  )}`}
+                >
+                  {team.strength_overall_away}
+                </span>
+              </div>
+              <StrengthBar value={team.strength_overall_away} />
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Attack</span>
+                <span
+                  className={`font-semibold ${getStrengthColor(
+                    team.strength_attack_away
+                  )}`}
+                >
+                  {team.strength_attack_away}
+                </span>
+              </div>
+              <StrengthBar value={team.strength_attack_away} />
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Defence</span>
+                <span
+                  className={`font-semibold ${getStrengthColor(
+                    team.strength_defence_away
+                  )}`}
+                >
+                  {team.strength_defence_away}
+                </span>
+              </div>
+              <StrengthBar value={team.strength_defence_away} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function TeamStats({ teams, elements }: TeamStatsProps) {
   const [sortBy, setSortBy] = useState<
     | "position"
@@ -40,7 +238,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [viewMode, setViewMode] = useState<"table" | "chart">("table");
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
-
+  const [hoveredTeam, setHoveredTeam] = useState<any | null>(null);
   // Fetch fixtures when component mounts
   useEffect(() => {
     const fetchFixtures = async () => {
@@ -59,7 +257,9 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
   // Calculate team statistics
   const getTeamStats = () => {
     return teams.map((team) => {
-      const teamPlayers = elements.filter((element) => element.team === team.id);
+      const teamPlayers = elements.filter(
+        (element) => element.team === team.id
+      );
 
       const totalPoints = teamPlayers.reduce(
         (sum, player) => sum + player.total_points,
@@ -243,9 +443,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
           <button
             onClick={() => setViewMode("table")}
             className={`px-3 rounded-md font-medium ${
-              viewMode === "table"
-                ? "text-white bg-green-600"
-                : "text-gray-700"
+              viewMode === "table" ? "text-white bg-green-600" : "text-gray-700"
             }`}
           >
             Table View
@@ -253,9 +451,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
           <button
             onClick={() => setViewMode("chart")}
             className={`px-3 rounded-md font-medium ${
-              viewMode === "chart"
-                ? "text-white bg-green-600"
-                : "text-gray-700"
+              viewMode === "chart" ? "text-white bg-green-600" : "text-gray-700"
             }`}
           >
             Chart View
@@ -314,15 +510,21 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
               </tr>
             </thead>
             <tbody>
-              {sortedTeamStats.map((team, index) => {
+              {sortedTeamStats.map((team) => {
                 const nextFixtures = getNext5Fixtures(team.id);
 
                 return (
                   <tr
                     key={team.id}
                     className="border-b hover:bg-gray-50 transition-colors"
+                    onMouseEnter={() => setHoveredTeam(team)}
+                    onMouseLeave={() => {
+                      setHoveredTeam(null);
+                    }}
                   >
-                    <td className="py-3 text-center font-semibold">{team.position}</td>
+                    <td className="py-3 text-center font-semibold">
+                      {team.position}
+                    </td>
                     <td className="py-3 text-center font-medium">
                       {team.short_name}
                     </td>
@@ -333,12 +535,13 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                     <td className="py-3 text-center">{team.assists}</td>
                     <td className="py-3 text-center">{team.clean_sheets}</td>
                     <td className="py-3 text-center">{team.goals_conceded}</td>
-                    <td className="py-3 text-center">
+                    <td className="py-3 text-center cursor-pointer hover:bg-blue-50 transition-colors">
                       <div className="text-xs">
-                        <div>Overall: {team.strength}</div>
-                        <div className="text-gray-600">
-                          H: {team.strength_overall_home} / A:{" "}
-                          {team.strength_overall_away}
+                        <div className="font-semibold text-blue-600">
+                          {team.strength}
+                        </div>
+                        <div className="text-gray-500 text-[10px]">
+                          hover for details
                         </div>
                       </div>
                     </td>
@@ -378,6 +581,15 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Strength Tooltip */}
+      {hoveredTeam && (
+        <StrengthTooltip
+          team={hoveredTeam}
+          isVisible={true}
+          setHoveredTeam={setHoveredTeam}
+        />
       )}
     </div>
   );
