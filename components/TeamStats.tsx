@@ -795,9 +795,6 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                         <div className="font-semibold text-blue-600">
                           {team.strength}
                         </div>
-                        <div className="text-gray-500 text-[10px]">
-                          hover for details
-                        </div>
                       </div>
                     </td>
                     <td className="py-3 text-center">
