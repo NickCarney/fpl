@@ -467,7 +467,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
     "Clean Sheets": team.clean_sheets,
   }));
 
-  const strengthRadarData = sortedTeamStats.slice(0, 6).map((team) => ({
+  const strengthRadarData = sortedTeamStats.slice(0, 20).map((team) => ({
     team: team.short_name,
     "Attack Home": team.strength_attack_home,
     "Attack Away": team.strength_attack_away,
@@ -479,7 +479,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
   const formData = sortedTeamStats.map((team) => ({
     name: team.short_name,
     position: team.position,
-    points: team.total_points,
+    points: team.total_points / 25,
     goals: team.goals_scored,
   }));
 
@@ -500,7 +500,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                 : "text-gray-700 bg-gray-100"
             }`}
           >
-            📊 Table
+            Table
           </button>
           <button
             onClick={() => setViewMode("performance")}
@@ -510,7 +510,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                 : "text-gray-700 bg-gray-100"
             }`}
           >
-            📈 Performance
+            Performance
           </button>
           <button
             onClick={() => setViewMode("efficiency")}
@@ -520,7 +520,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                 : "text-gray-700 bg-gray-100"
             }`}
           >
-            ⚡ Efficiency
+            Efficiency
           </button>
           <button
             onClick={() => setViewMode("strength")}
@@ -530,7 +530,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                 : "text-gray-700 bg-gray-100"
             }`}
           >
-            💪 Strength
+            Strength
           </button>
           <button
             onClick={() => setViewMode("form")}
@@ -540,7 +540,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                 : "text-gray-700 bg-gray-100"
             }`}
           >
-            🎯 Form Analysis
+            Form Analysis
           </button>
         </div>
       </div>
@@ -638,7 +638,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-semibold mb-4 text-center">
-              Team Strength Comparison (Top 6)
+              Team Strength Comparison
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {strengthRadarData.map((teamData) => (
@@ -659,12 +659,12 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
                           stat: "Defence Away",
                           value: teamData["Defence Away"],
                         },
-                        { stat: "Overall", value: teamData["Overall"] },
+                        { stat: "Overall", value: teamData["Overall"] * 275 },
                       ]}
                     >
                       <PolarGrid />
                       <PolarAngleAxis dataKey="stat" />
-                      <PolarRadiusAxis angle={90} domain={[0, 5]} />
+                      <PolarRadiusAxis angle={90} domain={[0, 1400]} />
                       <Radar
                         name={teamData.team}
                         dataKey="value"
@@ -684,7 +684,7 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-semibold mb-4 text-center">
-              League Position vs Total Points
+              League Position vs Points per player
             </h3>
             <div className="h-96">
               <ResponsiveContainer width="100%" height="100%">
