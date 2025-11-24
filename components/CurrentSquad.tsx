@@ -50,6 +50,9 @@ export default function CurrentSquad({
     playerName: string;
     points: number | string;
     position: number;
+    multiplier?: number;
+    isCaptain?: boolean;
+    isViceCaptain?: boolean;
   } | null>(null);
 
   // Add function to fetch gameweek data for a player
@@ -147,7 +150,7 @@ export default function CurrentSquad({
 
         if (gameHasStarted) {
           if (gameweekMinutes > 0) {
-            pointsDisplay = `${gameweekPoints}pts`;
+            pointsDisplay = `${gameweekPoints * pick.multiplier}pts`;
             minutesDisplay = `${gameweekMinutes} mins`;
             statusColor =
               gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
@@ -561,7 +564,7 @@ export default function CurrentSquad({
     setSelectedPlayer(null);
   };
 
-  const handlePointsClick = (e: React.MouseEvent, player: Element, stats: any) => {
+  const handlePointsClick = (e: React.MouseEvent, player: Element, stats: any, pick: Pick) => {
     e.stopPropagation(); // Prevent triggering the player card click
     if (showGameweekStats) {
       // Extract numeric points or pass the string if it's YTP/DNP
@@ -578,6 +581,9 @@ export default function CurrentSquad({
         playerName: player.web_name,
         points: pointsValue,
         position: player.element_type,
+        multiplier: pick.multiplier,
+        isCaptain: pick.is_captain,
+        isViceCaptain: pick.is_vice_captain,
       });
     }
   };
@@ -684,7 +690,7 @@ export default function CurrentSquad({
             {/* Stats - Updated to use getPlayerStats - Points are now clickable */}
             <div className="text-center mb-0.5 md:mb-2">
               <div
-                onClick={(e) => handlePointsClick(e, player, stats)}
+                onClick={(e) => handlePointsClick(e, player, stats, pick)}
                 className={`text-[10px] md:text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
                   showGameweekStats ? "hover:text-blue-600" : ""
                 }`}
@@ -804,7 +810,7 @@ export default function CurrentSquad({
           </div>
           <div className="text-right">
             <div
-              onClick={(e) => handlePointsClick(e, player, stats)}
+              onClick={(e) => handlePointsClick(e, player, stats, pick)}
               className={`text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
                 showGameweekStats ? "hover:text-blue-600" : ""
               }`}
@@ -1438,6 +1444,9 @@ export default function CurrentSquad({
           isOpen={!!pointsBreakdownPlayer}
           onClose={closePointsBreakdown}
           playerPosition={pointsBreakdownPlayer.position}
+          multiplier={pointsBreakdownPlayer.multiplier}
+          isCaptain={pointsBreakdownPlayer.isCaptain}
+          isViceCaptain={pointsBreakdownPlayer.isViceCaptain}
         />
       )}
     </div>

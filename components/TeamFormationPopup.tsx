@@ -72,6 +72,9 @@ export default function TeamFormationPopup({
     playerName: string;
     points: number | string;
     position: number;
+    multiplier?: number;
+    isCaptain?: boolean;
+    isViceCaptain?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -168,11 +171,17 @@ export default function TeamFormationPopup({
         pointsValue = isNaN(numericPoints) ? stats.points : numericPoints;
       }
 
+      // Find the pick to get the multiplier
+      const currentPick = teamPicks?.picks.find(p => p.element === player.id);
+
       setPointsBreakdownPlayer({
         playerId: player.id,
         playerName: player.web_name,
         points: pointsValue,
         position: player.element_type,
+        multiplier: currentPick?.multiplier || 1,
+        isCaptain: currentPick?.is_captain || false,
+        isViceCaptain: currentPick?.is_vice_captain || false,
       });
     } else {
       console.log("Not showing gameweek stats, points not clickable");
@@ -718,6 +727,9 @@ export default function TeamFormationPopup({
           isOpen={!!pointsBreakdownPlayer}
           onClose={closePointsBreakdown}
           playerPosition={pointsBreakdownPlayer.position}
+          multiplier={pointsBreakdownPlayer.multiplier}
+          isCaptain={pointsBreakdownPlayer.isCaptain}
+          isViceCaptain={pointsBreakdownPlayer.isViceCaptain}
         />
       )}
     </>

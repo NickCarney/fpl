@@ -10,6 +10,9 @@ interface PointsBreakdownModalProps {
   isOpen: boolean;
   onClose: () => void;
   playerPosition?: number; // 1=GK, 2=DEF, 3=MID, 4=FWD
+  multiplier?: number;
+  isCaptain?: boolean;
+  isViceCaptain?: boolean;
 }
 
 interface PointsDetail {
@@ -26,6 +29,9 @@ export default function PointsBreakdownModal({
   isOpen,
   onClose,
   playerPosition,
+  multiplier = 1,
+  isCaptain = false,
+  isViceCaptain = false,
 }: PointsBreakdownModalProps) {
   const [breakdown, setBreakdown] = useState<PointsDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,9 +304,21 @@ export default function PointsBreakdownModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">
-            {playerName} - GW{gameweek}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold">
+              {playerName} - GW{gameweek}
+            </h2>
+            {isCaptain && (
+              <span className="px-2 py-1 bg-yellow-400 text-xs rounded font-bold">
+                C
+              </span>
+            )}
+            {isViceCaptain && (
+              <span className="px-2 py-1 bg-yellow-200 text-xs rounded font-bold">
+                V
+              </span>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
@@ -379,9 +397,39 @@ export default function PointsBreakdownModal({
                   </div>
                 ))}
 
+                {/* Base points subtotal */}
                 <div className="border-t pt-3 mt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Base Points</span>
+                    <span className="text-gray-800 font-semibold">
+                      {breakdown.reduce((sum, detail) => sum + detail.points, 0)} pts
+                    </span>
+                  </div>
+                </div>
+
+                {/* Captain multiplier if applicable */}
+                {multiplier > 1 && (
+                  <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-yellow-800">
+                          {isCaptain ? "Captain (C)" : isViceCaptain ? "Vice Captain (V)" : "Multiplier"}
+                        </p>
+                        <p className="text-sm text-yellow-700">
+                          Points × {multiplier}
+                        </p>
+                      </div>
+                      <div className="text-lg font-bold text-yellow-800">
+                        ×{multiplier}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Final total */}
+                <div className="border-t-2 pt-3 mt-4">
                   <div className="flex justify-between items-center font-bold">
-                    <span>Total</span>
+                    <span>Final Total</span>
                     <span className="text-blue-600">{totalPoints} pts</span>
                   </div>
                 </div>
