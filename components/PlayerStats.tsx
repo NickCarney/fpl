@@ -68,6 +68,7 @@ export default function PlayerStats({
   } | null>(null);
   const [filters, setFilters] = useState<PlayerFilter[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [hoveredBadge, setHoveredBadge] = useState<string | null>(null);
 
   // Fetch fixtures when component mounts
   useEffect(() => {
@@ -149,6 +150,39 @@ export default function PlayerStats({
 
   const closePopup = () => {
     setSelectedPlayer(null);
+  };
+
+  // Badge calculation functions
+  const getPlayerBadges = (element: Element) => {
+    const badges: Array<{ label: string; color: string }> = [];
+    const teamPlayers = elements.filter((e) => e.team === element.team);
+
+    // Badge 1: Starter - started last 3 games (played 60+ minutes)
+    if (element.starts >= 3) {
+      badges.push({ label: "Started last 3+ games", color: "bg-green-600" });
+    }
+
+    // Badge 2: Team Top Player - highest points on their team
+    const topTeamPlayer = teamPlayers.reduce((prev, current) =>
+      current.total_points > prev.total_points ? current : prev
+    );
+    if (element.id === topTeamPlayer.id) {
+      badges.push({ label: "Team top points scorer", color: "bg-purple-600" });
+    }
+
+    // Badge 3: Form Player - form rating above 7
+    const formRating = parseFloat(element.form) || 0;
+    if (formRating >= 7) {
+      badges.push({ label: "Recent form > 7", color: "bg-orange-600" });
+    }
+
+    // Badge 4: Value Pick - high points per million
+    const pointsPerMillion = element.total_points / (element.now_cost / 10);
+    if (pointsPerMillion >= 12 && element.total_points >= 50) {
+      badges.push({ label: "Value player", color: "bg-blue-600" });
+    }
+
+    return badges;
   };
 
   // Filter management functions
@@ -831,6 +865,7 @@ export default function PlayerStats({
             <thead>
               <tr className="border-b">
                 <th className="text-center py-2 px-3">Player</th>
+                <th className="text-center py-2 px-3">Badges</th>
                 <th className="text-center py-2 px-3">Team</th>
                 <th className="text-center py-2 px-3">Pos</th>
                 <SortableHeader field="total_points">Points</SortableHeader>
@@ -848,6 +883,7 @@ export default function PlayerStats({
                 const team = getTeam(element.team);
                 const position = getPosition(element.element_type);
                 const nextFixtures = getNext5Fixtures(element.team);
+                const badges = getPlayerBadges(element);
 
                 return (
                   <tr
@@ -859,6 +895,38 @@ export default function PlayerStats({
                       <div>
                         <div className="font-medium">{element.web_name}</div>
                         <div className="text-xs ">{element.first_name}</div>
+                      </div>
+                    </td>
+                    <td
+                      className="py-3 text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex gap-1 justify-center flex-wrap">
+                        {badges.map((badge, index) => {
+                          const badgeId = `${element.id}-${index}`;
+                          return (
+                            <div key={index} className="relative">
+                              <span
+                                className={`${badge.color} text-white text-xs px-2 py-1 rounded-full font-medium cursor-pointer`}
+                                onMouseEnter={() => setHoveredBadge(badgeId)}
+                                onMouseLeave={() => setHoveredBadge(null)}
+                                onClick={() =>
+                                  setHoveredBadge(
+                                    hoveredBadge === badgeId ? null : badgeId
+                                  )
+                                }
+                              >
+                                {badge.label.charAt(0)}
+                              </span>
+                              {hoveredBadge === badgeId && (
+                                <div className="absolute z-10 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap -top-8 left-1/2 transform -translate-x-1/2">
+                                  {badge.label}
+                                  <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className="py-3 text-center">{team?.short_name}</td>
