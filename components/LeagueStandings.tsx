@@ -175,6 +175,7 @@ export default function LeagueStandings({
               // Return updated standing with corrected score
               return {
                 ...standing,
+                total: standing.total + actualGwScore - standing.event_total,
                 event_total: actualGwScore,
                 // Note: We don't update 'total' as that's the season total
               };
