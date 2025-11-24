@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       if (ragData) {
         ragContext = `
 
-ENHANCED ANALYSIS DATA:
+ENHANCED ANALYSIS DATA (from actual FPL API):
 
 Position Benchmarks:
 ${Object.entries(ragData.positionAverages)
@@ -144,21 +144,11 @@ ${Object.entries(ragData.positionAverages)
   )
   .join("\n")}
 
-Transfer Market Trends:
-- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(", ")}
-- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(", ")}
-- Rising prices: ${ragData.transferTrends.risingPrices.join(", ")}
-- Falling prices: ${ragData.transferTrends.fallingPrices.join(", ")}
-
-Expert Recommendations:
-${Object.entries(ragData.expertPicks)
-  .map(
-    ([expert, picks]: [string, any]) =>
-      `${expert}: Captain ${
-        picks.captain
-      }, Differentials: ${picks.differentials.join(", ")}`
-  )
-  .join("\n")}
+Transfer Market Trends (real-time FPL data):
+- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.slice(0, 5).join(", ")}
+- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.slice(0, 5).join(", ")}
+- Rising prices: ${ragData.transferTrends.risingPrices.slice(0, 5).join(", ")}
+- Falling prices: ${ragData.transferTrends.fallingPrices.slice(0, 5).join(", ")}
 
 Next Gameweek Fixtures: ${ragData.nextGameweekFixtures.length} matches scheduled
 `;
@@ -256,6 +246,11 @@ Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
           },
         ],
         stream: true,
+        max_completion_tokens: RAG_CONFIG.openAI.maxTokens,
+        // Note: GPT-5 nano only supports default temperature (1)
+        ...(RAG_CONFIG.openAI.reasoning_effort && {
+          reasoning_effort: RAG_CONFIG.openAI.reasoning_effort,
+        }),
       });
 
       // Create a ReadableStream to handle the OpenAI stream

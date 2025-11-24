@@ -86,7 +86,9 @@ export async function POST(request: NextRequest) {
     const alternativesContext = `
 AVAILABLE ALTERNATIVES FOR ${playerName} (${playerPosition}):
 
-Top ${samePositionPlayers.length} ${playerPosition} alternatives (EXCLUDING all players already in the user's squad):
+Top ${
+      samePositionPlayers.length
+    } ${playerPosition} alternatives (EXCLUDING all players already in the user's squad):
 ${samePositionPlayers
   .map(
     (p: any) =>
@@ -172,6 +174,11 @@ Keep it concise and data-driven. Reference specific stats and trends.`;
           },
         ],
         stream: true,
+        max_completion_tokens: RAG_CONFIG.openAI.maxTokens,
+        // Note: GPT-5 nano only supports default temperature (1)
+        ...(RAG_CONFIG.openAI.reasoning_effort && {
+          reasoning_effort: RAG_CONFIG.openAI.reasoning_effort,
+        }),
       });
 
       // Create a ReadableStream to handle the OpenAI stream

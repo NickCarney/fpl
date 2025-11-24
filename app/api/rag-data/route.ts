@@ -30,27 +30,12 @@ interface RAGData {
       };
     };
   };
-  predictedLineups: {
-    [teamId: string]: {
-      predicted: string[];
-      doubts: string[];
-      injured: string[];
-      suspended: string[];
-    };
-  };
   nextGameweekFixtures: any[];
   transferTrends: {
     mostTransferredIn: string[];
     mostTransferredOut: string[];
     risingPrices: string[];
     fallingPrices: string[];
-  };
-  expertPicks: {
-    [expert: string]: {
-      captain: string;
-      differentials: string[];
-      transfers: string[];
-    };
   };
 }
 
@@ -133,45 +118,48 @@ async function calculatePositionAverages(elements: any[]): Promise<RAGData['posi
   return result;
 }
 
-async function fetchPredictedLineups(): Promise<RAGData['predictedLineups']> {
-  // This would integrate with actual lineup prediction services
-  // For now, we'll return a structured placeholder
-  return {
-    // Sample data structure - in reality this would be fetched from lineup prediction APIs
-    '1': { // Arsenal
-      predicted: ['Raya', 'Saliba', 'Gabriel', 'Timber', 'Rice'],
-      doubts: ['Partey'],
-      injured: ['Tomiyasu'],
-      suspended: []
-    },
-    // ... more teams
-  };
-}
+async function fetchTransferTrends(elements: any[]): Promise<RAGData['transferTrends']> {
+  // Use actual FPL API data for transfer trends
+  try {
+    // Sort by transfers in this gameweek
+    const sortedByTransfersIn = [...elements]
+      .filter(p => p.transfers_in_event > 0)
+      .sort((a, b) => b.transfers_in_event - a.transfers_in_event)
+      .slice(0, 10);
 
-async function fetchTransferTrends(): Promise<RAGData['transferTrends']> {
-  // This would integrate with FPL transfer tracking services
-  return {
-    mostTransferredIn: ['Haaland', 'Salah', 'Palmer'],
-    mostTransferredOut: ['Isak', 'Gordon', 'Watkins'],
-    risingPrices: ['Palmer', 'Rogers'],
-    fallingPrices: ['Isak', 'Watkins']
-  };
-}
+    const sortedByTransfersOut = [...elements]
+      .filter(p => p.transfers_out_event > 0)
+      .sort((a, b) => b.transfers_out_event - a.transfers_out_event)
+      .slice(0, 10);
 
-async function fetchExpertPicks(): Promise<RAGData['expertPicks']> {
-  // This would scrape or use APIs from FPL content creators
-  return {
-    'FPL Focal': {
-      captain: 'Haaland',
-      differentials: ['Rogers', 'Welbeck'],
-      transfers: ['Palmer in', 'Isak out']
-    },
-    'Let\'s Talk FPL': {
-      captain: 'Salah',
-      differentials: ['Cunha', 'Strand Larsen'],
-      transfers: ['Salah in', 'Son out']
-    }
-  };
+    // Price changes - those with cost_change_event != 0
+    const risingPrices = [...elements]
+      .filter(p => p.cost_change_event > 0)
+      .sort((a, b) => b.cost_change_event - a.cost_change_event)
+      .slice(0, 10)
+      .map(p => p.web_name);
+
+    const fallingPrices = [...elements]
+      .filter(p => p.cost_change_event < 0)
+      .sort((a, b) => a.cost_change_event - b.cost_change_event)
+      .slice(0, 10)
+      .map(p => p.web_name);
+
+    return {
+      mostTransferredIn: sortedByTransfersIn.map(p => p.web_name),
+      mostTransferredOut: sortedByTransfersOut.map(p => p.web_name),
+      risingPrices: risingPrices.length > 0 ? risingPrices : ['No price rises this gameweek'],
+      fallingPrices: fallingPrices.length > 0 ? fallingPrices : ['No price falls this gameweek']
+    };
+  } catch (error) {
+    console.error('Error fetching transfer trends:', error);
+    return {
+      mostTransferredIn: [],
+      mostTransferredOut: [],
+      risingPrices: [],
+      fallingPrices: []
+    };
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -181,13 +169,11 @@ export async function POST(request: NextRequest) {
     // Fetch enhanced scraped data
     const scrapedData = await fplScraper.scrapeAll();
 
-    // Fetch and compile RAG data
+    // Fetch and compile RAG data with ONLY legitimate sources
     const ragData: RAGData = {
       positionAverages: await calculatePositionAverages(elements),
-      predictedLineups: await fetchPredictedLineups(),
       nextGameweekFixtures: fixtures?.filter((f: any) => f.event === currentGameweek + 1) || [],
-      transferTrends: await fetchTransferTrends(),
-      expertPicks: await fetchExpertPicks(),
+      transferTrends: await fetchTransferTrends(elements),
     };
 
     // Enhanced external content with scraped data
