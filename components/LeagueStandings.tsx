@@ -39,6 +39,11 @@ export default function LeagueStandings({
   const [showCommonLineup, setShowCommonLineup] = useState(true);
   const [teamChips, setTeamChips] = useState<TeamChips>({});
   const [isLoadingChips, setIsLoadingChips] = useState(true);
+  const [liveStandingsEnabled, setLiveStandingsEnabled] = useState(false);
+  const [liveStandingsLoading, setLiveStandingsLoading] = useState(false);
+  const [updatedStandings, setUpdatedStandings] = useState<LeagueStanding[]>(
+    []
+  );
 
   // Check if user is in the current standings
   const userInStandings = userTeamId
@@ -47,7 +52,12 @@ export default function LeagueStandings({
   const shouldShowUserPosition = userPosition && !userInStandings;
 
   // Create a combined list of all teams (standings + user position if not in standings)
-  const allTeams = [...standings];
+  // Use updated standings if live standings is enabled, otherwise use original
+  const baseStandings =
+    liveStandingsEnabled && updatedStandings.length > 0
+      ? updatedStandings
+      : standings;
+  const allTeams = [...baseStandings];
   if (shouldShowUserPosition) {
     allTeams.push(userPosition);
   }
@@ -96,6 +106,108 @@ export default function LeagueStandings({
 
   const selectedTeam =
     selectedTeamIndex !== null ? sortedTeams[selectedTeamIndex] : null;
+
+  // Function to sync live standings by fetching actual team picks
+  const syncLiveStandings = async () => {
+    setLiveStandingsLoading(true);
+    try {
+      const updatedStandingsList = await Promise.all(
+        sortedTeams.map(async (standing) => {
+          try {
+            // Fetch team picks for current gameweek
+            const response = await fetch(
+              `/api/team/${standing.entry}/event/${currentEvent}/picks`
+            );
+            if (!response.ok) {
+              console.error(`Failed to fetch picks for team ${standing.entry}`);
+              return standing; // Return original if fetch fails
+            }
+
+            const picksData = await response.json();
+
+            // Calculate actual GW score from picks
+            let actualGwScore = 0;
+
+            if (picksData.picks) {
+              // Get starting XI (positions 1-11)
+              const startingXI = picksData.picks.filter(
+                (pick: any) => pick.position <= 11
+              );
+
+              // For each pick, we need to get their gameweek points
+              const pickScores = await Promise.all(
+                startingXI.map(async (pick: any) => {
+                  try {
+                    const playerResponse = await fetch(
+                      `/api/player/${pick.element}/gameweeks`
+                    );
+                    if (!playerResponse.ok) return 0;
+
+                    const playerData = await playerResponse.json();
+                    const gwData = playerData.history?.find(
+                      (gw: any) => gw.round === currentEvent
+                    );
+
+                    if (gwData) {
+                      // Apply multiplier (captain = 2x, vice = 1x, regular = 1x)
+                      return (gwData.total_points || 0) * pick.multiplier;
+                    }
+                    return 0;
+                  } catch (error) {
+                    console.error(
+                      `Error fetching player ${pick.element}:`,
+                      error
+                    );
+                    return 0;
+                  }
+                })
+              );
+
+              actualGwScore = pickScores.reduce((sum, score) => sum + score, 0);
+            }
+
+            // Check if the score differs from what's in the table
+            if (actualGwScore !== standing.event_total) {
+              console.log(
+                `Score mismatch for ${standing.entry_name}: Table shows ${standing.event_total}, actual is ${actualGwScore}`
+              );
+
+              // Return updated standing with corrected score
+              return {
+                ...standing,
+                event_total: actualGwScore,
+                // Note: We don't update 'total' as that's the season total
+              };
+            }
+
+            return standing;
+          } catch (error) {
+            console.error(`Error syncing team ${standing.entry}:`, error);
+            return standing; // Return original on error
+          }
+        })
+      );
+
+      setUpdatedStandings(updatedStandingsList);
+    } catch (error) {
+      console.error("Error syncing live standings:", error);
+    } finally {
+      setLiveStandingsLoading(false);
+    }
+  };
+
+  // Toggle live standings
+  const handleLiveStandingsToggle = async () => {
+    if (!liveStandingsEnabled) {
+      // Turning on - sync the standings
+      setLiveStandingsEnabled(true);
+      await syncLiveStandings();
+    } else {
+      // Turning off - reset to original standings
+      setLiveStandingsEnabled(false);
+      setUpdatedStandings([]);
+    }
+  };
 
   // Fetch chips for all teams
   useEffect(() => {
@@ -153,6 +265,43 @@ export default function LeagueStandings({
         <h2 className="text-2xl font-bold mb-6 text-center">
           {leagueName} - Standings
         </h2>
+
+        {/* Live Standings Toggle */}
+        <div className="bg-white p-4 rounded-lg shadow-md mt-4 border">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Live League Standings</h3>
+              <p className="text-sm text-gray-600">
+                Sync GW scores with live team data
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {liveStandingsLoading && (
+                <span className="text-sm text-gray-500">Syncing...</span>
+              )}
+              <button
+                onClick={handleLiveStandingsToggle}
+                disabled={liveStandingsLoading}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                  liveStandingsEnabled ? "bg-green-600" : "bg-gray-300"
+                } ${
+                  liveStandingsLoading
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-gray-500 transition-transform ${
+                    liveStandingsEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <span className="text-sm font-medium text-black">
+                {liveStandingsEnabled ? "ON" : "OFF"}
+              </span>
+            </div>
+          </div>
+        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-spacing-x-[50%] text-center overflow-x-hidden">
