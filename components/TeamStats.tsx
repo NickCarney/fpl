@@ -31,7 +31,6 @@ import {
 interface TeamStatsProps {
   teams: Team[];
   elements: Element[];
-  setHoveredTeam: any;
 }
 
 // Add this interface for fixture data
