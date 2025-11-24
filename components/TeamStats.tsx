@@ -23,6 +23,9 @@ import {
   Line,
   Area,
   AreaChart,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 interface TeamStatsProps {
@@ -49,9 +52,13 @@ const StrengthTooltip = ({
   team,
   isVisible,
   setHoveredTeam,
+  fixtures,
+  teams,
 }: {
   team: {
+    id: number;
     name: string;
+    short_name: string;
     strength: number;
     strength_overall_home: number;
     strength_overall_away: number;
@@ -62,8 +69,94 @@ const StrengthTooltip = ({
   };
   isVisible: boolean;
   setHoveredTeam: any;
+  fixtures: Fixture[];
+  teams: Team[];
 }) => {
   if (!isVisible) return null;
+
+  // Get all previous results (sorted from earliest to most recent - gameweek 1 at top)
+  const previousResults = fixtures
+    .filter(
+      (fixture) =>
+        fixture.finished &&
+        (fixture.team_h === team.id || fixture.team_a === team.id)
+    )
+    .sort((a, b) => a.event - b.event) // Changed to ascending order (earliest first)
+    .map((fixture) => {
+      const isHome = fixture.team_h === team.id;
+      const opponentId = isHome ? fixture.team_a : fixture.team_h;
+      const opponent = teams.find((t) => t.id === opponentId);
+      const teamScore = isHome ? fixture.team_h_score : fixture.team_a_score;
+      const opponentScore = isHome
+        ? fixture.team_a_score
+        : fixture.team_h_score;
+      const result =
+        teamScore > opponentScore ? "W" : teamScore < opponentScore ? "L" : "D";
+
+      return {
+        opponent: opponent?.short_name || "TBD",
+        isHome,
+        teamScore,
+        opponentScore,
+        result,
+        gameweek: fixture.event,
+      };
+    });
+
+  // Get next 10 fixtures
+  const upcomingFixtures = fixtures
+    .filter(
+      (fixture) =>
+        !fixture.finished &&
+        (fixture.team_h === team.id || fixture.team_a === team.id)
+    )
+    .sort((a, b) => a.event - b.event)
+    .slice(0, 10) // Changed from 5 to 10
+    .map((fixture) => {
+      const isHome = fixture.team_h === team.id;
+      const opponentId = isHome ? fixture.team_a : fixture.team_h;
+      const opponent = teams.find((t) => t.id === opponentId);
+      const difficulty = isHome
+        ? fixture.team_h_difficulty
+        : fixture.team_a_difficulty;
+
+      return {
+        opponent: opponent?.short_name || "TBD",
+        isHome,
+        difficulty,
+        gameweek: fixture.event,
+      };
+    });
+
+  const getDifficultyColor = (difficulty: number) => {
+    switch (difficulty) {
+      case 1:
+        return "bg-green-500";
+      case 2:
+        return "bg-green-300";
+      case 3:
+        return "bg-yellow-300";
+      case 4:
+        return "bg-orange-400";
+      case 5:
+        return "bg-red-500";
+      default:
+        return "bg-gray-300";
+    }
+  };
+
+  const getResultColor = (result: string) => {
+    switch (result) {
+      case "W":
+        return "text-green-600 font-bold";
+      case "D":
+        return "text-yellow-600 font-bold";
+      case "L":
+        return "text-red-600 font-bold";
+      default:
+        return "text-gray-600";
+    }
+  };
 
   const getStrengthColor = (value: number) => {
     if (value >= 1300) return "text-green-600 font-semibold";
@@ -131,10 +224,71 @@ const StrengthTooltip = ({
       onMouseEnter={() => setHoveredTeam(team)}
       onMouseLeave={() => setHoveredTeam(null)}
     >
-      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-4 min-w-[280px] pointer-events-auto">
+      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-4 min-w-[320px] max-w-[400px] max-h-[80vh] overflow-y-auto pointer-events-auto">
+        <div className="mb-3 pb-2 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-center mb-2">{team.name}</h2>
+        </div>
+
+        {/* Previous Results Section */}
+        {previousResults.length > 0 && (
+          <div className="mb-4 pb-3 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              Previous Results
+            </h3>
+            <div className="space-y-1">
+              {previousResults.map((result, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded"
+                >
+                  <span className="text-gray-500">GW{result.gameweek}</span>
+                  <span className="font-medium">
+                    {result.isHome ? "vs" : "@"} {result.opponent}
+                  </span>
+                  <span className="font-semibold">
+                    {result.teamScore} - {result.opponentScore}
+                  </span>
+                  <span className={getResultColor(result.result)}>
+                    {result.result}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Upcoming Fixtures Section */}
+        {upcomingFixtures.length > 0 && (
+          <div className="mb-4 pb-3 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              Upcoming Fixtures
+            </h3>
+            <div className="space-y-1">
+              {upcomingFixtures.map((fixture, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded"
+                >
+                  <span className="text-gray-500">GW{fixture.gameweek}</span>
+                  <span className="font-medium">
+                    {fixture.isHome ? "vs" : "@"} {fixture.opponent}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded text-white text-xs font-medium ${getDifficultyColor(
+                      fixture.difficulty
+                    )}`}
+                  >
+                    FDR: {fixture.difficulty}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Strength Stats Section */}
         <div className="mb-3 pb-2 border-b border-gray-200">
           <div className="flex items-center justify-between mb-1 flex-col">
-            <h2> {team.name}</h2>
             <span className="text-sm font-semibold text-gray-700">
               Overall Strength
             </span>
@@ -451,14 +605,6 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
   );
 
   // Prepare various chart data
-  const performanceData = sortedTeamStats.map((team) => ({
-    name: team.short_name,
-    "Total Points": team.total_points,
-    "Goals Scored": team.goals_scored,
-    Assists: team.assists,
-    "Clean Sheets": team.clean_sheets,
-  }));
-
   const efficiencyData = sortedTeamStats.map((team) => ({
     name: team.short_name,
     "Goals Scored": team.goals_scored,
@@ -482,6 +628,55 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
     points: team.total_points / 25,
     goals: team.goals_scored,
   }));
+
+  // Team colors mapping (indexed by team id) - [primary, secondary]
+  const TEAM_COLORS: { [key: number]: [string, string] } = {
+    1: ["#EF0107", "#FFFFFF"], // Arsenal - Red & White
+    2: ["#670E36", "#95BFE5"], // Aston Villa - Claret & Blue
+    3: ["#6C1D45", "#99D6EA"], // Burnley - Claret & Sky Blue
+    4: ["#DA291C", "#000000"], // Bournemouth - Red & Black
+    5: ["#D20000", "#FFD900"], // Brentford - Red & Yellow
+    6: ["#0054A6", "#FFCD00"], // Brighton - Blue & Yellow
+    7: ["#034694", "#FFFFFF"], // Chelsea - Blue & White
+    8: ["#1B458F", "#C4122E"], // Crystal Palace - Blue & Red
+    9: ["#003399", "#FFFFFF"], // Everton - Blue & White
+    10: ["#FFFFFF", "#000000"], // Fulham - White & Black
+    11: ["#FFCD00", "#1D428A"], // Leeds - Yellow & Blue
+    12: ["#C8102E", "#00B2A9"], // Liverpool - Red & Teal
+    13: ["#6CABDD", "#1C2C5B"], // Man City - Sky Blue & Navy
+    14: ["#DA291C", "#FBE122"], // Man Utd - Red & Yellow
+    15: ["#241F20", "#FFFFFF"], // Newcastle - Black & White
+    16: ["#DD0000", "#FFFFFF"], // Nott'm Forest - Red & White
+    17: ["#EB172B", "#000000"], // Sunderland - Red & Black
+    18: ["#132257", "#FFFFFF"], // Spurs - Navy & White
+    19: ["#7A263A", "#1BB1E7"], // West Ham - Claret & Sky Blue
+    20: ["#FDB913", "#000000"], // Wolves - Gold & Black
+  };
+
+  // Total goals pie chart data
+  const totalGoalsData = sortedTeamStats.map((team) => ({
+    name: team.name,
+    value: team.goals_scored,
+    teamId: team.id,
+  }));
+
+  // Get top 10 players by position
+  const getTopPlayersByPosition = (positionId: number) => {
+    return elements
+      .filter((player) => player.element_type === positionId)
+      .sort((a, b) => b.total_points - a.total_points)
+      .slice(0, 10)
+      .map((player) => ({
+        name: player.web_name,
+        value: player.total_points,
+        teamId: player.team,
+      }));
+  };
+
+  const topGoalkeepers = getTopPlayersByPosition(1);
+  const topDefenders = getTopPlayersByPosition(2);
+  const topMidfielders = getTopPlayersByPosition(3);
+  const topForwards = getTopPlayersByPosition(4);
 
   return (
     <div>
@@ -547,29 +742,300 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
 
       {/* Content */}
       {viewMode === "performance" ? (
-        <div className="space-y-6">
+        <div className="space-y-8">
+          {/* Top 10 Players by Position */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Goalkeepers */}
+            <div>
+              <h3 className="text-md font-semibold mb-2 text-center">
+                Top 10 Goalkeepers (Points)
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={topGoalkeepers}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(props) => {
+                        const { name, value } = props;
+                        return (
+                          <text
+                            x={props.x}
+                            y={props.y}
+                            fill="#000000"
+                            textAnchor={props.x > props.cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            fontSize="12"
+                          >
+                            {`${name} ${value}`}
+                          </text>
+                        );
+                      }}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {topGoalkeepers.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={TEAM_COLORS[entry.teamId][0]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string, props: any) => {
+                        const teamName =
+                          teams.find((t) => t.id === props.payload.teamId)
+                            ?.name || "";
+                        return [`${value} points`, `${name} (${teamName})`];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Defenders */}
+            <div>
+              <h3 className="text-md font-semibold mb-2 text-center">
+                Top 10 Defenders (Points)
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={topDefenders}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(props) => {
+                        const { name, value } = props;
+                        return (
+                          <text
+                            x={props.x}
+                            y={props.y}
+                            fill="#000000"
+                            textAnchor={props.x > props.cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            fontSize="12"
+                          >
+                            {`${name} ${value}`}
+                          </text>
+                        );
+                      }}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {topDefenders.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={TEAM_COLORS[entry.teamId][0]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string, props: any) => {
+                        const teamName =
+                          teams.find((t) => t.id === props.payload.teamId)
+                            ?.name || "";
+                        return [`${value} points`, `${name} (${teamName})`];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Midfielders */}
+            <div>
+              <h3 className="text-md font-semibold mb-2 text-center">
+                Top 10 Midfielders (Points)
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={topMidfielders}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(props) => {
+                        const { name, value } = props;
+                        return (
+                          <text
+                            x={props.x}
+                            y={props.y}
+                            fill="#000000"
+                            textAnchor={props.x > props.cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            fontSize="12"
+                          >
+                            {`${name} ${value}`}
+                          </text>
+                        );
+                      }}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {topMidfielders.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={TEAM_COLORS[entry.teamId][0]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string, props: any) => {
+                        const teamName =
+                          teams.find((t) => t.id === props.payload.teamId)
+                            ?.name || "";
+                        return [`${value} points`, `${name} (${teamName})`];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Forwards */}
+            <div>
+              <h3 className="text-md font-semibold mb-2 text-center">
+                Top 10 Forwards (Points)
+              </h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={topForwards}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(props) => {
+                        const { name, value } = props;
+                        return (
+                          <text
+                            x={props.x}
+                            y={props.y}
+                            fill="#000000"
+                            textAnchor={props.x > props.cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            fontSize="12"
+                          >
+                            {`${name} ${value}`}
+                          </text>
+                        );
+                      }}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {topForwards.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={TEAM_COLORS[entry.teamId][0]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string, props: any) => {
+                        const teamName =
+                          teams.find((t) => t.id === props.payload.teamId)
+                            ?.name || "";
+                        return [`${value} points`, `${name} (${teamName})`];
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
           <div>
             <h3 className="text-lg font-semibold mb-4 text-center">
-              Team Performance Overview
+              Total Goals by Team
             </h3>
-            <div className="h-96">
+            <div className="h-[568px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis />
+                <PieChart>
+                  <defs>
+                    {totalGoalsData.map((entry, index) => {
+                      // Calculate the angle for this slice
+                      const total = totalGoalsData.reduce(
+                        (sum, item) => sum + item.value,
+                        0
+                      );
+                      const startAngle = totalGoalsData
+                        .slice(0, index)
+                        .reduce(
+                          (sum, item) => sum + (item.value / total) * 360,
+                          0
+                        );
+                      const sliceAngle = (entry.value / total) * 360;
+                      const midAngle = -startAngle + sliceAngle / 2;
+
+                      return (
+                        <pattern
+                          key={`stripe-${entry.teamId}-${index}`}
+                          id={`stripe-${entry.teamId}-${index}`}
+                          patternUnits="userSpaceOnUse"
+                          width="8"
+                          height="8"
+                          patternTransform={`rotate(${midAngle + 75} 4 4)`}
+                        >
+                          <rect
+                            width="8"
+                            height="4"
+                            fill={TEAM_COLORS[entry.teamId][0]}
+                          />
+                          <rect
+                            y="4"
+                            width="8"
+                            height="4"
+                            fill={TEAM_COLORS[entry.teamId][1]}
+                          />
+                        </pattern>
+                      );
+                    })}
+                  </defs>
+                  <Pie
+                    data={totalGoalsData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(props) => {
+                      const { name, value, percent } = props;
+                      return (
+                        <text
+                          x={props.x}
+                          y={props.y}
+                          fill="#000000"
+                          textAnchor={props.x > props.cx ? "start" : "end"}
+                          dominantBaseline="central"
+                          fontSize="14"
+                          fontWeight="600"
+                        >
+                          {`${name} ${value} ${((percent || 0) * 100).toFixed(
+                            0
+                          )}%`}
+                        </text>
+                      );
+                    }}
+                    outerRadius={240}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {totalGoalsData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={`url(#stripe-${entry.teamId}-${index})`}
+                      />
+                    ))}
+                  </Pie>
                   <Tooltip />
-                  <Legend />
-                  <Bar dataKey="Total Points" fill="#3b82f6" />
-                  <Bar dataKey="Goals Scored" fill="#ef4444" />
-                  <Bar dataKey="Assists" fill="#22c55e" />
-                  <Bar dataKey="Clean Sheets" fill="#f59e0b" />
-                </BarChart>
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -842,6 +1308,8 @@ export default function TeamStats({ teams, elements }: TeamStatsProps) {
           team={hoveredTeam}
           isVisible={true}
           setHoveredTeam={setHoveredTeam}
+          fixtures={fixtures}
+          teams={teams}
         />
       )}
     </div>
