@@ -54,6 +54,22 @@ export default function CurrentSquad({
     isCaptain?: boolean;
     isViceCaptain?: boolean;
   } | null>(null);
+  const [liveStandingsEnabled, setLiveStandingsEnabled] = useState(false);
+  const [substitutions, setSubstitutions] = useState<
+    Array<{
+      outPlayer: number;
+      inPlayer: number;
+    }>
+  >([]);
+  const [animatingSubstitution, setAnimatingSubstitution] = useState<{
+    outPlayer: number;
+    inPlayer: number;
+    phase: "flying" | "swapping";
+  } | null>(null);
+  const [livePoints, setLivePoints] = useState<number | null>(null);
+  const [liveBenchPoints, setLiveBenchPoints] = useState<number | null>(null);
+  const [liveTotalPoints, setLiveTotalPoints] = useState<number | null>(null);
+  const [displayPicks, setDisplayPicks] = useState<Pick[]>([]);
 
   // Add function to fetch gameweek data for a player
   const fetchPlayerGameweekData = async (playerId: number) => {
@@ -117,6 +133,28 @@ export default function CurrentSquad({
     }
   }, [picks, currentEvent]);
 
+  // Sync displayPicks with picks
+  useEffect(() => {
+    setDisplayPicks([...picks]);
+  }, [picks]);
+
+  // Recalculate substitutions when gameweek data or live standings changes
+  useEffect(() => {
+    if (
+      liveStandingsEnabled &&
+      Object.keys(gameweekData).length > 0 &&
+      picks.length > 0
+    ) {
+      calculateSubstitutions();
+    } else {
+      setSubstitutions([]);
+      setLivePoints(null);
+      setLiveBenchPoints(null);
+      setLiveTotalPoints(null);
+      setDisplayPicks([...picks]);
+    }
+  }, [liveStandingsEnabled, gameweekData, picks]);
+
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
   };
@@ -150,7 +188,13 @@ export default function CurrentSquad({
 
         if (gameHasStarted) {
           if (gameweekMinutes > 0) {
-            pointsDisplay = `${gameweekPoints * pick.multiplier}pts`;
+            // Show actual points regardless of multiplier (for bench display)
+            // But indicate captain/vice-captain with multiplier if applicable
+            const displayPoints =
+              pick.multiplier > 0
+                ? gameweekPoints * pick.multiplier
+                : gameweekPoints;
+            pointsDisplay = `${displayPoints}pts`;
             minutesDisplay = `${gameweekMinutes} mins`;
             statusColor =
               gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
@@ -204,6 +248,247 @@ export default function CurrentSquad({
         ppg: player.points_per_game,
       };
     }
+  };
+
+  // Calculate substitutions based on DNP players
+  const calculateSubstitutions = () => {
+    const isBenchBoost = teamPicks?.active_chip === "bboost";
+
+    // If bench boost active, no substitutions
+    if (isBenchBoost) {
+      setSubstitutions([]);
+      return;
+    }
+
+    const startingXI = picks.filter((pick) => pick.position <= 11);
+    const bench = picks.filter((pick) => pick.position > 11);
+
+    const subs: Array<{ outPlayer: number; inPlayer: number }> = [];
+
+    // Check for DNP players and valid substitutions
+    // GK substitution
+    const gk = startingXI.find((pick) => pick.position === 1);
+    if (gk) {
+      const gkData = gameweekData[gk.element];
+      if (gkData && gkData.minutes === 0) {
+        const backupGK = bench.find((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 1;
+        });
+        if (backupGK) {
+          const backupGKData = gameweekData[backupGK.element];
+          if (backupGKData && backupGKData.minutes > 0) {
+            subs.push({ outPlayer: gk.element, inPlayer: backupGK.element });
+          }
+        }
+      }
+    }
+
+    // Outfield substitutions
+    const dnpOutfield = startingXI.filter((pick) => {
+      if (pick.position === 1) return false; // Skip GK
+      const playerData = gameweekData[pick.element];
+      return playerData && playerData.minutes === 0;
+    });
+
+    const availableBench = bench
+      .filter((pick) => {
+        const player = getPlayer(pick.element);
+        if (player?.element_type === 1) return false; // Skip GK
+        const playerData = gameweekData[pick.element];
+        return playerData && playerData.minutes > 0;
+      })
+      .sort((a, b) => a.position - b.position);
+
+    for (const benchPick of availableBench) {
+      if (dnpOutfield.length === 0) break;
+
+      const benchPlayer = getPlayer(benchPick.element);
+      if (!benchPlayer) continue;
+
+      for (let i = 0; i < dnpOutfield.length; i++) {
+        const dnpPick = dnpOutfield[i];
+        const dnpPlayer = getPlayer(dnpPick.element);
+        if (!dnpPlayer) continue;
+
+        // Test substitution
+        const testLineup = startingXI.map((pick) => {
+          if (pick.element === dnpPick.element) {
+            return { ...benchPick, position: pick.position };
+          }
+          // Check if this player was already subbed out
+          const alreadySubbed = subs.find((s) => s.outPlayer === pick.element);
+          if (alreadySubbed) {
+            const subInPlayer = subs.find((s) => s.outPlayer === pick.element);
+            if (subInPlayer) {
+              return (
+                picks.find((p) => p.element === subInPlayer.inPlayer) || pick
+              );
+            }
+          }
+          return pick;
+        });
+
+        // Count formation
+        const outfield = testLineup.filter((pick) => pick.position > 1);
+        const defCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 2;
+        }).length;
+        const midCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 3;
+        }).length;
+        const fwdCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 4;
+        }).length;
+
+        // Check formation rules
+        if (defCount >= 3 && midCount >= 3 && fwdCount >= 1) {
+          subs.push({
+            outPlayer: dnpPick.element,
+            inPlayer: benchPick.element,
+          });
+          dnpOutfield.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    setSubstitutions(subs);
+
+    // Calculate live points with substitutions
+    calculateLivePoints(subs, isBenchBoost);
+
+    // Trigger animation sequence
+    if (subs.length > 0) {
+      animateSubstitutions(subs);
+    }
+  };
+
+  const calculateLivePoints = (
+    subs: Array<{ outPlayer: number; inPlayer: number }>,
+    isBenchBoost: boolean
+  ) => {
+    let starterPoints = 0;
+    let benchPoints = 0;
+
+    if (isBenchBoost) {
+      // Count all players (all 15 count as starters for bench boost)
+      picks.forEach((pick) => {
+        const playerData = gameweekData[pick.element];
+        if (playerData) {
+          const multiplier = pick.multiplier > 0 ? pick.multiplier : 1;
+          starterPoints += playerData.total_points * multiplier;
+        }
+      });
+      benchPoints = 0; // No separate bench for bench boost
+    } else {
+      // Get final lineup after substitutions
+      const finalStarterIds = new Set<number>();
+      const finalBenchIds = new Set<number>();
+
+      // Build final lineup
+      picks
+        .filter((pick) => pick.position <= 11)
+        .forEach((pick) => {
+          const sub = subs.find((s) => s.outPlayer === pick.element);
+          if (sub) {
+            finalStarterIds.add(sub.inPlayer);
+            finalBenchIds.add(pick.element);
+          } else {
+            finalStarterIds.add(pick.element);
+          }
+        });
+
+      // Add remaining bench players who weren't subbed in
+      picks
+        .filter((pick) => pick.position > 11)
+        .forEach((pick) => {
+          if (!finalStarterIds.has(pick.element)) {
+            finalBenchIds.add(pick.element);
+          }
+        });
+
+      // Calculate starter points
+      picks.forEach((pick) => {
+        if (finalStarterIds.has(pick.element)) {
+          const playerData = gameweekData[pick.element];
+          if (playerData) {
+            const multiplier = pick.multiplier > 0 ? pick.multiplier : 1;
+            starterPoints += playerData.total_points * multiplier;
+          }
+        }
+      });
+
+      // Calculate bench points
+      picks.forEach((pick) => {
+        if (finalBenchIds.has(pick.element)) {
+          const playerData = gameweekData[pick.element];
+          if (playerData) {
+            benchPoints += playerData.total_points; // No multiplier for bench
+          }
+        }
+      });
+    }
+
+    setLivePoints(starterPoints);
+    setLiveBenchPoints(benchPoints);
+    setLiveTotalPoints(starterPoints + benchPoints);
+  };
+
+  const animateSubstitutions = (
+    subs: Array<{ outPlayer: number; inPlayer: number }>
+  ) => {
+    let currentIndex = 0;
+
+    const animateNext = () => {
+      if (currentIndex < subs.length) {
+        const currentSub = subs[currentIndex];
+
+        // Phase 1: Flying animation (800ms)
+        setAnimatingSubstitution({ ...currentSub, phase: "flying" });
+
+        setTimeout(() => {
+          // Phase 2: Swap positions in displayPicks
+          setDisplayPicks((prevPicks) => {
+            const newPicks = [...prevPicks];
+            const outIndex = newPicks.findIndex(
+              (p) => p.element === currentSub.outPlayer
+            );
+            const inIndex = newPicks.findIndex(
+              (p) => p.element === currentSub.inPlayer
+            );
+
+            if (outIndex !== -1 && inIndex !== -1) {
+              // Swap the picks but keep their original position numbers temporarily
+              const outPick = { ...newPicks[outIndex] };
+              const inPick = { ...newPicks[inIndex] };
+
+              // Swap positions
+              newPicks[outIndex] = { ...inPick, position: outPick.position };
+              newPicks[inIndex] = { ...outPick, position: inPick.position };
+            }
+
+            return newPicks;
+          });
+
+          setAnimatingSubstitution({ ...currentSub, phase: "swapping" });
+
+          setTimeout(() => {
+            setAnimatingSubstitution(null);
+            currentIndex++;
+            if (currentIndex < subs.length) {
+              setTimeout(animateNext, 300); // Small delay between subs
+            }
+          }, 500);
+        }, 800);
+      }
+    };
+
+    // Start animation after a short delay
+    setTimeout(animateNext, 500);
   };
 
   // Calculate suggested lineup for the NEXT gameweek based on comprehensive analysis
@@ -530,10 +815,10 @@ export default function CurrentSquad({
 
   const startingXI = showSuggestedLineup
     ? suggestedLineup.startingXI.map((p) => p!.pick)
-    : picks.filter((pick) => pick.position <= 11);
+    : displayPicks.filter((pick) => pick.position <= 11);
   const bench = showSuggestedLineup
     ? suggestedLineup.bench.map((p) => p!.pick)
-    : picks.filter((pick) => pick.position > 11);
+    : displayPicks.filter((pick) => pick.position > 11);
 
   // Group players by position for formation display
   const getPlayersByPosition = (positionId: number) => {
@@ -564,15 +849,20 @@ export default function CurrentSquad({
     setSelectedPlayer(null);
   };
 
-  const handlePointsClick = (e: React.MouseEvent, player: Element, stats: any, pick: Pick) => {
+  const handlePointsClick = (
+    e: React.MouseEvent,
+    player: Element,
+    stats: any,
+    pick: Pick
+  ) => {
     e.stopPropagation(); // Prevent triggering the player card click
     if (showGameweekStats) {
       // Extract numeric points or pass the string if it's YTP/DNP
       let pointsValue: number | string = stats.points;
 
       // If stats.points is a string like "7pts", extract the number
-      if (typeof stats.points === 'string' && stats.points.endsWith('pts')) {
-        const numericPoints = parseInt(stats.points.replace('pts', ''));
+      if (typeof stats.points === "string" && stats.points.endsWith("pts")) {
+        const numericPoints = parseInt(stats.points.replace("pts", ""));
         pointsValue = isNaN(numericPoints) ? stats.points : numericPoints;
       }
 
@@ -640,6 +930,20 @@ export default function CurrentSquad({
         }
       : null;
 
+    // Check if this player is involved in a substitution
+    const isSubbedOut = substitutions.some((s) => s.outPlayer === pick.element);
+    const isSubbedIn = substitutions.some((s) => s.inPlayer === pick.element);
+    const isAnimatingOut =
+      animatingSubstitution && animatingSubstitution.outPlayer === pick.element;
+    const isAnimatingIn =
+      animatingSubstitution && animatingSubstitution.inPlayer === pick.element;
+    const isFlying =
+      (isAnimatingOut || isAnimatingIn) &&
+      animatingSubstitution?.phase === "flying";
+    const isSwapping =
+      (isAnimatingOut || isAnimatingIn) &&
+      animatingSubstitution?.phase === "swapping";
+
     if (isFormation) {
       // Enhanced formation view with stats toggle
       return (
@@ -649,30 +953,56 @@ export default function CurrentSquad({
         >
           <div
             onClick={() => handlePlayerClick(pick)}
-            className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 overflow-y-auto overflow-x-hidden ${
-              pick.is_captain
-                ? "ring-1 ring-yellow-400"
+            className={`relative flex flex-col p-1 md:p-3 rounded-lg cursor-pointer w-full h-full overflow-y-auto overflow-x-hidden ${
+              isFlying
+                ? isAnimatingOut
+                  ? "bg-red-300 ring-2 ring-red-500 animate-[fly-to-bench_0.8s_ease-in-out] z-50 scale-110 shadow-2xl"
+                  : "bg-green-500 ring-2 ring-green-600 animate-[fly-to-field_0.8s_ease-in-out] z-50 scale-110 shadow-2xl"
+                : isSwapping
+                ? "animate-pulse bg-orange-300 ring-2 ring-orange-500 transition-all duration-500"
+                : isSubbedOut
+                ? "bg-red-200 opacity-60 ring-2 ring-red-400"
+                : isSubbedIn
+                ? "bg-green-400 ring-2 ring-green-600"
+                : pick.is_captain
+                ? "bg-green-300 ring-1 ring-yellow-400"
                 : pick.is_vice_captain
-                ? "ring-1 ring-yellow-300"
+                ? "bg-green-300 ring-1 ring-yellow-300"
                 : isNewSuggestion
-                ? "ring-1 ring-green-500"
+                ? "bg-green-300 ring-1 ring-green-500"
                 : isBenchedSuggestion
-                ? "ring-1 ring-orange-400"
-                : ""
-            }`}
+                ? "bg-green-300 ring-1 ring-orange-400"
+                : "bg-green-300"
+            } ${isFlying ? "transition-none" : "transition-all"}`}
+            style={{
+              ...(isFlying && {
+                position: "relative",
+                zIndex: 9999,
+              }),
+            }}
           >
+            {/* Substitution indicators */}
+            {(isSubbedOut || isSubbedIn) && (
+              <div
+                className={`absolute -top-1 -right-1 text-white text-[8px] md:text-xs rounded-full w-5 md:w-6 h-5 md:h-6 flex items-center justify-center font-bold z-10 ${
+                  isSubbedOut ? "bg-red-500" : "bg-green-600"
+                }`}
+              >
+                {isSubbedOut ? "OUT" : "IN"}
+              </div>
+            )}
             {/* Suggestion indicators */}
-            {isNewSuggestion && (
+            {!isSubbedOut && !isSubbedIn && isNewSuggestion && (
               <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↑
               </div>
             )}
-            {isBenchedSuggestion && (
+            {!isSubbedOut && !isSubbedIn && isBenchedSuggestion && (
               <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↓
               </div>
             )}
-            {isTransferIn && (
+            {!isSubbedOut && !isSubbedIn && isTransferIn && (
               <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ⚡
               </div>
@@ -691,9 +1021,9 @@ export default function CurrentSquad({
             <div className="text-center mb-0.5 md:mb-2">
               <div
                 onClick={(e) => handlePointsClick(e, player, stats, pick)}
-                className={`text-[10px] md:text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
-                  showGameweekStats ? "hover:text-blue-600" : ""
-                }`}
+                className={`text-[10px] md:text-sm font-bold cursor-pointer hover:underline ${
+                  stats.statusColor
+                } ${showGameweekStats ? "hover:text-blue-600" : ""}`}
                 title={showGameweekStats ? "Click to see points breakdown" : ""}
               >
                 {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
@@ -811,9 +1141,9 @@ export default function CurrentSquad({
           <div className="text-right">
             <div
               onClick={(e) => handlePointsClick(e, player, stats, pick)}
-              className={`text-sm font-bold cursor-pointer hover:underline ${stats.statusColor} ${
-                showGameweekStats ? "hover:text-blue-600" : ""
-              }`}
+              className={`text-sm font-bold cursor-pointer hover:underline ${
+                stats.statusColor
+              } ${showGameweekStats ? "hover:text-blue-600" : ""}`}
               title={showGameweekStats ? "Click to see points breakdown" : ""}
             >
               {stats.points}
@@ -1246,21 +1576,55 @@ export default function CurrentSquad({
               {showGameweekStats ? `Gameweek ${currentEvent}` : "Season Total"}
             </p>
             <div className="space-y-1">
-              <p className="text-xl font-bold">
-                {displayedStarterPoints} points{" "}
-              </p>
+              <div className="flex items-center justify-center gap-3">
+                <p className="text-xl font-bold">
+                  {liveStandingsEnabled && livePoints !== null
+                    ? `${livePoints} points`
+                    : `${displayedStarterPoints} points`}
+                </p>
+                {showGameweekStats && (
+                  <label
+                    className="flex items-center cursor-pointer group"
+                    title="Apply auto-substitutions"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={liveStandingsEnabled}
+                      onChange={() =>
+                        setLiveStandingsEnabled(!liveStandingsEnabled)
+                      }
+                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                    />
+                    <span className="ml-2 text-sm text-gray-600 group-hover:text-gray-800">
+                      Live
+                    </span>
+                  </label>
+                )}
+              </div>
               <div className="flex justify-center gap-4 text-sm">
                 <span className="text-green-700 font-medium">
-                  {manualBenchPointsSum} benched
+                  {liveStandingsEnabled && liveBenchPoints !== null
+                    ? liveBenchPoints
+                    : manualBenchPointsSum}{" "}
+                  benched
                 </span>
                 <span className="text-orange-600 font-medium">
-                  {displayedTotalPoints} total
+                  {liveStandingsEnabled && liveTotalPoints !== null
+                    ? liveTotalPoints
+                    : displayedTotalPoints}{" "}
+                  total
                 </span>
               </div>
-              {manualBenchPointsSum > 0 && (
+              {manualBenchPointsSum > 0 && !liveStandingsEnabled && (
                 <p className="text-xs text-gray-600 mt-1">
                   You left {manualBenchPointsSum} point
                   {manualBenchPointsSum === 1 ? "" : "s"} on the bench
+                </p>
+              )}
+              {liveStandingsEnabled && substitutions.length > 0 && (
+                <p className="text-xs text-green-600 mt-1">
+                  {substitutions.length} auto-sub
+                  {substitutions.length === 1 ? "" : "s"} applied
                 </p>
               )}
             </div>
@@ -1430,7 +1794,9 @@ export default function CurrentSquad({
           onClose={closePopup}
           isCaptain={selectedPlayer.pick.is_captain}
           isViceCaptain={selectedPlayer.pick.is_vice_captain}
-          currentSquad={elements.filter((el) => picks.some((p) => p.element === el.id))}
+          currentSquad={elements.filter((el) =>
+            picks.some((p) => p.element === el.id)
+          )}
         />
       )}
 

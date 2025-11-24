@@ -58,8 +58,16 @@ export default function LeagueStandings({
       ? updatedStandings
       : standings;
   const allTeams = [...baseStandings];
+
+  // Only add user position if they're not already in the standings
   if (shouldShowUserPosition) {
-    allTeams.push(userPosition);
+    // Check if user is already in baseStandings (could be in updatedStandings after sync)
+    const userAlreadyInStandings = baseStandings.some(
+      (s) => s.entry === userPosition.entry
+    );
+    if (!userAlreadyInStandings) {
+      allTeams.push(userPosition);
+    }
   }
 
   // Sort teams by total points (starting XI only, as original)
@@ -125,45 +133,158 @@ export default function LeagueStandings({
 
             const picksData = await response.json();
 
-            // Calculate actual GW score from picks
+            // Calculate actual GW score from picks with substitutions
             let actualGwScore = 0;
 
-            if (picksData.picks) {
-              // Get starting XI (positions 1-11)
-              const startingXI = picksData.picks.filter(
-                (pick: any) => pick.position <= 11
-              );
+            // Check if bench boost chip is active
+            const isBenchBoost = picksData.active_chip === "bboost";
 
-              // For each pick, we need to get their gameweek points
-              const pickScores = await Promise.all(
-                startingXI.map(async (pick: any) => {
+            if (picksData.picks) {
+              // Fetch all player data (starting XI + bench) in parallel
+              const allPlayerData = await Promise.all(
+                picksData.picks.map(async (pick: any) => {
                   try {
                     const playerResponse = await fetch(
                       `/api/player/${pick.element}/gameweeks`
                     );
-                    if (!playerResponse.ok) return 0;
+                    if (!playerResponse.ok) return null;
 
                     const playerData = await playerResponse.json();
                     const gwData = playerData.history?.find(
                       (gw: any) => gw.round === currentEvent
                     );
 
-                    if (gwData) {
-                      // Apply multiplier (captain = 2x, vice = 1x, regular = 1x)
-                      return (gwData.total_points || 0) * pick.multiplier;
-                    }
-                    return 0;
+                    // Find player element type from elements array
+                    const playerInfo = elements.find(
+                      (el) => el.id === pick.element
+                    );
+
+                    return {
+                      pick,
+                      gwData,
+                      elementType: playerInfo?.element_type,
+                      didNotPlay: gwData ? gwData.minutes === 0 : true,
+                    };
                   } catch (error) {
                     console.error(
                       `Error fetching player ${pick.element}:`,
                       error
                     );
-                    return 0;
+                    return null;
                   }
                 })
               );
 
-              actualGwScore = pickScores.reduce((sum, score) => sum + score, 0);
+              // Filter out nulls and separate starting XI and bench with their data
+              const startingXIData = allPlayerData
+                .filter((data) => data && data.pick.position <= 11)
+                .map((data) => data!);
+
+              const benchData = allPlayerData
+                .filter((data) => data && data.pick.position > 11)
+                .map((data) => data!)
+                .sort((a, b) => a.pick.position - b.pick.position); // Sort by bench order
+
+              // If bench boost is active, count all players
+              if (isBenchBoost) {
+                actualGwScore = allPlayerData
+                  .filter((data) => data !== null)
+                  .reduce((sum, data) => {
+                    if (data!.gwData) {
+                      // Use multiplier if > 0, otherwise use 1 (for bench players)
+                      const multiplier = data!.pick.multiplier > 0 ? data!.pick.multiplier : 1;
+                      return sum + data!.gwData.total_points * multiplier;
+                    }
+                    return sum;
+                  }, 0);
+              } else {
+                // Process automatic substitutions for non-bench boost teams
+                let finalLineup = [...startingXIData];
+
+                // Handle goalkeeper substitutions (position 1)
+                const gkData = startingXIData.find(
+                  (data) => data.pick.position === 1
+                );
+                if (gkData && gkData.didNotPlay) {
+                  // Find backup GK on bench (element_type 1 = GK)
+                  const backupGK = benchData.find(
+                    (data) => data.elementType === 1
+                  );
+                  if (backupGK && !backupGK.didNotPlay) {
+                    // Swap GK
+                    finalLineup = finalLineup.map((data) =>
+                      data.pick.position === 1 ? backupGK : data
+                    );
+                  }
+                }
+
+                // Handle outfield player substitutions
+                // Element types: 1=GK, 2=DEF, 3=MID, 4=FWD
+                const outfieldStarters = finalLineup.filter(
+                  (data) => data.pick.position > 1
+                );
+
+                // Find DNP outfield players
+                const dnpPlayers = outfieldStarters.filter(
+                  (data) => data.didNotPlay
+                );
+
+                // Get available outfield subs (not GK, not already subbed in, and actually played)
+                const availableSubs = benchData.filter(
+                  (data) =>
+                    data.elementType !== 1 &&
+                    !data.didNotPlay &&
+                    !finalLineup.some((starter) => starter.pick.element === data.pick.element)
+                );
+
+                // Process substitutions in bench order
+                for (const sub of availableSubs) {
+                  if (dnpPlayers.length === 0) break;
+
+                  // Check if we can make this substitution while maintaining formation rules
+                  // Must have at least: 3 DEF, 3 MID, 1 FWD
+                  for (let i = 0; i < dnpPlayers.length; i++) {
+                    const dnpPlayer = dnpPlayers[i];
+
+                    // Try substitution
+                    const testLineup = finalLineup.map((data) =>
+                      data.pick.element === dnpPlayer.pick.element ? sub : data
+                    );
+
+                    // Count positions in test lineup (excluding GK)
+                    const outfieldTestLineup = testLineup.filter(
+                      (data) => data.pick.position > 1 || data.elementType !== 1
+                    );
+                    const defCount = outfieldTestLineup.filter(
+                      (data) => data.elementType === 2
+                    ).length;
+                    const midCount = outfieldTestLineup.filter(
+                      (data) => data.elementType === 3
+                    ).length;
+                    const fwdCount = outfieldTestLineup.filter(
+                      (data) => data.elementType === 4
+                    ).length;
+
+                    // Check formation rules
+                    if (defCount >= 3 && midCount >= 3 && fwdCount >= 1) {
+                      // Valid substitution
+                      finalLineup = testLineup;
+                      dnpPlayers.splice(i, 1);
+                      break; // Move to next sub
+                    }
+                  }
+                }
+
+                // Calculate score from final lineup
+                actualGwScore = finalLineup.reduce((sum, data) => {
+                  if (data.gwData) {
+                    // Use multiplier if > 0, otherwise use 1 (for subbed-in players from bench)
+                    const multiplier = data.pick.multiplier > 0 ? data.pick.multiplier : 1;
+                    return sum + data.gwData.total_points * multiplier;
+                  }
+                  return sum;
+                }, 0);
+              }
             }
 
             // Check if the score differs from what's in the table
@@ -177,7 +298,6 @@ export default function LeagueStandings({
                 ...standing,
                 total: standing.total + actualGwScore - standing.event_total,
                 event_total: actualGwScore,
-                // Note: We don't update 'total' as that's the season total
               };
             }
 
@@ -328,18 +448,20 @@ export default function LeagueStandings({
             <tbody>
               {sortedTeams.map((standing, index) => {
                 const isUserTeam = userTeamId === standing.entry;
-                const movement = standing.last_rank - (index + 1);
+                // Use standing.rank for proper rank display, fallback to index + 1 if not available
+                const displayRank = standing.rank;
+                const movement = standing.last_rank - displayRank;
                 const activeChip = teamChips[standing.entry];
 
                 return (
                   <tr
-                    key={standing.entry}
+                    key={`${standing.entry}-${index}`}
                     onClick={() => handleTeamClick(standing, index)}
                     className={`border-b hover:bg-gray-50 cursor-pointer transition-colors h-12 ${
                       isUserTeam ? "bg-blue-50 font-semibold" : ""
                     }`}
                   >
-                    <td className="py-2 px-1 md:py-3 md:px-3">{index + 1}</td>
+                    <td className="py-2 px-1 md:py-3 md:px-3">{displayRank}</td>
                     <td className="py-2 px-1 md:py-3 md:px-3 text-blue-600 hover:text-blue-800 font-medium border-l text-xs md:text-sm">
                       {standing.entry_name}
                     </td>
@@ -452,6 +574,8 @@ export default function LeagueStandings({
           canNavigatePrevious={selectedTeamIndex > 0}
           // Add standing data
           standingData={selectedTeam}
+          // Live standings
+          liveStandingsEnabled={liveStandingsEnabled}
         />
       )}
     </div>

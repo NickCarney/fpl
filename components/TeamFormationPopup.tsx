@@ -36,6 +36,9 @@ interface TeamFormationPopupProps {
 
   // Add standing data
   standingData?: any;
+
+  // Live standings
+  liveStandingsEnabled?: boolean;
 }
 
 export default function TeamFormationPopup({
@@ -56,6 +59,7 @@ export default function TeamFormationPopup({
   canNavigateNext,
   canNavigatePrevious,
   standingData,
+  liveStandingsEnabled = false,
 }: TeamFormationPopupProps) {
   const [teamPicks, setTeamPicks] = useState<TeamPicks | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,12 +80,29 @@ export default function TeamFormationPopup({
     isCaptain?: boolean;
     isViceCaptain?: boolean;
   } | null>(null);
+  const [substitutions, setSubstitutions] = useState<Array<{
+    outPlayer: number;
+    inPlayer: number;
+  }>>([]);
+  const [animatingSubstitution, setAnimatingSubstitution] = useState<{
+    outPlayer: number;
+    inPlayer: number;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen && teamId) {
       loadTeamData();
     }
-  }, [isOpen, teamId, currentEvent]);
+  }, [isOpen, teamId, currentEvent, liveStandingsEnabled]);
+
+  // Recalculate substitutions when gameweek data or live standings changes
+  useEffect(() => {
+    if (liveStandingsEnabled && teamPicks && Object.keys(gameweekData).length > 0) {
+      calculateSubstitutions(teamPicks);
+    } else {
+      setSubstitutions([]);
+    }
+  }, [liveStandingsEnabled, gameweekData, teamPicks]);
 
   const loadTeamData = async () => {
     setLoading(true);
@@ -91,9 +112,15 @@ export default function TeamFormationPopup({
 
       // Fetch gameweek data for all players
       if (picksData?.picks) {
-        const gameweekPromises = picksData.picks.map((pick) =>
-          fetchPlayerGameweekData(pick.element)
-        );
+        // Store promises with their player IDs
+        const gameweekDataMap: { [key: number]: any } = {};
+
+        const gameweekPromises = picksData.picks.map(async (pick) => {
+          const data = await fetchPlayerGameweekData(pick.element);
+          gameweekDataMap[pick.element] = data;
+          return data;
+        });
+
         await Promise.all(gameweekPromises);
       }
     } catch (error) {
@@ -128,6 +155,131 @@ export default function TeamFormationPopup({
       );
       return null;
     }
+  };
+
+  const calculateSubstitutions = (picksData: TeamPicks) => {
+    const isBenchBoost = picksData.active_chip === "bboost";
+
+    // If bench boost active, no substitutions
+    if (isBenchBoost) {
+      setSubstitutions([]);
+      return;
+    }
+
+    const startingXI = picksData.picks.filter((pick) => pick.position <= 11);
+    const bench = picksData.picks.filter((pick) => pick.position > 11);
+
+    const subs: Array<{ outPlayer: number; inPlayer: number }> = [];
+
+    // Check for DNP players and valid substitutions
+    // GK substitution
+    const gk = startingXI.find((pick) => pick.position === 1);
+    if (gk) {
+      const gkData = gameweekData[gk.element];
+      if (gkData && gkData.minutes === 0) {
+        const backupGK = bench.find((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 1;
+        });
+        if (backupGK) {
+          const backupGKData = gameweekData[backupGK.element];
+          if (backupGKData && backupGKData.minutes > 0) {
+            subs.push({ outPlayer: gk.element, inPlayer: backupGK.element });
+          }
+        }
+      }
+    }
+
+    // Outfield substitutions
+    const dnpOutfield = startingXI.filter((pick) => {
+      if (pick.position === 1) return false; // Skip GK
+      const playerData = gameweekData[pick.element];
+      return playerData && playerData.minutes === 0;
+    });
+
+    const availableBench = bench
+      .filter((pick) => {
+        const player = getPlayer(pick.element);
+        if (player?.element_type === 1) return false; // Skip GK
+        const playerData = gameweekData[pick.element];
+        return playerData && playerData.minutes > 0;
+      })
+      .sort((a, b) => a.position - b.position);
+
+    for (const benchPick of availableBench) {
+      if (dnpOutfield.length === 0) break;
+
+      const benchPlayer = getPlayer(benchPick.element);
+      if (!benchPlayer) continue;
+
+      for (let i = 0; i < dnpOutfield.length; i++) {
+        const dnpPick = dnpOutfield[i];
+        const dnpPlayer = getPlayer(dnpPick.element);
+        if (!dnpPlayer) continue;
+
+        // Test substitution
+        const testLineup = startingXI.map((pick) => {
+          if (pick.element === dnpPick.element) {
+            return { ...benchPick, position: pick.position };
+          }
+          // Check if this player was already subbed out
+          const alreadySubbed = subs.find((s) => s.outPlayer === pick.element);
+          if (alreadySubbed) {
+            const subInPlayer = subs.find((s) => s.outPlayer === pick.element);
+            if (subInPlayer) {
+              return picksData.picks.find((p) => p.element === subInPlayer.inPlayer) || pick;
+            }
+          }
+          return pick;
+        });
+
+        // Count formation
+        const outfield = testLineup.filter((pick) => pick.position > 1);
+        const defCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 2;
+        }).length;
+        const midCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 3;
+        }).length;
+        const fwdCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 4;
+        }).length;
+
+        // Check formation rules
+        if (defCount >= 3 && midCount >= 3 && fwdCount >= 1) {
+          subs.push({ outPlayer: dnpPick.element, inPlayer: benchPick.element });
+          dnpOutfield.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    setSubstitutions(subs);
+
+    // Trigger animation sequence
+    if (subs.length > 0) {
+      animateSubstitutions(subs);
+    }
+  };
+
+  const animateSubstitutions = (subs: Array<{ outPlayer: number; inPlayer: number }>) => {
+    let currentIndex = 0;
+
+    const animateNext = () => {
+      if (currentIndex < subs.length) {
+        setAnimatingSubstitution(subs[currentIndex]);
+        currentIndex++;
+        setTimeout(animateNext, 1500); // 1.5s per substitution
+      } else {
+        setAnimatingSubstitution(null);
+      }
+    };
+
+    // Start animation after a short delay
+    setTimeout(animateNext, 500);
   };
 
   const getPlayer = (elementId: number) => {
@@ -222,7 +374,12 @@ export default function TeamFormationPopup({
 
         if (gameHasStarted) {
           if (gameweekMinutes > 0) {
-            pointsDisplay = `${gameweekPoints * pick.multiplier}pts`;
+            // Show actual points regardless of multiplier (for bench display)
+            // But indicate captain/vice-captain with multiplier if applicable
+            const displayPoints = pick.multiplier > 0
+              ? gameweekPoints * pick.multiplier
+              : gameweekPoints;
+            pointsDisplay = `${displayPoints}pts`;
             minutesDisplay = `${gameweekMinutes} mins`;
             statusColor =
               gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
@@ -286,6 +443,13 @@ export default function TeamFormationPopup({
     const position = getPosition(player.element_type);
     const stats = getPlayerStats(player, pick);
 
+    // Check if this player is involved in a substitution
+    const isSubbedOut = substitutions.some((s) => s.outPlayer === pick.element);
+    const isSubbedIn = substitutions.some((s) => s.inPlayer === pick.element);
+    const isAnimating = animatingSubstitution &&
+      (animatingSubstitution.outPlayer === pick.element ||
+        animatingSubstitution.inPlayer === pick.element);
+
     return (
       <div
         key={pick.element}
@@ -298,13 +462,29 @@ export default function TeamFormationPopup({
           handlePlayerClick(pick);
         }}
         className={`relative flex flex-col p-1 md:p-3 rounded-lg border-2 transition-all hover:scale-105 hover:shadow-lg cursor-pointer w-16 md:w-24 h-20 md:h-36 ${
-          pick.is_captain
+          isAnimating
+            ? "animate-pulse border-orange-500 bg-orange-50"
+            : isSubbedOut
+            ? "border-red-400 opacity-60"
+            : isSubbedIn
+            ? "border-green-500 bg-green-50"
+            : pick.is_captain
             ? "border-yellow-400"
             : pick.is_vice_captain
             ? "border-yellow-300"
             : "border-green-300"
         }`}
       >
+        {/* Substitution indicator */}
+        {(isSubbedOut || isSubbedIn) && (
+          <div
+            className={`absolute -top-2 -right-2 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center text-white text-xs md:text-sm font-bold z-10 ${
+              isSubbedOut ? "bg-red-500" : "bg-green-500"
+            }`}
+          >
+            {isSubbedOut ? "OUT" : "IN"}
+          </div>
+        )}
         {/* Player Name and Team */}
         <div className="text-center mb-0.5 md:mb-2">
           <h3 className="font-semibold text-[10px] md:text-sm leading-tight">
@@ -645,12 +825,29 @@ export default function TeamFormationPopup({
                 const position = getPosition(player.element_type);
                 const stats = getPlayerStats(player, pick);
 
+                // Check if this bench player is subbed in
+                const isSubbedIn = substitutions.some((s) => s.inPlayer === pick.element);
+                const isAnimating = animatingSubstitution &&
+                  animatingSubstitution.inPlayer === pick.element;
+
                 return (
                   <div
                     key={pick.element}
                     onClick={() => handlePlayerClick(pick)}
-                    className="relative p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg bg-gray-50 border-gray-300"
+                    className={`relative p-3 rounded-lg border cursor-pointer transition-all hover:shadow-lg ${
+                      isAnimating
+                        ? "animate-pulse border-orange-500 bg-orange-50"
+                        : isSubbedIn
+                        ? "bg-green-50 border-green-500"
+                        : "bg-gray-50 border-gray-300"
+                    }`}
                   >
+                    {/* Substitution indicator for bench */}
+                    {isSubbedIn && (
+                      <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold z-10">
+                        IN
+                      </div>
+                    )}
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <h3 className="font-semibold text-sm">
