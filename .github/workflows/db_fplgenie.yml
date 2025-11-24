@@ -29,11 +29,14 @@ jobs:
           npm run build --if-present
           npm run test --if-present
 
+      - name: Zip artifact for deployment
+        run: zip -r node-app.zip . -x "*.git*"
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: . # upload entire project folder
+          path: node-app.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,10 +50,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-          path: ./appfolder # extract into real folder
 
-      - name: Show downloaded files (debug)
-        run: ls -R ./appfolder
+      - name: Unzip artifact
+        run: unzip node-app.zip -d ./appfolder
 
       - name: Login to Azure
         uses: azure/login@v2
