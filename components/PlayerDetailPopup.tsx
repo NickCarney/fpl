@@ -20,6 +20,7 @@ interface PlayerDetailPopupProps {
   onClose: () => void;
   isCaptain?: boolean;
   isViceCaptain?: boolean;
+  currentSquad?: Element[]; // Add current squad to props
 }
 
 export default function PlayerDetailPopup({
@@ -31,12 +32,17 @@ export default function PlayerDetailPopup({
   onClose,
   isCaptain = false,
   isViceCaptain = false,
+  currentSquad = [],
 }: PlayerDetailPopupProps) {
   const [gameweekData, setGameweekData] = useState<PlayerGameweekData | null>(
     null
   );
   const [loadingGameweeks, setLoadingGameweeks] = useState(false);
   const [showGameweeks, setShowGameweeks] = useState(true);
+  const [loadingTransferSuggestions, setLoadingTransferSuggestions] =
+    useState(false);
+  const [transferSuggestions, setTransferSuggestions] = useState<string>("");
+  const [showTransferSuggestions, setShowTransferSuggestions] = useState(false);
 
   // Load gameweek data when popup opens
   useEffect(() => {
@@ -54,6 +60,66 @@ export default function PlayerDetailPopup({
       console.error("Failed to load gameweek data:", error);
     } finally {
       setLoadingGameweeks(false);
+    }
+  };
+
+  const handleSuggestTransfers = async () => {
+    setLoadingTransferSuggestions(true);
+    setShowTransferSuggestions(true);
+    setTransferSuggestions("");
+
+    try {
+      // Get current squad player IDs to exclude from suggestions
+      const currentSquadIds = currentSquad.map((p) => p.id);
+
+      const response = await fetch("/api/transfer-suggestions-player", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          playerId: player.id,
+          playerName: player.web_name,
+          playerPosition: position.singular_name,
+          playerPrice: player.now_cost / 10,
+          playerPoints: player.total_points,
+          playerForm: player.form,
+          currentSquadIds, // Pass current squad IDs
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate transfer suggestions");
+      }
+
+      // Handle streaming response
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("text/plain")) {
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedContent = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedContent += chunk;
+            setTransferSuggestions(accumulatedContent);
+          }
+        }
+      } else {
+        const result = await response.json();
+        setTransferSuggestions(result.analysis || "No suggestions available");
+      }
+    } catch (error) {
+      console.error("Failed to generate transfer suggestions:", error);
+      setTransferSuggestions(
+        "Failed to generate transfer suggestions. Please try again."
+      );
+    } finally {
+      setLoadingTransferSuggestions(false);
     }
   };
 
@@ -164,6 +230,40 @@ export default function PlayerDetailPopup({
             <div className="text-sm ">Selected By</div>
           </div>
         </div>
+
+        {/* Transfer Suggestions Button */}
+        <div className="mb-6 flex justify-center">
+          <button
+            onClick={handleSuggestTransfers}
+            disabled={loadingTransferSuggestions}
+            className="!border-black w-fit px-4 py-3 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingTransferSuggestions
+              ? "Analyzing alternatives..."
+              : "Suggest transfers for this player"}
+          </button>
+        </div>
+
+        {/* Transfer Suggestions Display */}
+        {showTransferSuggestions && (
+          <div className="mb-6 bg-purple-50 rounded-lg p-4 border border-purple-200">
+            <h3 className="text-lg font-semibold mb-3 text-purple-900">
+              Transfer Suggestions for {player.web_name}
+            </h3>
+            {loadingTransferSuggestions ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                <p className="text-purple-700">
+                  Analyzing player alternatives...
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm text-purple-900 whitespace-pre-wrap">
+                {transferSuggestions}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Stats Tables */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

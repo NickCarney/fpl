@@ -1424,6 +1424,7 @@ export default function CurrentSquad({
           onClose={closePopup}
           isCaptain={selectedPlayer.pick.is_captain}
           isViceCaptain={selectedPlayer.pick.is_vice_captain}
+          currentSquad={elements.filter((el) => picks.some((p) => p.element === el.id))}
         />
       )}
 
