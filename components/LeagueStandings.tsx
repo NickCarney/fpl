@@ -44,6 +44,7 @@ export default function LeagueStandings({
   const [updatedStandings, setUpdatedStandings] = useState<LeagueStanding[]>(
     []
   );
+  const [liveGameweekData, setLiveGameweekData] = useState<any>(null);
 
   // Check if user is in the current standings
   const userInStandings = userTeamId
@@ -116,6 +117,111 @@ export default function LeagueStandings({
     selectedTeamIndex !== null ? sortedTeams[selectedTeamIndex] : null;
 
   // Function to sync live standings by fetching actual team picks
+  // Fetch live gameweek data for bonus calculations
+  useEffect(() => {
+    const fetchLiveData = async () => {
+      if (liveStandingsEnabled) {
+        try {
+          const response = await fetch(`/api/event/${currentEvent}/live`);
+          const data = await response.json();
+          setLiveGameweekData(data);
+        } catch (error) {
+          console.error("Error fetching live gameweek data:", error);
+        }
+      }
+    };
+
+    fetchLiveData();
+  }, [liveStandingsEnabled, currentEvent]);
+
+  // Calculate predicted bonus points based on ALL players in each fixture
+  const calculatePredictedBonus = () => {
+    if (!liveGameweekData || !liveGameweekData.elements) {
+      return {};
+    }
+
+    const bonusPredictions: { [playerId: number]: number } = {};
+
+    // Group ALL players in the game by fixture (not just team's players)
+    const fixtureGroups: { [fixtureId: number]: Array<{ id: number; bps: number; bonus: number; minutes: number }> } = {};
+    const fixtureHasBonus: { [fixtureId: number]: boolean } = {};
+
+    // Build fixture groups from ALL players in the live data
+    liveGameweekData.elements.forEach((playerLiveData: any) => {
+      if (playerLiveData.explain && playerLiveData.explain.length > 0) {
+        const fixtureId = playerLiveData.explain[0].fixture;
+        const bps = playerLiveData.stats.bps || 0;
+        const bonus = playerLiveData.stats.bonus || 0;
+        const minutes = playerLiveData.stats.minutes || 0;
+
+        // Track if any player in this fixture has bonus awarded
+        if (bonus > 0) {
+          fixtureHasBonus[fixtureId] = true;
+        }
+
+        // Collect all players who played (we'll filter later)
+        if (minutes > 0) {
+          if (!fixtureGroups[fixtureId]) {
+            fixtureGroups[fixtureId] = [];
+          }
+          fixtureGroups[fixtureId].push({
+            id: playerLiveData.id,
+            bps,
+            bonus,
+            minutes
+          });
+        }
+      }
+    });
+
+    // Calculate bonus for each fixture - only if bonus hasn't been awarded yet
+    Object.entries(fixtureGroups).forEach(([fixtureId, players]) => {
+      // Skip this fixture if bonus has already been awarded
+      if (fixtureHasBonus[Number(fixtureId)]) {
+        return;
+      }
+      // Sort by BPS descending
+      const sortedPlayers = players.sort((a, b) => b.bps - a.bps);
+
+      if (sortedPlayers.length === 0) return;
+
+      // Find top BPS value(s) - 3 bonus points
+      const topBPS = sortedPlayers[0].bps;
+      if (topBPS === 0) return; // No bonus if no BPS
+
+      const topPlayers = sortedPlayers.filter(p => p.bps === topBPS);
+      topPlayers.forEach(p => {
+        bonusPredictions[p.id] = 3;
+      });
+
+      // Find second highest BPS value(s) - 2 bonus points
+      const remainingAfterTop = sortedPlayers.filter(p => p.bps < topBPS);
+      if (remainingAfterTop.length > 0) {
+        const secondBPS = remainingAfterTop[0].bps;
+        if (secondBPS > 0) {
+          const secondPlayers = remainingAfterTop.filter(p => p.bps === secondBPS);
+          secondPlayers.forEach(p => {
+            bonusPredictions[p.id] = 2;
+          });
+
+          // Find third highest BPS value(s) - 1 bonus point
+          const remainingAfterSecond = remainingAfterTop.filter(p => p.bps < secondBPS);
+          if (remainingAfterSecond.length > 0) {
+            const thirdBPS = remainingAfterSecond[0].bps;
+            if (thirdBPS > 0) {
+              const thirdPlayers = remainingAfterSecond.filter(p => p.bps === thirdBPS);
+              thirdPlayers.forEach(p => {
+                bonusPredictions[p.id] = 1;
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return bonusPredictions;
+  };
+
   const syncLiveStandings = async () => {
     setLiveStandingsLoading(true);
     try {
@@ -140,6 +246,9 @@ export default function LeagueStandings({
             const isBenchBoost = picksData.active_chip === "bboost";
 
             if (picksData.picks) {
+              // Calculate bonus predictions based on ALL players in the game
+              const bonusPredictions = calculatePredictedBonus();
+
               // Fetch all player data (starting XI + bench) in parallel
               const allPlayerData = await Promise.all(
                 picksData.picks.map(async (pick: any) => {
@@ -193,7 +302,9 @@ export default function LeagueStandings({
                     if (data!.gwData) {
                       // Use multiplier if > 0, otherwise use 1 (for bench players)
                       const multiplier = data!.pick.multiplier > 0 ? data!.pick.multiplier : 1;
-                      return sum + data!.gwData.total_points * multiplier;
+                      const currentBonus = data!.gwData.bonus || 0;
+                      const predictedBonus = (currentBonus === 0) ? (bonusPredictions[data!.pick.element] || 0) : 0;
+                      return sum + (data!.gwData.total_points + predictedBonus) * multiplier;
                     }
                     return sum;
                   }, 0);
@@ -280,7 +391,9 @@ export default function LeagueStandings({
                   if (data.gwData) {
                     // Use multiplier if > 0, otherwise use 1 (for subbed-in players from bench)
                     const multiplier = data.pick.multiplier > 0 ? data.pick.multiplier : 1;
-                    return sum + data.gwData.total_points * multiplier;
+                    const currentBonus = data.gwData.bonus || 0;
+                    const predictedBonus = (currentBonus === 0) ? (bonusPredictions[data.pick.element] || 0) : 0;
+                    return sum + (data.gwData.total_points + predictedBonus) * multiplier;
                   }
                   return sum;
                 }, 0);

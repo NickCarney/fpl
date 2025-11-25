@@ -70,6 +70,8 @@ export default function CurrentSquad({
   const [liveBenchPoints, setLiveBenchPoints] = useState<number | null>(null);
   const [liveTotalPoints, setLiveTotalPoints] = useState<number | null>(null);
   const [displayPicks, setDisplayPicks] = useState<Pick[]>([]);
+  const [liveGameweekData, setLiveGameweekData] = useState<any>(null);
+  const [predictedBonus, setPredictedBonus] = useState<{ [playerId: number]: number }>({});
 
   // Add function to fetch gameweek data for a player
   const fetchPlayerGameweekData = async (playerId: number) => {
@@ -138,6 +140,23 @@ export default function CurrentSquad({
     setDisplayPicks([...picks]);
   }, [picks]);
 
+  // Fetch live gameweek data for bonus calculations
+  useEffect(() => {
+    const fetchLiveData = async () => {
+      if (liveStandingsEnabled) {
+        try {
+          const response = await fetch(`/api/event/${currentEvent}/live`);
+          const data = await response.json();
+          setLiveGameweekData(data);
+        } catch (error) {
+          console.error("Error fetching live gameweek data:", error);
+        }
+      }
+    };
+
+    fetchLiveData();
+  }, [liveStandingsEnabled, currentEvent]);
+
   // Recalculate substitutions when gameweek data or live standings changes
   useEffect(() => {
     if (
@@ -152,8 +171,9 @@ export default function CurrentSquad({
       setLiveBenchPoints(null);
       setLiveTotalPoints(null);
       setDisplayPicks([...picks]);
+      setPredictedBonus({});
     }
-  }, [liveStandingsEnabled, gameweekData, picks]);
+  }, [liveStandingsEnabled, gameweekData, picks, liveGameweekData]);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -190,11 +210,21 @@ export default function CurrentSquad({
           if (gameweekMinutes > 0) {
             // Show actual points regardless of multiplier (for bench display)
             // But indicate captain/vice-captain with multiplier if applicable
+            const currentBonus = playerGameweekData.bonus || 0;
+            const predictedBonusPoints = (currentBonus === 0) ? (predictedBonus[player.id] || 0) : 0;
+            const pointsWithBonus = gameweekPoints + predictedBonusPoints;
             const displayPoints =
               pick.multiplier > 0
-                ? gameweekPoints * pick.multiplier
-                : gameweekPoints;
-            pointsDisplay = `${displayPoints}pts`;
+                ? pointsWithBonus * pick.multiplier
+                : pointsWithBonus;
+
+            // Show predicted bonus separately if applicable
+            if (liveStandingsEnabled && predictedBonusPoints > 0) {
+              pointsDisplay = `${displayPoints}pts (+${predictedBonusPoints}*)`;
+            } else {
+              pointsDisplay = `${displayPoints}pts`;
+            }
+
             minutesDisplay = `${gameweekMinutes} mins`;
             statusColor =
               gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
@@ -248,6 +278,94 @@ export default function CurrentSquad({
         ppg: player.points_per_game,
       };
     }
+  };
+
+  // Calculate predicted bonus points for players who played but haven't received bonus yet
+  const calculatePredictedBonus = () => {
+    if (!liveGameweekData || !liveGameweekData.elements) {
+      return {};
+    }
+
+    const bonusPredictions: { [playerId: number]: number } = {};
+
+    // Group ALL players in the game by fixture (not just our picks)
+    const fixtureGroups: { [fixtureId: number]: Array<{ id: number; bps: number; bonus: number; minutes: number }> } = {};
+    const fixtureHasBonus: { [fixtureId: number]: boolean } = {};
+
+    // Build fixture groups from ALL players in the live data
+    liveGameweekData.elements.forEach((playerLiveData: any) => {
+      if (playerLiveData.explain && playerLiveData.explain.length > 0) {
+        const fixtureId = playerLiveData.explain[0].fixture;
+        const bps = playerLiveData.stats.bps || 0;
+        const bonus = playerLiveData.stats.bonus || 0;
+        const minutes = playerLiveData.stats.minutes || 0;
+
+        // Track if any player in this fixture has bonus awarded
+        if (bonus > 0) {
+          fixtureHasBonus[fixtureId] = true;
+        }
+
+        // Collect all players who played (we'll filter later)
+        if (minutes > 0) {
+          if (!fixtureGroups[fixtureId]) {
+            fixtureGroups[fixtureId] = [];
+          }
+          fixtureGroups[fixtureId].push({
+            id: playerLiveData.id,
+            bps,
+            bonus,
+            minutes
+          });
+        }
+      }
+    });
+
+    // Calculate bonus for each fixture - only if bonus hasn't been awarded yet
+    Object.entries(fixtureGroups).forEach(([fixtureId, players]) => {
+      // Skip this fixture if bonus has already been awarded
+      if (fixtureHasBonus[Number(fixtureId)]) {
+        return;
+      }
+      // Sort by BPS descending
+      const sortedPlayers = players.sort((a, b) => b.bps - a.bps);
+
+      if (sortedPlayers.length === 0) return;
+
+      // Find top BPS value(s) - 3 bonus points
+      const topBPS = sortedPlayers[0].bps;
+      if (topBPS === 0) return; // No bonus if no BPS
+
+      const topPlayers = sortedPlayers.filter(p => p.bps === topBPS);
+      topPlayers.forEach(p => {
+        bonusPredictions[p.id] = 3;
+      });
+
+      // Find second highest BPS value(s) - 2 bonus points
+      const remainingAfterTop = sortedPlayers.filter(p => p.bps < topBPS);
+      if (remainingAfterTop.length > 0) {
+        const secondBPS = remainingAfterTop[0].bps;
+        if (secondBPS > 0) {
+          const secondPlayers = remainingAfterTop.filter(p => p.bps === secondBPS);
+          secondPlayers.forEach(p => {
+            bonusPredictions[p.id] = 2;
+          });
+
+          // Find third highest BPS value(s) - 1 bonus point
+          const remainingAfterSecond = remainingAfterTop.filter(p => p.bps < secondBPS);
+          if (remainingAfterSecond.length > 0) {
+            const thirdBPS = remainingAfterSecond[0].bps;
+            if (thirdBPS > 0) {
+              const thirdPlayers = remainingAfterSecond.filter(p => p.bps === thirdBPS);
+              thirdPlayers.forEach(p => {
+                bonusPredictions[p.id] = 1;
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return bonusPredictions;
   };
 
   // Calculate substitutions based on DNP players
@@ -358,8 +476,12 @@ export default function CurrentSquad({
 
     setSubstitutions(subs);
 
+    // Calculate predicted bonus points
+    const bonusPredictions = calculatePredictedBonus();
+    setPredictedBonus(bonusPredictions);
+
     // Calculate live points with substitutions
-    calculateLivePoints(subs, isBenchBoost);
+    calculateLivePoints(subs, isBenchBoost, bonusPredictions);
 
     // Trigger animation sequence
     if (subs.length > 0) {
@@ -369,7 +491,8 @@ export default function CurrentSquad({
 
   const calculateLivePoints = (
     subs: Array<{ outPlayer: number; inPlayer: number }>,
-    isBenchBoost: boolean
+    isBenchBoost: boolean,
+    bonusPredictions: { [playerId: number]: number }
   ) => {
     let starterPoints = 0;
     let benchPoints = 0;
@@ -380,7 +503,9 @@ export default function CurrentSquad({
         const playerData = gameweekData[pick.element];
         if (playerData) {
           const multiplier = pick.multiplier > 0 ? pick.multiplier : 1;
-          starterPoints += playerData.total_points * multiplier;
+          const currentBonus = playerData.bonus || 0;
+          const predictedBonus = (currentBonus === 0) ? (bonusPredictions[pick.element] || 0) : 0;
+          starterPoints += (playerData.total_points + predictedBonus) * multiplier;
         }
       });
       benchPoints = 0; // No separate bench for bench boost
@@ -417,7 +542,9 @@ export default function CurrentSquad({
           const playerData = gameweekData[pick.element];
           if (playerData) {
             const multiplier = pick.multiplier > 0 ? pick.multiplier : 1;
-            starterPoints += playerData.total_points * multiplier;
+            const currentBonus = playerData.bonus || 0;
+            const predictedBonus = (currentBonus === 0) ? (bonusPredictions[pick.element] || 0) : 0;
+            starterPoints += (playerData.total_points + predictedBonus) * multiplier;
           }
         }
       });
@@ -427,7 +554,9 @@ export default function CurrentSquad({
         if (finalBenchIds.has(pick.element)) {
           const playerData = gameweekData[pick.element];
           if (playerData) {
-            benchPoints += playerData.total_points; // No multiplier for bench
+            const currentBonus = playerData.bonus || 0;
+            const predictedBonus = (currentBonus === 0) ? (bonusPredictions[pick.element] || 0) : 0;
+            benchPoints += playerData.total_points + predictedBonus; // No multiplier for bench
           }
         }
       });
@@ -860,10 +989,17 @@ export default function CurrentSquad({
       // Extract numeric points or pass the string if it's YTP/DNP
       let pointsValue: number | string = stats.points;
 
-      // If stats.points is a string like "7pts", extract the number
-      if (typeof stats.points === "string" && stats.points.endsWith("pts")) {
-        const numericPoints = parseInt(stats.points.replace("pts", ""));
-        pointsValue = isNaN(numericPoints) ? stats.points : numericPoints;
+      // If stats.points is a string like "7pts" or "7pts (+3*)", extract the number
+      if (typeof stats.points === "string") {
+        if (stats.points === "YTP" || stats.points === "DNP") {
+          pointsValue = stats.points;
+        } else if (stats.points.includes("pts")) {
+          // Extract just the first number before "pts"
+          const match = stats.points.match(/^(\d+)pts/);
+          if (match) {
+            pointsValue = parseInt(match[1]);
+          }
+        }
       }
 
       setPointsBreakdownPlayer({

@@ -88,7 +88,7 @@ export default function PointsBreakdownModal({
           details.push({
             label: "Did Not Play",
             points: 0,
-            description: "Did not play this gameweek" + gameweek + gameweekData,
+            description: `Did not play in gameweek ${gameweek}`,
           });
         }
 
