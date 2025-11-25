@@ -72,6 +72,7 @@ export default function CurrentSquad({
   const [displayPicks, setDisplayPicks] = useState<Pick[]>([]);
   const [liveGameweekData, setLiveGameweekData] = useState<any>(null);
   const [predictedBonus, setPredictedBonus] = useState<{ [playerId: number]: number }>({});
+  const [hasAnimated, setHasAnimated] = useState(false);
 
   // Add function to fetch gameweek data for a player
   const fetchPlayerGameweekData = async (playerId: number) => {
@@ -135,10 +136,12 @@ export default function CurrentSquad({
     }
   }, [picks, currentEvent]);
 
-  // Sync displayPicks with picks
+  // Sync displayPicks with picks only when live standings is disabled
   useEffect(() => {
-    setDisplayPicks([...picks]);
-  }, [picks]);
+    if (!liveStandingsEnabled) {
+      setDisplayPicks([...picks]);
+    }
+  }, [picks, liveStandingsEnabled]);
 
   // Fetch live gameweek data for bonus calculations
   useEffect(() => {
@@ -157,23 +160,26 @@ export default function CurrentSquad({
     fetchLiveData();
   }, [liveStandingsEnabled, currentEvent]);
 
-  // Recalculate substitutions when gameweek data or live standings changes
+  // Trigger substitution calculation when live data is ready
   useEffect(() => {
     if (
       liveStandingsEnabled &&
       Object.keys(gameweekData).length > 0 &&
-      picks.length > 0
+      picks.length > 0 &&
+      liveGameweekData &&
+      !hasAnimated // Only calculate once when data is ready
     ) {
       calculateSubstitutions();
-    } else {
+    } else if (!liveStandingsEnabled) {
       setSubstitutions([]);
       setLivePoints(null);
       setLiveBenchPoints(null);
       setLiveTotalPoints(null);
       setDisplayPicks([...picks]);
       setPredictedBonus({});
+      setHasAnimated(false);
     }
-  }, [liveStandingsEnabled, gameweekData, picks, liveGameweekData]);
+  }, [liveStandingsEnabled, gameweekData, picks, liveGameweekData, hasAnimated]);
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -483,8 +489,9 @@ export default function CurrentSquad({
     // Calculate live points with substitutions
     calculateLivePoints(subs, isBenchBoost, bonusPredictions);
 
-    // Trigger animation sequence
-    if (subs.length > 0) {
+    // Trigger animation sequence only once
+    if (subs.length > 0 && !hasAnimated) {
+      setHasAnimated(true);
       animateSubstitutions(subs);
     }
   };
