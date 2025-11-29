@@ -268,11 +268,29 @@ export default function LeagueStandings({
                       (el) => el.id === pick.element
                     );
 
+                    // A player "did not play" (DNP) only if:
+                    // 1. Their game has kicked off (kickoff_time has passed)
+                    // 2. AND they got 0 minutes
+                    // If game hasn't kicked off yet, the player is yet to play (YTP), not DNP
+                    let didNotPlay = false;
+                    let fixtureHasBeenPlayed = false;
+
+                    if (gwData && gwData.kickoff_time) {
+                      const kickoffTime = new Date(gwData.kickoff_time);
+                      const currentTime = new Date();
+                      const gameHasStarted = currentTime >= kickoffTime;
+
+                      fixtureHasBeenPlayed = gameHasStarted;
+                      // Only DNP if game has started AND player got 0 minutes
+                      didNotPlay = gameHasStarted && gwData.minutes === 0;
+                    }
+
                     return {
                       pick,
                       gwData,
                       elementType: playerInfo?.element_type,
-                      didNotPlay: gwData ? gwData.minutes === 0 : true,
+                      didNotPlay,
+                      fixtureHasBeenPlayed,
                     };
                   } catch (error) {
                     console.error(
@@ -402,14 +420,17 @@ export default function LeagueStandings({
 
             // Check if the score differs from what's in the table
             if (actualGwScore !== standing.event_total) {
+              const scoreDifference = actualGwScore - standing.event_total;
+              const newTotal = standing.total + scoreDifference;
+
               console.log(
-                `Score mismatch for ${standing.entry_name}: Table shows ${standing.event_total}, actual is ${actualGwScore}`
+                `Score mismatch for ${standing.entry_name}: Table shows ${standing.event_total}, actual is ${actualGwScore}, Total: ${standing.total} -> ${newTotal} (diff: ${scoreDifference >= 0 ? '+' : ''}${scoreDifference})`
               );
 
-              // Return updated standing with corrected score
+              // Return updated standing with corrected score and recalculated total
               return {
                 ...standing,
-                total: standing.total + actualGwScore - standing.event_total,
+                total: newTotal,
                 event_total: actualGwScore,
               };
             }

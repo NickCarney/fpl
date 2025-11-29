@@ -393,38 +393,65 @@ export default function CurrentSquad({
 
     const subs: Array<{ outPlayer: number; inPlayer: number }> = [];
 
+    // Helper function to check if a player is DNP (not YTP)
+    const isPlayerDNP = (elementId: number): boolean => {
+      const playerData = gameweekData[elementId];
+      if (!playerData) return false;
+
+      // A player "did not play" (DNP) only if:
+      // 1. Their game has kicked off (kickoff_time has passed)
+      // 2. AND they got 0 minutes
+      // If game hasn't kicked off yet, the player is yet to play (YTP), not DNP
+      if (!playerData.kickoff_time) return false; // No kickoff time = YTP
+
+      const kickoffTime = new Date(playerData.kickoff_time);
+      const currentTime = new Date();
+      const gameHasStarted = currentTime >= kickoffTime;
+
+      // Only DNP if game has started AND player got 0 minutes
+      return gameHasStarted && playerData.minutes === 0;
+    };
+
+    // Helper function to check if a player has played (for bench players)
+    const hasPlayerPlayed = (elementId: number): boolean => {
+      const playerData = gameweekData[elementId];
+      if (!playerData) return false;
+
+      // Player has played if their game has kicked off and they got minutes
+      if (!playerData.kickoff_time) return false; // No kickoff time = hasn't played yet
+
+      const kickoffTime = new Date(playerData.kickoff_time);
+      const currentTime = new Date();
+      const gameHasStarted = currentTime >= kickoffTime;
+
+      // Only counts as "played" if game has started AND player got minutes
+      return gameHasStarted && playerData.minutes > 0;
+    };
+
     // Check for DNP players and valid substitutions
     // GK substitution
     const gk = startingXI.find((pick) => pick.position === 1);
-    if (gk) {
-      const gkData = gameweekData[gk.element];
-      if (gkData && gkData.minutes === 0) {
-        const backupGK = bench.find((pick) => {
-          const player = getPlayer(pick.element);
-          return player?.element_type === 1;
-        });
-        if (backupGK) {
-          const backupGKData = gameweekData[backupGK.element];
-          if (backupGKData && backupGKData.minutes > 0) {
-            subs.push({ outPlayer: gk.element, inPlayer: backupGK.element });
-          }
-        }
+    if (gk && isPlayerDNP(gk.element)) {
+      const backupGK = bench.find((pick) => {
+        const player = getPlayer(pick.element);
+        return player?.element_type === 1;
+      });
+      if (backupGK && hasPlayerPlayed(backupGK.element)) {
+        subs.push({ outPlayer: gk.element, inPlayer: backupGK.element });
       }
     }
 
     // Outfield substitutions
     const dnpOutfield = startingXI.filter((pick) => {
       if (pick.position === 1) return false; // Skip GK
-      const playerData = gameweekData[pick.element];
-      return playerData && playerData.minutes === 0;
+      return isPlayerDNP(pick.element);
     });
 
     const availableBench = bench
       .filter((pick) => {
         const player = getPlayer(pick.element);
         if (player?.element_type === 1) return false; // Skip GK
-        const playerData = gameweekData[pick.element];
-        return playerData && playerData.minutes > 0;
+        return hasPlayerPlayed(pick.element);
       })
       .sort((a, b) => a.position - b.position);
 
