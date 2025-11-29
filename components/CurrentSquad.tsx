@@ -20,6 +20,8 @@ interface CurrentSquadProps {
   currentEvent: number;
   events: Event[];
   teamPicks?: any; // Full team picks data including entry history
+  teamHistory?: any; // Team history with weekly scores
+  userLeagues?: any[]; // User's leagues with rankings
 }
 
 export default function CurrentSquad({
@@ -30,6 +32,8 @@ export default function CurrentSquad({
   currentEvent,
   events,
   teamPicks,
+  teamHistory,
+  userLeagues,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
   const [manualStarterPoints, setManualStarterPoints] = useState(0);
@@ -1909,6 +1913,9 @@ export default function CurrentSquad({
           currentEvent={currentEvent}
           totalPoints={pointsBreakdown.total}
           events={events}
+          teamPicks={teamPicks}
+          teamHistory={teamHistory}
+          userLeagues={userLeagues}
         />
       </div>
 

@@ -12,6 +12,9 @@ interface TeamInsightsProps {
   currentEvent: number;
   totalPoints: number;
   events: Event[];
+  teamPicks?: any;
+  teamHistory?: any;
+  userLeagues?: any[];
 }
 
 export default function TeamInsights({
@@ -22,6 +25,9 @@ export default function TeamInsights({
   currentEvent,
   totalPoints,
   events,
+  teamPicks,
+  teamHistory,
+  userLeagues,
 }: TeamInsightsProps) {
   const [insights, setInsights] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -30,6 +36,8 @@ export default function TeamInsights({
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [streamedContent, setStreamedContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [grade, setGrade] = useState<number | null>(null);
+  const [gradeDescription, setGradeDescription] = useState<string>("");
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -80,6 +88,10 @@ export default function TeamInsights({
         squadValue:
           squadData.reduce((sum, p) => sum + (p?.now_cost || 0), 0) / 10,
         currentGameweek: currentEvent,
+        overallRank: teamPicks?.entry_history?.overall_rank,
+        gameweekRank: teamPicks?.entry_history?.rank,
+        teamValue: teamPicks?.entry_history?.value,
+        bank: teamPicks?.entry_history?.bank,
       };
 
       // Make streaming request
@@ -95,6 +107,8 @@ export default function TeamInsights({
           gameweekFinished,
           fixtures,
           elements,
+          teamHistory,
+          userLeagues,
         }),
       });
 
@@ -102,10 +116,18 @@ export default function TeamInsights({
         throw new Error("Failed to generate insights");
       }
 
-      // Check if it's a streaming response
+      // Check if it's a streaming response or JSON with grade
       const contentType = response.headers.get("content-type");
-      if (contentType?.includes("text/plain")) {
-        // Handle streaming response
+      if (contentType?.includes("application/json")) {
+        // Handle JSON response with grade
+        const result = await response.json();
+        setGrade(result.grade || null);
+        setGradeDescription(result.gradeDescription || "");
+        setInsights(result.insights || "");
+        setIsFallback(result.fallback || false);
+        setStreamedContent(result.insights || "");
+      } else if (contentType?.includes("text/plain")) {
+        // Handle streaming response (legacy, no grade)
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let accumulatedContent = "";
@@ -123,12 +145,6 @@ export default function TeamInsights({
 
         setInsights(accumulatedContent);
         setIsFallback(false);
-      } else {
-        // Handle regular JSON response (fallback)
-        const result = await response.json();
-        setInsights(result.insights);
-        setIsFallback(result.fallback || false);
-        setStreamedContent(result.insights);
       }
     } catch (err) {
       console.error("Failed to generate insights:", err);
@@ -181,19 +197,22 @@ export default function TeamInsights({
         className="flex justify-between items-center p-4 cursor-pointer rounded-t-lg transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          Team Insights
-          {isFallback && (
-            <span className="text-xs text-yellow-800 px-2 py-1 rounded">
-              Basic Mode
-            </span>
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            Rate my team
+            {isFallback && (
+              <span className="text-xs text-yellow-800 px-2 py-1 rounded">
+                Basic Mode
+              </span>
+            )}
+          </h3>
+          {grade !== null && (
+            <div className="text-3xl font-bold text-blue-700">
+              {grade}
+              <span className="text-sm text-gray-600">/100</span>
+            </div>
           )}
-          {/* {isStreaming && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded animate-pulse">
-              Streaming...
-            </span>
-          )} */}
-        </h3>
+        </div>
         <div className="flex items-center gap-2">
           {!isCollapsed && (
             <button
@@ -207,8 +226,8 @@ export default function TeamInsights({
               {loading
                 ? "Analyzing..."
                 : insights
-                ? "New Analysis"
-                : "Analyze Squad"}
+                ? "Re-rate Team"
+                : "Rate My Team"}
             </button>
           )}
           <button className="hover:bg-green-300 p-1 rounded">
@@ -219,20 +238,16 @@ export default function TeamInsights({
 
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          {/* {loading && (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-              <p className="">
-                {isStreaming
-                  ? "Streaming analysis..."
-                  : "Analyzing your team..."}
-              </p>
-            </div>
-          )} */}
-
           {error && (
             <div className="border border-red-200 rounded-md p-4">
               <p className="text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Grade Description */}
+          {gradeDescription && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-gray-800">{gradeDescription}</p>
             </div>
           )}
 
@@ -255,13 +270,13 @@ export default function TeamInsights({
           {!insights && !streamedContent && !loading && (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">
-                Get AI-powered insights about your team&apos;s strengths, weaknesses, and performance
+                Get your team rated based on weekly performance vs average, personal league rankings, and overall rank
               </p>
               <button
                 onClick={generateInsights}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
-                Analyze My Squad
+                Rate My Team
               </button>
             </div>
           )}

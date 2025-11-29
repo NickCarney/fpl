@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { ragCache } from "@/lib/rag-cache";
 import { RAG_CONFIG } from "@/lib/rag-config";
+import { calculateTeamGrade, getGradeDescription } from "./grading";
 
 export async function POST(request: NextRequest) {
   const openai = new OpenAI({
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest) {
       gameweekFinished,
       fixtures,
       elements,
+      teamHistory,
+      userLeagues,
     } = body;
 
     if (!teamData || !squadData) {
@@ -24,6 +27,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Calculate team grade
+    const { grade, breakdown } = await calculateTeamGrade(
+      teamData,
+      squadData,
+      currentGameweek,
+      teamHistory,
+      userLeagues
+    );
+    const gradeDescription = getGradeDescription(grade);
 
     try {
       // Fetch RAG data for enhanced analysis with caching
@@ -190,18 +203,24 @@ ${
       }
 
       const prompt = `
-You are an expert Fantasy Premier League analyst with access to comprehensive data. Analyze this team and provide 4-5 specific, actionable insights.
+You are an expert Fantasy Premier League analyst. This team has been rated ${grade}/100. Provide 4-5 specific team insights that explain and support this rating.
 
-IMPORTANT CONTEXT: ${gameweekStatusText}
+TEAM RATING: ${grade}/100
+${gradeDescription}
+
+RATING BREAKDOWN (use these EXACT scores in your section headers):
+${JSON.stringify(breakdown, null, 2)}
+
+CONTEXT: ${gameweekStatusText}
 ${ragContext}
 ${externalContext}
 
 Team Overview:
 - Total Points: ${teamData.totalPoints}
+- Overall Rank: ${teamData.overallRank ? `#${teamData.overallRank.toLocaleString()}` : 'N/A'}
+- Team Value: ${teamData.teamValue ? `£${(teamData.teamValue / 10).toFixed(1)}m` : 'N/A'}
+- Bank: ${teamData.bank ? `£${(teamData.bank / 10).toFixed(1)}m` : 'N/A'}
 - Current Gameweek: ${currentGameweek}
-- Squad Value: £${squadData
-        .reduce((sum: number, p: any) => sum + p.now_cost / 10, 0)
-        .toFixed(1)}m
 
 Squad Details:
 ${squadWithFixtures
@@ -215,25 +234,40 @@ ${squadWithFixtures
   )
   .join("\n")}
 
-Provide data-driven insights about:
-1. **Performance vs Position Benchmarks**: Compare players to position averages and identify over/underperformers
-2. **Transfer Market Analysis**: Highlight alignment with market trends and potential value moves
-3. **Captaincy & Lineup Strategy**: Evaluate choices against expert consensus and upcoming fixtures
-4. **Value & Budget Optimization**: Suggest improvements based on price trends and position efficiency
-5. **Differential Opportunities**: Identify low-owned gems based on the data
+Provide insights that explain the ${grade}/100 rating:
+
+IMPORTANT: The overall grade of ${grade}/100 comes from these components:
+- Weekly Performance: ${breakdown.weeklyPerformance?.score || 'N/A'}/${breakdown.weeklyPerformance?.max || 35} points
+- Private League Standings: ${breakdown.privateLeagues?.score || 'N/A'}/${breakdown.privateLeagues?.max || 30} points
+- Overall Rank: ${breakdown.overallRank?.score || 'N/A'}/${breakdown.overallRank?.max || 15} points
+- Team Value: ${breakdown.teamValue?.score || 'N/A'}/${breakdown.teamValue?.max || 10} points
+- Recent Form: ${breakdown.recentForm?.score || 'N/A'}/${breakdown.recentForm?.max || 10} points
+
+Create 4-5 insights using these EXACT section headers with INDIVIDUAL scores:
+1. **Weekly Performance (${breakdown.weeklyPerformance?.score || 'N/A'}/${breakdown.weeklyPerformance?.max || 35})**: Explain weekly performance vs averages
+2. **Private League Standings (${breakdown.privateLeagues?.score || 'N/A'}/${breakdown.privateLeagues?.max || 30})**: Explain private league performance
+3. **Key Strengths**: What's driving the strong rating components
+4. **Areas for Improvement**: What's limiting the grade
+5. **Strategic Recommendations**: Specific actions to improve
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Copy the EXACT section headers above with their individual component scores
+- For example: "Weekly Performance (30.2/35)" NOT "Weekly Performance (${grade}/100)"
+- For example: "Private League Standings (30.0/30)" NOT "Private League Standings (${grade}/100)"
+- Sections 3-5 should have NO score in the header (just the title)
 
 Requirements:
-- Reference specific benchmark data when available
-- Mention transfer trends and expert picks where relevant
-- If a player shows "[NOT PLAYED YET THIS GW]", focus on season form and upcoming fixtures
-- Be specific with numbers (points, prices, percentages)
-- Prioritize actionable insights over general observations
+- Directly reference the grade and rating factors
+- Be specific with player names and numbers
+- Each insight should be 2-3 sentences
+- Focus on actionable advice
+- Use expert FPL terminology
 
-Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
+Format as bullet points with section headers.
 `;
 
-      // Create streaming response
-      const stream = await openai.chat.completions.create({
+      // Create completion (non-streaming)
+      const completion = await openai.chat.completions.create({
         model: RAG_CONFIG.openAI.model,
         messages: [
           {
@@ -245,37 +279,20 @@ Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
             content: prompt,
           },
         ],
-        stream: true,
         max_completion_tokens: RAG_CONFIG.openAI.maxTokens,
-        // Note: GPT-5 nano only supports default temperature (1)
         ...(RAG_CONFIG.openAI.reasoning_effort && {
           reasoning_effort: RAG_CONFIG.openAI.reasoning_effort,
         }),
       });
 
-      // Create a ReadableStream to handle the OpenAI stream
-      const readableStream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const chunk of stream) {
-              const content = chunk.choices[0]?.delta?.content || "";
-              if (content) {
-                controller.enqueue(new TextEncoder().encode(content));
-              }
-            }
-            controller.close();
-          } catch (error) {
-            controller.error(error);
-          }
-        },
-      });
+      const insights = completion.choices[0]?.message?.content || "";
 
-      return new Response(readableStream, {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-        },
+      return NextResponse.json({
+        grade,
+        gradeDescription,
+        insights,
+        breakdown,
+        fallback: false,
       });
     } catch (aiError) {
       console.error("Error with OpenAI analysis:", aiError);
@@ -283,14 +300,17 @@ Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
       // Enhanced fallback insights with basic data
       const fallbackInsights = `
 **Team Analysis** (Basic Mode)
-• Your squad is performing at the current level for gameweek ${currentGameweek}
+• Your team has been rated ${grade}/100 based on performance metrics
 • Monitor players with consistently low minutes for potential rotation risks
 • Consider fixture difficulty and form trends when making transfer decisions
 • Review your captaincy choice based on upcoming opponents and recent performance
-• Note: Some players may not have played this gameweek - check fixtures before transfers`;
+• Focus on beating weekly averages to improve your rating`;
 
       return NextResponse.json({
+        grade,
+        gradeDescription,
         insights: fallbackInsights.trim(),
+        breakdown,
         fallback: true,
       });
     }
