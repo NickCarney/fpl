@@ -226,6 +226,10 @@ async function upsertPlayers(pool, players) {
         .input('threat', sql.Decimal(10, 2), parseFloat(player.threat) || 0)
         .input('ict_index', sql.Decimal(10, 2), parseFloat(player.ict_index) || 0)
         .input('starts', sql.Int, player.starts || 0)
+        .input('clearances_blocks_interceptions', sql.Int, player.clearances_blocks_interceptions || 0)
+        .input('recoveries', sql.Int, player.recoveries || 0)
+        .input('tackles', sql.Int, player.tackles || 0)
+        .input('defensive_contribution', sql.Int, player.defensive_contribution || 0)
         .input('influence_rank', sql.Int, player.influence_rank)
         .input('influence_rank_type', sql.Int, player.influence_rank_type)
         .input('creativity_rank', sql.Int, player.creativity_rank)
@@ -264,6 +268,8 @@ async function upsertPlayers(pool, players) {
               expected_assists = @expected_assists, expected_goal_involvements = @expected_goal_involvements,
               expected_goals_conceded = @expected_goals_conceded, influence = @influence,
               creativity = @creativity, threat = @threat, ict_index = @ict_index, starts = @starts,
+              clearances_blocks_interceptions = @clearances_blocks_interceptions, recoveries = @recoveries,
+              tackles = @tackles, defensive_contribution = @defensive_contribution,
               influence_rank = @influence_rank, influence_rank_type = @influence_rank_type,
               creativity_rank = @creativity_rank, creativity_rank_type = @creativity_rank_type,
               threat_rank = @threat_rank, threat_rank_type = @threat_rank_type,
@@ -282,8 +288,9 @@ async function upsertPlayers(pool, players) {
                     goals_scored, assists, clean_sheets, goals_conceded, own_goals, penalties_saved,
                     penalties_missed, yellow_cards, red_cards, saves, bonus, bps, expected_goals,
                     expected_assists, expected_goal_involvements, expected_goals_conceded,
-                    influence, creativity, threat, ict_index, starts, influence_rank,
-                    influence_rank_type, creativity_rank, creativity_rank_type, threat_rank,
+                    influence, creativity, threat, ict_index, starts,
+                    clearances_blocks_interceptions, recoveries, tackles, defensive_contribution,
+                    influence_rank, influence_rank_type, creativity_rank, creativity_rank_type, threat_rank,
                     threat_rank_type, ict_index_rank, ict_index_rank_type,
                     corners_and_indirect_freekicks_order, corners_and_indirect_freekicks_text,
                     direct_freekicks_order, direct_freekicks_text, penalties_order, penalties_text,
@@ -296,6 +303,7 @@ async function upsertPlayers(pool, players) {
                     @penalties_saved, @penalties_missed, @yellow_cards, @red_cards, @saves,
                     @bonus, @bps, @expected_goals, @expected_assists, @expected_goal_involvements,
                     @expected_goals_conceded, @influence, @creativity, @threat, @ict_index, @starts,
+                    @clearances_blocks_interceptions, @recoveries, @tackles, @defensive_contribution,
                     @influence_rank, @influence_rank_type, @creativity_rank, @creativity_rank_type,
                     @threat_rank, @threat_rank_type, @ict_index_rank, @ict_index_rank_type,
                     @corners_and_indirect_freekicks_order, @corners_and_indirect_freekicks_text,

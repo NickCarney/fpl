@@ -34,6 +34,10 @@ export interface Element {
   expected_assists: string;
   expected_goal_involvements: string;
   expected_goals_conceded: string;
+  clearances_blocks_interceptions: number;
+  recoveries: number;
+  tackles: number;
+  defensive_contribution: number;
 }
 
 export interface Team {
@@ -299,6 +303,7 @@ export interface PlayerGameweek {
   selected: number;
   transfers_in: number;
   transfers_out: number;
+  defensive_contribution: number;
 }
 
 export interface PlayerGameweekData {

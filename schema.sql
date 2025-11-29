@@ -123,6 +123,12 @@ CREATE TABLE dbo.players (
     -- Starts
     starts INT DEFAULT 0,
 
+    -- Defensive stats
+    clearances_blocks_interceptions INT DEFAULT 0,
+    recoveries INT DEFAULT 0,
+    tackles INT DEFAULT 0,
+    defensive_contribution INT DEFAULT 0,
+
     -- Influence rank
     influence_rank INT,
     influence_rank_type INT,

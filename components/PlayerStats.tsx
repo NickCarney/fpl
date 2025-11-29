@@ -49,7 +49,7 @@ export default function PlayerStats({
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<
-    "total_points" | "form" | "now_cost" | "ict_index"
+    "total_points" | "form" | "now_cost" | "ict_index" | "defensive_contribution"
   >("total_points");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [searchTerm, setSearchTerm] = useState("");
@@ -276,6 +276,10 @@ export default function PlayerStats({
         case "ict_index":
           aValue = parseFloat(a.ict_index) || 0;
           bValue = parseFloat(b.ict_index) || 0;
+          break;
+        case "defensive_contribution":
+          aValue = a.minutes >= 90 ? (a.defensive_contribution / a.minutes) * 90 : 0;
+          bValue = b.minutes >= 90 ? (b.defensive_contribution / b.minutes) * 90 : 0;
           break;
         default:
           aValue = 0;
@@ -872,6 +876,7 @@ export default function PlayerStats({
                 <SortableHeader field="form">Form</SortableHeader>
                 <SortableHeader field="now_cost">Price</SortableHeader>
                 <SortableHeader field="ict_index">ICT</SortableHeader>
+                <SortableHeader field="defensive_contribution">DC/90</SortableHeader>
                 <th className="text-center py-2 text-nowrap px-3">
                   Selected %
                 </th>
@@ -941,6 +946,13 @@ export default function PlayerStats({
                       £{(element.now_cost / 10).toFixed(1)}m
                     </td>
                     <td className="py-3 text-center">{element.ict_index}</td>
+                    <td className="py-3 text-center">
+                      {(() => {
+                        if (element.minutes < 90) return '-';
+                        const dcPer90 = (element.defensive_contribution / element.minutes) * 90;
+                        return dcPer90 > 0 ? dcPer90.toFixed(1) : '-';
+                      })()}
+                    </td>
                     <td className="py-3 text-center">
                       {element.selected_by_percent}%
                     </td>

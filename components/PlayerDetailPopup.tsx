@@ -43,6 +43,8 @@ export default function PlayerDetailPopup({
     useState(false);
   const [transferSuggestions, setTransferSuggestions] = useState<string>("");
   const [showTransferSuggestions, setShowTransferSuggestions] = useState(false);
+  const [sortColumn, setSortColumn] = useState<keyof PlayerGameweek | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Load gameweek data when popup opens
   useEffect(() => {
@@ -126,6 +128,38 @@ export default function PlayerDetailPopup({
   const getOpponentTeamName = (gameweek: PlayerGameweek, teams: Team[]) => {
     const opponentTeam = teams.find((t) => t.id === gameweek.opponent_team);
     return opponentTeam?.short_name || "Unknown";
+  };
+
+  const handleSort = (column: keyof PlayerGameweek) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+
+  const getSortedGameweeks = () => {
+    if (!gameweekData || !sortColumn) return gameweekData?.history || [];
+
+    const sorted = [...gameweekData.history].sort((a, b) => {
+      const aVal = a[sortColumn];
+      const bVal = b[sortColumn];
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+
+      return 0;
+    });
+
+    return sorted;
   };
   const statsRows = [
     { label: "Total Points", value: player.total_points, highlight: true },
@@ -347,20 +381,66 @@ export default function PlayerDetailPopup({
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b w-fit">
-                        <th className="text-left py-2 px-4">GW</th>
+                        <th
+                          className="text-left py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("round")}
+                        >
+                          GW {sortColumn === "round" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
                         <th className="text-left py-2 px-4">Opponent</th>
                         <th className="text-left py-2 px-4">Venue</th>
-                        <th className="text-right py-2 px-4">Pts</th>
-                        <th className="text-right py-2 px-4">Min</th>
-                        <th className="text-right py-2 px-4">Goals</th>
-                        <th className="text-right py-2 px-4">Assists</th>
-                        <th className="text-right py-2 px-4">CS</th>
-                        <th className="text-right py-2 px-4">Bonus</th>
-                        <th className="text-right py-2 px-4">BPS</th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("total_points")}
+                        >
+                          Pts {sortColumn === "total_points" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("minutes")}
+                        >
+                          Min {sortColumn === "minutes" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("goals_scored")}
+                        >
+                          Goals {sortColumn === "goals_scored" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("assists")}
+                        >
+                          Assists {sortColumn === "assists" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("clean_sheets")}
+                        >
+                          CS {sortColumn === "clean_sheets" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("bonus")}
+                        >
+                          Bonus {sortColumn === "bonus" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("bps")}
+                        >
+                          BPS {sortColumn === "bps" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("defensive_contribution")}
+                        >
+                          Def Con {sortColumn === "defensive_contribution" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {gameweekData.history.map((gw, index) => (
+                      {getSortedGameweeks().map((gw, index) => (
                         <tr key={index} className="border-b hover:">
                           <td className="py-2 font-medium">{gw.round}</td>
                           <td className="py-2">
@@ -376,6 +456,7 @@ export default function PlayerDetailPopup({
                           <td className="py-2 text-right">{gw.clean_sheets}</td>
                           <td className="py-2 text-right">{gw.bonus}</td>
                           <td className="py-2 text-right">{gw.bps}</td>
+                          <td className="py-2 text-right">{gw.defensive_contribution}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -383,7 +464,7 @@ export default function PlayerDetailPopup({
                   <div className="mt-4 text-xs ">
                     <p>
                       <strong>CS:</strong> Clean Sheets | <strong>BPS:</strong>{" "}
-                      Bonus Points System
+                      Bonus Points System | <strong>Def Con:</strong> Defensive Contributions
                     </p>
                   </div>
                 </div>
