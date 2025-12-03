@@ -49,8 +49,8 @@ jobs:
       - name: Configure Azure App Settings
         run: |
           az webapp config appsettings set \
+            --resource-group fpl-resources \
             --name fplgenie \
-            --resource-group $(az webapp show --name fplgenie --query resourceGroup -o tsv) \
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT="true" \
               WEBSITE_NODE_DEFAULT_VERSION="22" \
