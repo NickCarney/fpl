@@ -33,11 +33,19 @@ jobs:
 
       - name: Prepare deployment package
         run: |
-          mkdir -p deploy
-          cp -r .next deploy/
-          cp -r public deploy/ 2>/dev/null || :
-          cp package*.json deploy/
-          cp next.config.* deploy/ 2>/dev/null || :
+          # Copy standalone output (already contains node_modules and all dependencies)
+          cp -r .next/standalone ./deploy
+
+          # Copy static files to the correct location
+          mkdir -p deploy/.next
+          cp -r .next/static deploy/.next/static
+
+          # Copy public folder if it exists
+          cp -r public deploy/public 2>/dev/null || :
+
+          # Verify the structure
+          ls -la deploy/
+          ls -la deploy/.next/ 2>/dev/null || echo "No .next directory yet"
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -52,9 +60,13 @@ jobs:
             --resource-group fpl-resources \
             --name fplgenie \
             --settings \
-              SCM_DO_BUILD_DURING_DEPLOYMENT="true" \
-              WEBSITE_NODE_DEFAULT_VERSION="22" \
-              ENABLE_ORYX_BUILD="true"
+              SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
+              WEBSITE_NODE_DEFAULT_VERSION="22"
+
+          az webapp config set \
+            --resource-group fpl-resources \
+            --name fplgenie \
+            --startup-file "node server.js"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3

@@ -5,6 +5,7 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 });
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   serverExternalPackages: ['jsdom', 'mssql'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
