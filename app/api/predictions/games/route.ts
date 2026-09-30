@@ -41,14 +41,6 @@ interface Fixture {
   team_a_difficulty: number;
 }
 
-interface HistoricalTeamData {
-  goals_for: number;
-  goals_against: number;
-  played: number;
-  points: number;
-  position: number;
-}
-
 function calculateTeamStats(fixtures: Fixture[], teams: Team[]): TeamStats[] {
   const statsMap = new Map<number, TeamStats>();
 
@@ -198,9 +190,6 @@ export async function GET(request: NextRequest) {
     // Filter upcoming fixtures (not finished)
     const upcomingFixtures = fixtures.filter((fixture) => !fixture.finished);
 
-    // Fetch historical data (last season)
-    const historicalData = await fetchHistoricalData();
-
     // Calculate league averages for more realistic predictions
     const leagueStats = calculateLeagueAverages(teamStats);
 
@@ -220,8 +209,7 @@ export async function GET(request: NextRequest) {
           homeStats,
           awayStats,
           fixture,
-          leagueStats,
-          historicalData
+          leagueStats
         );
 
         return {
@@ -275,215 +263,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchHistoricalData(): Promise<Map<string, HistoricalTeamData>> {
-  const historicalData = new Map<string, HistoricalTeamData>();
-
-  // Premier League 2023-24 final table data (last complete season)
-  const lastSeasonData = [
-    {
-      name: "Manchester City",
-      goals_for: 96,
-      goals_against: 34,
-      played: 38,
-      points: 91,
-      position: 1,
-    },
-    {
-      name: "Arsenal",
-      goals_for: 91,
-      goals_against: 29,
-      played: 38,
-      points: 89,
-      position: 2,
-    },
-    {
-      name: "Liverpool",
-      goals_for: 86,
-      goals_against: 41,
-      played: 38,
-      points: 82,
-      position: 3,
-    },
-    {
-      name: "Aston Villa",
-      goals_for: 76,
-      goals_against: 61,
-      played: 38,
-      points: 68,
-      position: 4,
-    },
-    {
-      name: "Tottenham",
-      goals_for: 74,
-      goals_against: 61,
-      played: 38,
-      points: 66,
-      position: 5,
-    },
-    {
-      name: "Chelsea",
-      goals_for: 77,
-      goals_against: 63,
-      played: 38,
-      points: 63,
-      position: 6,
-    },
-    {
-      name: "Newcastle",
-      goals_for: 85,
-      goals_against: 62,
-      played: 38,
-      points: 60,
-      position: 7,
-    },
-    {
-      name: "Man Utd",
-      goals_for: 57,
-      goals_against: 58,
-      played: 38,
-      points: 60,
-      position: 8,
-    },
-    {
-      name: "West Ham",
-      goals_for: 60,
-      goals_against: 74,
-      played: 38,
-      points: 52,
-      position: 9,
-    },
-    {
-      name: "Crystal Palace",
-      goals_for: 57,
-      goals_against: 58,
-      played: 38,
-      points: 49,
-      position: 10,
-    },
-    {
-      name: "Brighton",
-      goals_for: 56,
-      goals_against: 62,
-      played: 38,
-      points: 48,
-      position: 11,
-    },
-    {
-      name: "Bournemouth",
-      goals_for: 54,
-      goals_against: 67,
-      played: 38,
-      points: 48,
-      position: 12,
-    },
-    {
-      name: "Fulham",
-      goals_for: 55,
-      goals_against: 61,
-      played: 38,
-      points: 47,
-      position: 13,
-    },
-    {
-      name: "Wolves",
-      goals_for: 50,
-      goals_against: 65,
-      played: 38,
-      points: 46,
-      position: 14,
-    },
-    {
-      name: "Everton",
-      goals_for: 40,
-      goals_against: 57,
-      played: 38,
-      points: 40,
-      position: 15,
-    }, // After points deduction
-    {
-      name: "Brentford",
-      goals_for: 56,
-      goals_against: 65,
-      played: 38,
-      points: 39,
-      position: 16,
-    },
-    {
-      name: "Nottm Forest",
-      goals_for: 49,
-      goals_against: 67,
-      played: 38,
-      points: 32,
-      position: 17,
-    }, // After points deduction
-    {
-      name: "Luton",
-      goals_for: 52,
-      goals_against: 85,
-      played: 38,
-      points: 26,
-      position: 18,
-    },
-    {
-      name: "Burnley",
-      goals_for: 41,
-      goals_against: 78,
-      played: 38,
-      points: 24,
-      position: 19,
-    },
-    {
-      name: "Sheffield Utd",
-      goals_for: 35,
-      goals_against: 104,
-      played: 38,
-      points: 16,
-      position: 20,
-    },
-  ];
-
-  // Add promoted teams with Championship data estimates
-  const promotedTeams = [
-    {
-      name: "Leicester",
-      goals_for: 89,
-      goals_against: 41,
-      played: 46,
-      points: 97,
-      position: 1,
-    }, // Championship winners
-    {
-      name: "Ipswich",
-      goals_for: 92,
-      goals_against: 57,
-      played: 46,
-      points: 96,
-      position: 2,
-    }, // Championship runners-up
-    {
-      name: "Southampton",
-      goals_for: 87,
-      goals_against: 63,
-      played: 46,
-      points: 87,
-      position: 4,
-    }, // Championship play-off winners
-  ];
-
-  // Combine data
-  [...lastSeasonData, ...promotedTeams].forEach((team) => {
-    historicalData.set(team.name, {
-      goals_for: team.goals_for,
-      goals_against: team.goals_against,
-      played: team.played,
-      points: team.points,
-      position: team.position,
-    });
-  });
-
-  return historicalData;
-}
-
 function calculateLeagueAverages(teamStats: TeamStats[]) {
   const playedTeams = teamStats.filter((t) => t.played > 0);
 
@@ -526,8 +305,7 @@ function predictScoreWithSimulations(
   homeStats: TeamStats,
   awayStats: TeamStats,
   fixture: Fixture,
-  leagueStats: any,
-  historicalData: Map<string, HistoricalTeamData>
+  leagueStats: any
 ) {
   const numSimulations = 7;
   const simulations = [];
@@ -540,8 +318,7 @@ function predictScoreWithSimulations(
       homeStats,
       awayStats,
       fixture,
-      leagueStats,
-      historicalData
+      leagueStats
     );
     simulations.push(result);
   }
@@ -571,8 +348,7 @@ function predictScoreWithSimulations(
     middleSimulation.awayXG,
     middleSimulation.homeGPG,
     middleSimulation.awayGPG,
-    numSimulations,
-    historicalData
+    numSimulations
   );
 
   return {
@@ -588,13 +364,8 @@ function predictSingleScore(
   homeStats: TeamStats,
   awayStats: TeamStats,
   fixture: Fixture,
-  leagueStats: any,
-  historicalData: Map<string, HistoricalTeamData>
+  leagueStats: any
 ) {
-  // Get historical data for both teams
-  const homeHistorical = historicalData.get(homeTeam.name);
-  const awayHistorical = historicalData.get(awayTeam.name);
-
   // Current season data
   const homeGoalsFor = homeStats.goals_for;
   const homeGoalsAgainst = homeStats.goals_against;
@@ -609,41 +380,28 @@ function predictSingleScore(
   const awayCurrentAttackRate = awayGoalsFor / awayPlayed;
   const awayCurrentDefenseRate = awayGoalsAgainst / awayPlayed;
 
-  // Calculate historical rates (if available)
-  let homeHistoricalAttackRate = 1.35; // Default PL average
-  let homeHistoricalDefenseRate = 1.35;
-  let awayHistoricalAttackRate = 1.35;
-  let awayHistoricalDefenseRate = 1.35;
-
-  if (homeHistorical) {
-    homeHistoricalAttackRate = homeHistorical.goals_for / homeHistorical.played;
-    homeHistoricalDefenseRate =
-      homeHistorical.goals_against / homeHistorical.played;
-  }
-
-  if (awayHistorical) {
-    awayHistoricalAttackRate = awayHistorical.goals_for / awayHistorical.played;
-    awayHistoricalDefenseRate =
-      awayHistorical.goals_against / awayHistorical.played;
-  }
-
-  // Weighted combination of current and historical data
-  // Early season: more weight on historical, later season: more weight on current
-  const seasonWeight = Math.min(0.8, Math.max(0.2, homePlayed / 20)); // 20% to 80% current season weight
-  const historicalWeight = 1 - seasonWeight;
+  // Early in the season a team's own rate is noisy (few real games to go
+  // on), so blend it toward the league's actual CURRENT-season average
+  // (computed live from this season's finished fixtures) rather than a
+  // fixed prior - this converges to the team's own rate as real games
+  // accumulate, without relying on stale season-to-season data.
+  const homeSeasonWeight = Math.min(0.9, Math.max(0.3, homeStats.played / 10));
+  const awaySeasonWeight = Math.min(0.9, Math.max(0.3, awayStats.played / 10));
+  const leagueAvgAttack = leagueStats.avgGoalsPerGame;
+  const leagueAvgDefense = leagueStats.avgGoalsAgainstPerGame;
 
   const effectiveHomeAttack =
-    homeCurrentAttackRate * seasonWeight +
-    homeHistoricalAttackRate * historicalWeight;
+    homeCurrentAttackRate * homeSeasonWeight +
+    leagueAvgAttack * (1 - homeSeasonWeight);
   const effectiveHomeDefense =
-    homeCurrentDefenseRate * seasonWeight +
-    homeHistoricalDefenseRate * historicalWeight;
+    homeCurrentDefenseRate * homeSeasonWeight +
+    leagueAvgDefense * (1 - homeSeasonWeight);
   const effectiveAwayAttack =
-    awayCurrentAttackRate * seasonWeight +
-    awayHistoricalAttackRate * historicalWeight;
+    awayCurrentAttackRate * awaySeasonWeight +
+    leagueAvgAttack * (1 - awaySeasonWeight);
   const effectiveAwayDefense =
-    awayCurrentDefenseRate * seasonWeight +
-    awayHistoricalDefenseRate * historicalWeight;
+    awayCurrentDefenseRate * awaySeasonWeight +
+    leagueAvgDefense * (1 - awaySeasonWeight);
 
   // FPL strength adjustments (normalize to 0.8-1.2)
   const homeAttackStrength = Math.max(
@@ -706,33 +464,29 @@ function predictSingleScore(
     }
   }
 
-  // League position adjustment (increased impact from 0.04 to 0.10)
-  const positionImpact = 0.10;
-  if (homeStats.position && awayStats.position) {
-    const currentPositionDiff = awayStats.position - homeStats.position;
-    let historicalPositionDiff = 0;
+  // League position adjustment - only once both teams have played enough
+  // real games that position reflects results rather than tiebreaker order
+  // (everyone is tied at 0 points before kickoff, so position is meaningless
+  // that early - no historical stand-in needed, just wait for real data).
+  const positionImpact = 0.1;
+  const minGamesForPosition = 3;
+  if (
+    homeStats.position &&
+    awayStats.position &&
+    homeStats.played >= minGamesForPosition &&
+    awayStats.played >= minGamesForPosition
+  ) {
+    const positionDiff = awayStats.position - homeStats.position;
+    const positionScale = Math.min(12, Math.abs(positionDiff)) / 12;
 
-    if (homeHistorical && awayHistorical) {
-      historicalPositionDiff =
-        awayHistorical.position - homeHistorical.position;
-    }
-
-    // Weighted position difference
-    const effectivePositionDiff =
-      currentPositionDiff * seasonWeight +
-      historicalPositionDiff * historicalWeight;
-
-    // Scale position impact based on the magnitude of difference
-    const positionScale = Math.min(12, Math.abs(effectivePositionDiff)) / 12;
-
-    if (effectivePositionDiff > 0) {
+    if (positionDiff > 0) {
       // Home team is higher (better position, lower number)
-      homeExpectedGoals *= 1 + (positionImpact * positionScale);
-      awayExpectedGoals *= 1 - (positionImpact * 0.5 * positionScale);
-    } else if (effectivePositionDiff < 0) {
+      homeExpectedGoals *= 1 + positionImpact * positionScale;
+      awayExpectedGoals *= 1 - positionImpact * 0.5 * positionScale;
+    } else if (positionDiff < 0) {
       // Away team is higher
-      awayExpectedGoals *= 1 + (positionImpact * positionScale);
-      homeExpectedGoals *= 1 - (positionImpact * 0.5 * positionScale);
+      awayExpectedGoals *= 1 + positionImpact * positionScale;
+      homeExpectedGoals *= 1 - positionImpact * 0.5 * positionScale;
     }
   }
 
@@ -772,8 +526,7 @@ function generateDetailedReasoning(
   awayXG: number,
   homeGPG: number,
   awayGPG: number,
-  numSimulations: number,
-  historicalData: Map<string, HistoricalTeamData>
+  numSimulations: number
 ): string {
   const reasons = [];
 
@@ -803,22 +556,6 @@ function generateDetailedReasoning(
     } ${awayGPG.toFixed(1)}/game`
   );
 
-  // Historical context
-  const homeHistorical = historicalData.get(homeTeam.name);
-  const awayHistorical = historicalData.get(awayTeam.name);
-
-  if (homeHistorical && awayHistorical) {
-    const homeLastSeasonGPG = (
-      homeHistorical.goals_for / homeHistorical.played
-    ).toFixed(1);
-    const awayLastSeasonGPG = (
-      awayHistorical.goals_for / awayHistorical.played
-    ).toFixed(1);
-    reasons.push(
-      `Last season: ${homeTeam.short_name} ${homeLastSeasonGPG}/game, ${awayTeam.short_name} ${awayLastSeasonGPG}/game`
-    );
-  }
-
   // Form analysis - form property not available on Team type
   // if (
   //   homeTeam.form !== null &&
@@ -830,7 +567,7 @@ function generateDetailedReasoning(
   //   reasons.push(`${betterTeam} in better recent form`);
   // }
 
-  reasons.push("Home advantage (+15%) and historical data factored in");
+  reasons.push("Home advantage (+15%) factored in");
 
   return reasons.join("; ");
 }
