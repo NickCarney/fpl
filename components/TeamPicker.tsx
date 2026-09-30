@@ -79,14 +79,14 @@ const PlayerCard = ({
   if (isFormationView && !isBench) {
     // Formation view for starting XI - MATCH CurrentSquad
     return (
-      <div className="gradient-border rounded-lg p-0 w-16 md:w-24 h-20 md:h-32">
+      <div className="gradient-border rounded-lg p-0 w-16 md:w-24">
         <div
           draggable
           onDragStart={() => onDragStart(player, pick, false)}
           onDrop={() => onDrop(pick)}
           onDragOver={onDragOver}
           onClick={() => onClick(pick)}
-          className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 overflow-y-auto overflow-x-hidden ${
+          className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 ${
             isSelected
               ? "border-blue-500 bg-blue-50 ring-2 ring-blue-300"
               : canBeReplaced
@@ -98,6 +98,16 @@ const PlayerCard = ({
               : "border-green-300"
           } ${className}`}
         >
+          {/* Captain/Vice-Captain badge - top right corner */}
+          {(pick.is_captain || pick.is_vice_captain) && (
+            <div
+              className={`absolute -top-1 -right-1 text-[8px] md:text-xs rounded-full w-3.5 md:w-5 h-3.5 md:h-5 flex items-center justify-center font-bold text-black shadow ${
+                pick.is_captain ? "bg-yellow-400" : "bg-yellow-200"
+              }`}
+            >
+              {pick.is_captain ? "C" : "V"}
+            </div>
+          )}
           {/* Player Name and Team */}
           <div className="text-center mb-0.5 md:mb-2">
             <h3 className="font-semibold text-[10px] md:text-sm leading-tight">
@@ -119,7 +129,7 @@ const PlayerCard = ({
           </div>
 
           {/* Form and Minutes - Hidden on mobile */}
-          <div className="hidden md:block text-center text-xs mb-2">
+          <div className="hidden md:block text-center text-xs">
             <div>Form: {player.form}</div>
             <div className="text-gray-700">{player.minutes} mins</div>
             <div className="mt-1">
@@ -150,20 +160,9 @@ const PlayerCard = ({
             )}
           </div>
 
-          {/* Captain/Vice-Captain Badges */}
-          <div className="flex justify-center gap-0.5 md:gap-1 mt-auto">
-            {pick.is_captain && (
-              <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-400 text-[8px] md:text-xs rounded font-bold">
-                C
-              </span>
-            )}
-            {pick.is_vice_captain && (
-              <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-200 text-[8px] md:text-xs rounded font-bold">
-                V
-              </span>
-            )}
-            {/* Captain select button (optional, keep if you want quick selection) */}
-            {!pick.is_captain && !pick.is_vice_captain && !isBench && (
+          {/* Captain select button - only shown when not already C/V */}
+          {!pick.is_captain && !pick.is_vice_captain && !isBench && (
+            <div className="flex justify-center mt-2">
               <span
                 className="hidden md:inline px-2 py-1 bg-gray-200 text-xs rounded font-bold cursor-pointer hover:bg-yellow-200"
                 onClick={(e) => {
@@ -173,8 +172,8 @@ const PlayerCard = ({
               >
                 +
               </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
