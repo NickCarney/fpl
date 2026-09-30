@@ -2,10 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { ragCache } from "@/lib/rag-cache";
 import { RAG_CONFIG } from "@/lib/rag-config";
+import {
+  getAvailability,
+  formatAvailability,
+} from "@/lib/player-availability";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const CHIP_LABELS: Record<string, string> = {
+  wildcard: "Wildcard",
+  freehit: "Free Hit",
+  bboost: "Bench Boost",
+  "3xc": "Triple Captain",
+};
+const CHIP_TYPES = ["wildcard", "freehit", "bboost", "3xc"];
+const FIRST_HALF_DEADLINE_GW = 19;
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +30,9 @@ export async function POST(request: NextRequest) {
       gameweekFinished,
       fixtures,
       elements,
+      teams,
+      chipsUsed,
+      activeChip,
     } = body;
 
     if (!teamData || !squadData) {
@@ -27,18 +43,14 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Fetch RAG data for enhanced analysis with caching
+      // Fetch RAG data (computed live from real FPL data) with caching
       let ragData = null;
-      let externalContent = null;
 
       const cacheKey = `rag-data-${currentGameweek}`;
-      const cachedData = ragCache.get<{ ragData: any; externalContent: any }>(
-        cacheKey
-      );
+      const cachedData = ragCache.get<{ ragData: any }>(cacheKey);
 
       if (cachedData && RAG_CONFIG.features.enableCaching) {
         ragData = cachedData.ragData;
-        externalContent = cachedData.externalContent;
       } else {
         try {
           const ragResponse = await fetch(
@@ -48,21 +60,21 @@ export async function POST(request: NextRequest) {
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ elements, fixtures, currentGameweek }),
+              body: JSON.stringify({
+                elements,
+                fixtures,
+                currentGameweek,
+                gameweekFinished,
+              }),
             }
           );
 
           if (ragResponse.ok) {
             const ragResult = await ragResponse.json();
             ragData = ragResult.ragData;
-            externalContent = ragResult.externalContent;
 
             if (RAG_CONFIG.features.enableCaching) {
-              ragCache.set(
-                cacheKey,
-                { ragData, externalContent },
-                RAG_CONFIG.cache.ragDataTTL
-              );
+              ragCache.set(cacheKey, { ragData }, RAG_CONFIG.cache.ragDataTTL);
             }
           }
         } catch (error) {
@@ -73,21 +85,30 @@ export async function POST(request: NextRequest) {
       }
 
       // Prepare data for analysis
-      const squadAnalysis = squadData.map((player: any) => ({
-        name: player.web_name,
-        position: player.position_name,
-        team: player.team_name,
-        teamId: player.team,
-        points: player.total_points,
-        form: player.form,
-        price: player.now_cost / 10,
-        minutes: player.minutes,
-        goals: player.goals_scored,
-        assists: player.assists,
-        cleanSheets: player.clean_sheets,
-        isCaptain: player.is_captain,
-        isViceCaptain: player.is_vice_captain,
-      }));
+      const squadAnalysis = squadData.map((player: any) => {
+        const availability = getAvailability(
+          player.status,
+          player.chance_of_playing_next_round,
+          player.news
+        );
+        return {
+          name: player.web_name,
+          position: player.position_name,
+          team: player.team_name,
+          teamId: player.team,
+          points: player.total_points,
+          form: player.form,
+          price: player.now_cost / 10,
+          minutes: player.minutes,
+          goals: player.goals_scored,
+          assists: player.assists,
+          cleanSheets: player.clean_sheets,
+          isCaptain: player.is_captain,
+          isViceCaptain: player.is_vice_captain,
+          isStarting: player.is_starting !== false,
+          availability,
+        };
+      });
 
       // Analyze current gameweek fixtures for each team
       const currentGameweekFixtures =
@@ -120,16 +141,153 @@ export async function POST(request: NextRequest) {
         };
       });
 
+      // --- Real forward-looking fixture analysis (next 5 gameweeks) ---
+      const teamsById = new Map<number, any>(
+        (teams || []).map((t: any) => [t.id, t])
+      );
+      const windowEnd = currentGameweek + 5;
+      const upcomingFixtures = (fixtures || []).filter(
+        (f: any) => f.event > currentGameweek && f.event <= windowEnd
+      );
+
+      const fixtureLabel = (fixture: any, teamId: number) => {
+        const isHome = fixture.team_h === teamId;
+        const oppId = isHome ? fixture.team_a : fixture.team_h;
+        const opp = teamsById.get(oppId)?.short_name || "?";
+        const difficulty = isHome
+          ? fixture.team_h_difficulty
+          : fixture.team_a_difficulty;
+        return `${isHome ? "vs" : "@"}${opp}(${difficulty})`;
+      };
+
+      const squadWithFixtureRun = squadWithFixtures.map((p: any) => {
+        const teamFixtures = upcomingFixtures
+          .filter((f: any) => f.team_h === p.teamId || f.team_a === p.teamId)
+          .sort((a: any, b: any) => a.event - b.event);
+        const nextFixture = teamFixtures[0];
+        const runLabel = teamFixtures
+          .map((f: any) => fixtureLabel(f, p.teamId))
+          .join(", ");
+        const avgDifficulty =
+          teamFixtures.length > 0
+            ? (
+                teamFixtures.reduce(
+                  (sum: number, f: any) =>
+                    sum +
+                    (f.team_h === p.teamId
+                      ? f.team_h_difficulty
+                      : f.team_a_difficulty),
+                  0
+                ) / teamFixtures.length
+              ).toFixed(1)
+            : null;
+        return {
+          ...p,
+          nextFixture: nextFixture
+            ? fixtureLabel(nextFixture, p.teamId)
+            : "blank next GW",
+          fixtureRun: runLabel || "no fixtures in next 5 GWs",
+          avgFixtureDifficulty: avgDifficulty,
+        };
+      });
+
+      // Squad-wide gameweek-by-gameweek outlook, useful for chip timing (Bench Boost / Triple Captain windows)
+      const gwWindowAnalysis = [];
+      for (let gw = currentGameweek + 1; gw <= windowEnd; gw++) {
+        let appearances = 0;
+        let totalDifficulty = 0;
+        let playersWithFixture = 0;
+        squadWithFixtures.forEach((p: any) => {
+          const pf = (fixtures || []).filter(
+            (f: any) =>
+              f.event === gw && (f.team_h === p.teamId || f.team_a === p.teamId)
+          );
+          if (pf.length > 0) playersWithFixture++;
+          pf.forEach((f: any) => {
+            totalDifficulty +=
+              f.team_h === p.teamId ? f.team_h_difficulty : f.team_a_difficulty;
+            appearances++;
+          });
+        });
+        gwWindowAnalysis.push({
+          gameweek: gw,
+          playersWithFixture,
+          totalAppearances: appearances,
+          avgDifficulty:
+            appearances > 0 ? (totalDifficulty / appearances).toFixed(2) : null,
+        });
+      }
+
+      const fixtureOutlookContext = `
+Squad Fixture Run (next 5 GWs, difficulty 1=easiest to 5=hardest):
+${squadWithFixtureRun
+  .map((p: any) => `${p.name} (${p.team}): ${p.fixtureRun}`)
+  .join("\n")}
+
+Gameweek-by-Gameweek Squad Outlook (use this for chip timing):
+${gwWindowAnalysis
+  .map(
+    (g: any) =>
+      `GW${g.gameweek}: ${g.playersWithFixture}/${squadWithFixtures.length} squad players have a fixture, ${
+        g.totalAppearances
+      } total player-appearances${
+        g.totalAppearances > squadWithFixtures.length
+          ? " (some squad players have a double gameweek)"
+          : g.totalAppearances < squadWithFixtures.length
+          ? " (some squad players are blank this gameweek)"
+          : ""
+      }, avg difficulty ${g.avgDifficulty ?? "N/A"}`
+  )
+  .join("\n")}
+`;
+
+      // --- Real chip usage context ---
+      const chipStatus = CHIP_TYPES.map((type) => {
+        const usages = (chipsUsed || []).filter((c: any) => c.name === type);
+        const usedFirstHalf = usages.some(
+          (c: any) => c.event <= FIRST_HALF_DEADLINE_GW
+        );
+        const usedSecondHalf = usages.some(
+          (c: any) => c.event > FIRST_HALF_DEADLINE_GW
+        );
+        return {
+          label: CHIP_LABELS[type],
+          events: usages.map((c: any) => c.event),
+          usedFirstHalf,
+          usedSecondHalf,
+        };
+      });
+
+      const chipContext = `
+Chip Status (each of Wildcard/Free Hit/Bench Boost/Triple Captain is available twice per season: once for GW1-${FIRST_HALF_DEADLINE_GW}, once for GW${
+        FIRST_HALF_DEADLINE_GW + 1
+      }-38):
+${chipStatus
+  .map((c) => {
+    const usedText =
+      c.events.length > 0 ? `used in GW ${c.events.join(", ")}` : "not yet used";
+    const urgency =
+      !c.usedFirstHalf && currentGameweek <= FIRST_HALF_DEADLINE_GW
+        ? ` - first-half chip still available, must be used by GW${FIRST_HALF_DEADLINE_GW} or it is lost`
+        : !c.usedSecondHalf && currentGameweek > FIRST_HALF_DEADLINE_GW
+        ? " - second-half chip still available"
+        : "";
+    return `${c.label}: ${usedText}${urgency}`;
+  })
+  .join("\n")}
+${activeChip ? `Active this gameweek: ${CHIP_LABELS[activeChip] || activeChip}` : "No chip active this gameweek"}
+`;
+
       const gameweekStatusText = gameweekFinished
         ? "Gameweek has finished"
         : "Gameweek is ongoing - some matches may not have been played yet";
 
-      // Build enhanced context with RAG data
+      // Build enhanced context with RAG data (all computed from live FPL data)
       let ragContext = "";
       if (ragData) {
         ragContext = `
 
-ENHANCED ANALYSIS DATA:
+ENHANCED ANALYSIS DATA (live, computed from current FPL data):
 
 Position Benchmarks:
 ${Object.entries(ragData.positionAverages)
@@ -145,67 +303,41 @@ ${Object.entries(ragData.positionAverages)
   )
   .join("\n")}
 
-Transfer Market Trends:
+Transfer Market Trends (this gameweek):
 - Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(", ")}
 - Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(", ")}
 - Rising prices: ${ragData.transferTrends.risingPrices.join(", ")}
 - Falling prices: ${ragData.transferTrends.fallingPrices.join(", ")}
 
-Expert Recommendations:
-${Object.entries(ragData.expertPicks)
-  .map(
-    ([expert, picks]: [string, any]) =>
-      `${expert}: Captain ${
-        picks.captain
-      }, Differentials: ${picks.differentials.join(", ")}`
-  )
-  .join("\n")}
+Form Leaders: ${ragData.formLeaders
+          .map((p: any) => `${p.player} (${p.form})`)
+          .join(", ")}
 
-Next Gameweek Fixtures: ${ragData.nextGameweekFixtures.length} matches scheduled
-`;
-      }
+Expected Goals (xG) Leaders:
+${ragData.xgLeaders
+  .map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`)
+  .join(", ")}
 
-      // Add external content if available
-      let externalContext = "";
-      if (externalContent) {
-        externalContext = `
-LIVE INTELLIGENCE DATA:
-${externalContent.summary || ""}
-
-Expected Goals (xG) Data:
+Injury/Availability Concerns:
 ${
-  externalContent.analytics?.xGData
-    ?.map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`)
-    .join(", ") || "No xG data available"
-}
-
-Form Trends:
-${
-  externalContent.analytics?.formTable
-    ?.map((p: any) => `${p.player}: ${p.form} (${p.trend})`)
-    .join(", ") || "No form data available"
-}
-
-Community Insights:
-${
-  externalContent.predictions
-    ?.map((pred: any) =>
-      pred.predictions
-        .slice(0, 2)
-        .map((p: any) => `${p.player}: ${p.prediction}`)
-        .join("; ")
-    )
-    .join("\n") || "No community insights available"
+  ragData.availabilityConcerns.length > 0
+    ? ragData.availabilityConcerns
+        .map(
+          (p: any) => `${p.player}: ${p.status}${p.news ? ` - ${p.news}` : ""}`
+        )
+        .join("\n")
+    : "No significant availability concerns among widely-owned players"
 }
 `;
       }
 
       const prompt = `
-You are an expert Fantasy Premier League analyst with access to comprehensive data. Analyze this team and provide 4-5 specific, actionable insights.
+You are an expert Fantasy Premier League analyst. Analyze this team and produce a ONE-TIME report. This is not a conversation - do not ask the user for more information, do not invite follow-up, and do not end with a question or offer.
 
 IMPORTANT CONTEXT: ${gameweekStatusText}
 ${ragContext}
-${externalContext}
+${fixtureOutlookContext}
+${chipContext}
 
 Team Overview:
 - Total Points: ${teamData.totalPoints}
@@ -215,32 +347,55 @@ Team Overview:
         .toFixed(1)}m
 
 Squad Details:
-${squadWithFixtures
+${squadWithFixtureRun
   .map(
     (p: any) =>
       `${p.name} (${p.team}) - ${p.position}: ${p.points}pts, Form: ${
         p.form
       }, £${p.price}m, ${p.minutes} mins${p.isCaptain ? " [CAPTAIN]" : ""}${
         p.isViceCaptain ? " [VC]" : ""
-      }${!p.hasPlayedThisGW ? " [NOT PLAYED YET THIS GW]" : ""}`
+      }${p.isStarting ? "" : " [BENCH]"}${
+        !p.hasPlayedThisGW ? " [NOT PLAYED YET THIS GW]" : ""
+      } | Next: ${p.nextFixture}${
+        p.availability
+          ? ` | AVAILABILITY: ${formatAvailability(p.availability)}`
+          : ""
+      }`
   )
   .join("\n")}
 
-Provide data-driven insights about:
-1. **Performance vs Position Benchmarks**: Compare players to position averages and identify over/underperformers
-2. **Transfer Market Analysis**: Highlight alignment with market trends and potential value moves
-3. **Captaincy & Lineup Strategy**: Evaluate choices against expert consensus and upcoming fixtures
-4. **Value & Budget Optimization**: Suggest improvements based on price trends and position efficiency
-5. **Differential Opportunities**: Identify low-owned gems based on the data
+Respond ONLY in this exact structured format, with nothing before or after it. Use "-" for every bullet. Do not add any section that isn't listed here, and do not add closing remarks after DIFFERENTIALS:
 
-Requirements:
-- Reference specific benchmark data when available
-- Mention transfer trends and expert picks where relevant
-- If a player shows "[NOT PLAYED YET THIS GW]", focus on season form and upcoming fixtures
-- Be specific with numbers (points, prices, percentages)
-- Prioritize actionable insights over general observations
+CAPTAIN_PICK: [player name from squad] | [1-2 sentence reasoning citing real stats: form, xG, or fixture difficulty]
+VICE_CAPTAIN_PICK: [player name from squad] | [1-2 sentence reasoning]
 
-Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
+STRENGTHS:
+- [specific over-performer or strong area, with numbers, vs position benchmark]
+- [specific strength, with numbers]
+
+WEAKNESSES:
+- [specific under-performer or weak area, with numbers, vs position benchmark]
+- [specific weakness, with numbers]
+
+TRANSFER_MARKET:
+- [bullet referencing real transfer trends/price changes relevant to this squad]
+- [bullet referencing injury/availability concerns relevant to this squad, or state none]
+
+CHIP_STRATEGY:
+- [one bullet per chip that is still unused, using the real Chip Status and Gameweek-by-Gameweek Squad Outlook data above to recommend a window - reference specific GW numbers and the fixture data provided. If a chip is already used, skip it]
+- [if all chips are used, say so in one bullet instead]
+
+DIFFERENTIALS:
+- [low-owned player from squad or a real market trend that fits as a differential]
+
+Rules:
+- Every claim must be backed by a number from the data provided above (points, price, form, xG, difficulty rating, ownership, gameweek).
+- Never invent fixtures, opponents, or players not present in the data.
+- Keep each bullet to 1-2 sentences.
+- If a squad player has an AVAILABILITY tag, do not captain or vice-captain them unless their chance of playing is 75% or higher, and say why in the reasoning.
+- If a squad player has low form or low minutes AND has an AVAILABILITY tag (injured/doubtful), attribute it to that injury/fitness issue rather than calling it a pure performance decline - a player returning from injury needs time to rebuild form and minutes, that is not the same as an out-of-form player who was fully fit.
+- Only flag a player as a genuine WEAKNESS for underperformance if they have no AVAILABILITY tag, or their tag shows they've been fully fit and playing (no recent injury/doubt).
+- A player marked [BENCH] does not contribute to the score unless Bench Boost is active - low points/minutes on a cheap bench player is normal squad-building (a budget enabler), not a weakness. Do not name a [BENCH] player as a WEAKNESS just for having low stats; only mention a bench player if their price is unusually high for a bench role, or they pose a real rotation risk to a starting player in the same position.
 `;
 
       // Create streaming response
@@ -286,14 +441,25 @@ Keep each insight to 2-3 sentences maximum. Use expert FPL terminology.
     } catch (aiError) {
       console.error("Error with OpenAI analysis:", aiError);
 
-      // Enhanced fallback insights with basic data
+      // Enhanced fallback insights with basic data, matching the structured format
       const fallbackInsights = `
-**Team Analysis** (Basic Mode)
-• Your squad is performing at the current level for gameweek ${currentGameweek}
-• Monitor players with consistently low minutes for potential rotation risks
-• Consider fixture difficulty and form trends when making transfer decisions
-• Review your captaincy choice based on upcoming opponents and recent performance
-• Note: Some players may not have played this gameweek - check fixtures before transfers`;
+CAPTAIN_PICK: ${squadData.find((p: any) => p.is_captain)?.web_name || "Review your squad"} | AI analysis unavailable - keep your highest-form premium player as captain.
+VICE_CAPTAIN_PICK: ${squadData.find((p: any) => p.is_vice_captain)?.web_name || "Review your squad"} | AI analysis unavailable.
+
+STRENGTHS:
+- Squad total points this season: ${teamData.totalPoints}
+
+WEAKNESSES:
+- Monitor players with consistently low minutes for rotation risk
+
+TRANSFER_MARKET:
+- Consider fixture difficulty and form trends when making transfer decisions
+
+CHIP_STRATEGY:
+- Review your remaining chips and plan around your squad's upcoming fixture difficulty
+
+DIFFERENTIALS:
+- Check ownership percentages on the Player Stats tab for low-owned in-form players`;
 
       return NextResponse.json({
         insights: fallbackInsights.trim(),

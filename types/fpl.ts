@@ -34,6 +34,18 @@ export interface Element {
   expected_assists: string;
   expected_goal_involvements: string;
   expected_goals_conceded: string;
+  transfers_in_event: number;
+  transfers_out_event: number;
+  cost_change_event: number;
+  cost_change_start: number;
+  ep_next: string;
+  ep_this: string;
+  value_form: string;
+  value_season: string;
+  status: string;
+  news: string;
+  chance_of_playing_next_round: number | null;
+  chance_of_playing_this_round: number | null;
 }
 
 export interface Team {

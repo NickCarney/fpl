@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
+import { Element, Pick, Team, ElementType, Event, TeamHistory } from "@/types/fpl";
 import PlayerDetailPopup from "./PlayerDetailPopup";
 import TeamInsights from "./TeamInsights";
 import TransferSuggestions from "./TransferSuggestions";
@@ -19,6 +19,7 @@ interface CurrentSquadProps {
   currentEvent: number;
   events: Event[];
   teamPicks?: any; // Full team picks data including entry history
+  teamHistory?: TeamHistory | null;
 }
 
 export default function CurrentSquad({
@@ -29,6 +30,7 @@ export default function CurrentSquad({
   currentEvent,
   events,
   teamPicks,
+  teamHistory,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
   const [manualStarterPoints, setManualStarterPoints] = useState(0);
@@ -607,11 +609,11 @@ export default function CurrentSquad({
       return (
         <div
           key={pick.element}
-          className="gradient-border rounded-lg w-16 md:w-24 h-20 md:h-32"
+          className="gradient-border rounded-lg w-16 md:w-24"
         >
           <div
             onClick={() => handlePlayerClick(pick)}
-            className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 overflow-y-auto overflow-x-hidden ${
+            className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 ${
               pick.is_captain
                 ? "ring-1 ring-yellow-400"
                 : pick.is_vice_captain
@@ -623,14 +625,24 @@ export default function CurrentSquad({
                 : ""
             }`}
           >
+            {/* Captain/Vice-Captain badge - top right corner */}
+            {(pick.is_captain || pick.is_vice_captain) && (
+              <div
+                className={`absolute -top-1 -right-1 text-[8px] md:text-xs rounded-full w-3.5 md:w-5 h-3.5 md:h-5 flex items-center justify-center font-bold text-black shadow ${
+                  pick.is_captain ? "bg-yellow-400" : "bg-yellow-200"
+                }`}
+              >
+                {pick.is_captain ? "C" : "V"}
+              </div>
+            )}
             {/* Suggestion indicators */}
             {isNewSuggestion && (
-              <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
+              <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↑
               </div>
             )}
             {isBenchedSuggestion && (
-              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
+              <div className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↓
               </div>
             )}
@@ -658,7 +670,7 @@ export default function CurrentSquad({
             </div>
 
             {/* Form and Minutes - Updated - Hidden on mobile, shown on desktop */}
-            <div className="hidden md:block text-center text-xs mb-2">
+            <div className="hidden md:block text-center text-xs">
               <div>Form: {stats.form}</div>
               <div className={stats.statusColor}>{stats.minutes}</div>
               {stats.isGameweek && (
@@ -707,20 +719,6 @@ export default function CurrentSquad({
                   GW{nextGameweekId}: {fixtureInfo.isHome ? "vs" : "@"}{" "}
                   {fixtureInfo.opponent}
                 </div>
-              )}
-            </div>
-
-            {/* Captain/Vice-Captain Badges */}
-            <div className="flex justify-center gap-0.5 md:gap-1 mt-auto">
-              {pick.is_captain && (
-                <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-400 text-[8px] md:text-xs rounded font-bold">
-                  C
-                </span>
-              )}
-              {pick.is_vice_captain && (
-                <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-200 text-[8px] md:text-xs rounded font-bold">
-                  V
-                </span>
               )}
             </div>
           </div>
@@ -1352,6 +1350,8 @@ export default function CurrentSquad({
           currentEvent={currentEvent}
           totalPoints={pointsBreakdown.total}
           events={events}
+          chipsUsed={teamHistory?.chips || []}
+          activeChip={teamPicks?.active_chip || null}
         />
       </div>
 

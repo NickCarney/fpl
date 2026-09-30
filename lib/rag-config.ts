@@ -41,16 +41,15 @@ export const RAG_CONFIG = {
 
   // AI Model configuration
   openAI: {
-    model: "gpt-4.1-nano",
+    model: "gpt-5.4-nano",
     // maxTokens: 600,
     // temperature: 0.1,
     systemPrompt: `You are an elite Fantasy Premier League analyst with access to comprehensive real-time data including:
     - Expected goals (xG) and expected assists (xA) statistics
-    - Transfer market trends and ownership data
-    - Predicted lineups and rotation information
-    - Expert opinions and community sentiment
+    - Live transfer market trends and ownership data
+    - Injury and availability status
     - Historical performance benchmarks
-    
+
     Provide data-driven, specific, and actionable FPL advice.`,
   },
 

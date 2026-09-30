@@ -358,6 +358,7 @@ export default function TeamPageClient({ teamId }: { teamId: number }) {
             currentEvent={currentEvent}
             events={bootstrapData.events}
             teamPicks={teamPicks}
+            teamHistory={teamHistory}
           />
         )}
 

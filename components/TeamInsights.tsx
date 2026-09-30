@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Element, Pick, Team, ElementType, Event, Fixture } from "@/types/fpl";
+import { useState } from "react";
+import { Element, Pick, Team, ElementType, Event, ChipPlay } from "@/types/fpl";
 import { getFixtures } from "@/lib/fpl-api";
 
 interface TeamInsightsProps {
@@ -12,6 +12,86 @@ interface TeamInsightsProps {
   currentEvent: number;
   totalPoints: number;
   events: Event[];
+  chipsUsed?: ChipPlay[];
+  activeChip?: string | null;
+}
+
+interface ParsedInsights {
+  captain: { player: string; reasoning: string } | null;
+  viceCaptain: { player: string; reasoning: string } | null;
+  strengths: string[];
+  weaknesses: string[];
+  transferMarket: string[];
+  chipStrategy: string[];
+  differentials: string[];
+}
+
+const SECTION_KEYS = [
+  "CAPTAIN_PICK",
+  "VICE_CAPTAIN_PICK",
+  "STRENGTHS",
+  "WEAKNESSES",
+  "TRANSFER_MARKET",
+  "CHIP_STRATEGY",
+  "DIFFERENTIALS",
+] as const;
+
+function parseInsights(text: string): ParsedInsights | null {
+  const lines = text.split("\n").map((l) => l.trim());
+
+  const findSectionLine = (key: string) =>
+    lines.findIndex((l) => l.startsWith(key + ":"));
+
+  const captainLine = findSectionLine("CAPTAIN_PICK");
+  if (captainLine === -1) return null;
+
+  const getPipeValue = (lineIdx: number, key: string) => {
+    const raw = lines[lineIdx].replace(key + ":", "").trim();
+    const [player, ...rest] = raw.split("|");
+    return {
+      player: (player || "").trim(),
+      reasoning: rest.join("|").trim(),
+    };
+  };
+
+  const captain = getPipeValue(captainLine, "CAPTAIN_PICK");
+
+  const vcLine = findSectionLine("VICE_CAPTAIN_PICK");
+  const viceCaptain = vcLine !== -1 ? getPipeValue(vcLine, "VICE_CAPTAIN_PICK") : null;
+
+  const sectionBounds: { key: string; start: number }[] = SECTION_KEYS.map(
+    (key) => ({ key, start: findSectionLine(key) })
+  ).filter((s) => s.start !== -1);
+  sectionBounds.sort((a, b) => a.start - b.start);
+
+  const getBullets = (key: string): string[] => {
+    const idx = sectionBounds.findIndex((s) => s.key === key);
+    if (idx === -1) return [];
+    const start = sectionBounds[idx].start + 1;
+    const end =
+      idx + 1 < sectionBounds.length ? sectionBounds[idx + 1].start : lines.length;
+    return lines
+      .slice(start, end)
+      .filter((l) => l.startsWith("-") || l.startsWith("•"))
+      .map((l) => l.replace(/^[-•]\s*/, "").trim())
+      .filter(Boolean);
+  };
+
+  return {
+    captain: captain.player ? captain : null,
+    viceCaptain: viceCaptain?.player ? viceCaptain : null,
+    strengths: getBullets("STRENGTHS"),
+    weaknesses: getBullets("WEAKNESSES"),
+    transferMarket: getBullets("TRANSFER_MARKET"),
+    chipStrategy: getBullets("CHIP_STRATEGY"),
+    differentials: getBullets("DIFFERENTIALS"),
+  };
+}
+
+// Renders **bold** segments within a line of text
+function renderInline(text: string) {
+  const parts = text.split("**");
+  return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
 }
 
 export default function TeamInsights({
@@ -22,13 +102,15 @@ export default function TeamInsights({
   currentEvent,
   totalPoints,
   events,
+  chipsUsed = [],
+  activeChip = null,
 }: TeamInsightsProps) {
-  const [insights, setInsights] = useState<string>("");
+  const [rawText, setRawText] = useState<string>("");
+  const [parsed, setParsed] = useState<ParsedInsights | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [streamedContent, setStreamedContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
 
   const getPlayer = (elementId: number) => {
@@ -46,9 +128,9 @@ export default function TeamInsights({
   const generateInsights = async () => {
     setLoading(true);
     setError(null);
-    setStreamedContent("");
+    setRawText("");
+    setParsed(null);
     setIsStreaming(true);
-    setInsights("");
 
     try {
       // Get current gameweek info
@@ -72,6 +154,7 @@ export default function TeamInsights({
           is_captain: pick.is_captain,
           is_vice_captain: pick.is_vice_captain,
           multiplier: pick.multiplier,
+          is_starting: pick.position <= 11,
         };
       });
 
@@ -95,6 +178,9 @@ export default function TeamInsights({
           gameweekFinished,
           fixtures,
           elements,
+          teams,
+          chipsUsed,
+          activeChip,
         }),
       });
 
@@ -117,18 +203,22 @@ export default function TeamInsights({
 
             const chunk = decoder.decode(value, { stream: true });
             accumulatedContent += chunk;
-            setStreamedContent(accumulatedContent);
+            setRawText(accumulatedContent);
+
+            const partial = parseInsights(accumulatedContent);
+            if (partial) setParsed(partial);
           }
         }
 
-        setInsights(accumulatedContent);
+        setRawText(accumulatedContent);
+        setParsed(parseInsights(accumulatedContent));
         setIsFallback(false);
       } else {
         // Handle regular JSON response (fallback)
         const result = await response.json();
-        setInsights(result.insights);
+        setRawText(result.insights);
+        setParsed(parseInsights(result.insights));
         setIsFallback(result.fallback || false);
-        setStreamedContent(result.insights);
       }
     } catch (err) {
       console.error("Failed to generate insights:", err);
@@ -137,42 +227,6 @@ export default function TeamInsights({
       setLoading(false);
       setIsStreaming(false);
     }
-  };
-
-  const formatInsights = (text: string) => {
-    // Split by bullet points and format as list items
-    const lines = text.split("\n").filter((line) => line.trim());
-    return lines.map((line, index) => {
-      if (line.startsWith("•") || line.startsWith("-")) {
-        return (
-          <li key={index} className="mb-2">
-            {line.replace(/^[•-]\s*/, "")}
-          </li>
-        );
-      } else if (line.startsWith("**") && line.endsWith("**")) {
-        return (
-          <h4 key={index} className="font-semibold text-lg mb-2 text-blue-700">
-            {line.replace(/\*\*/g, "")}
-          </h4>
-        );
-      } else if (line.includes("**")) {
-        // Handle inline bold text
-        const parts = line.split("**");
-        return (
-          <p key={index} className="mb-2">
-            {parts.map((part, i) =>
-              i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-            )}
-          </p>
-        );
-      } else {
-        return (
-          <p key={index} className="mb-2">
-            {line}
-          </p>
-        );
-      }
-    });
   };
 
   return (
@@ -188,11 +242,6 @@ export default function TeamInsights({
               Basic Mode
             </span>
           )}
-          {/* {isStreaming && (
-            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded animate-pulse">
-              Streaming...
-            </span>
-          )} */}
         </h3>
         <div className="flex items-center gap-2">
           {!isCollapsed && (
@@ -206,7 +255,7 @@ export default function TeamInsights({
             >
               {loading
                 ? "Analyzing..."
-                : insights
+                : parsed
                 ? "New Analysis"
                 : "Analyze Squad"}
             </button>
@@ -219,40 +268,143 @@ export default function TeamInsights({
 
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          {/* {loading && (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-              <p className="">
-                {isStreaming
-                  ? "Streaming analysis..."
-                  : "Analyzing your team..."}
-              </p>
-            </div>
-          )} */}
-
           {error && (
             <div className="border border-red-200 rounded-md p-4">
               <p className="text-red-700">{error}</p>
             </div>
           )}
 
-          {(streamedContent || insights) && (
-            <div className="prose prose-sm max-w-none">
-              <div className="leading-relaxed">
-                {formatInsights(streamedContent || insights)}
-              </div>
-              {/* {isStreaming && (
-                <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
-              )} */}
+          {parsed && (
+            <div className="space-y-4">
+              {/* Captaincy */}
+              {(parsed.captain || parsed.viceCaptain) && (
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <h4 className="font-semibold mb-3">Captaincy</h4>
+                  <div className="space-y-2">
+                    {parsed.captain && (
+                      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                        <p className="text-sm text-yellow-900">
+                          <span className="font-bold">Captain: </span>
+                          {parsed.captain.player}
+                        </p>
+                        <p className="text-xs text-yellow-800 mt-1">
+                          {renderInline(parsed.captain.reasoning)}
+                        </p>
+                      </div>
+                    )}
+                    {parsed.viceCaptain && (
+                      <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                        <p className="text-sm text-orange-900">
+                          <span className="font-bold">Vice-Captain: </span>
+                          {parsed.viceCaptain.player}
+                        </p>
+                        <p className="text-xs text-orange-800 mt-1">
+                          {renderInline(parsed.viceCaptain.reasoning)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Strengths / Weaknesses */}
+              {(parsed.strengths.length > 0 || parsed.weaknesses.length > 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {parsed.strengths.length > 0 && (
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <h4 className="font-semibold mb-2 text-green-800">
+                        Strengths
+                      </h4>
+                      <ul className="space-y-2">
+                        {parsed.strengths.map((s, i) => (
+                          <li key={i} className="text-sm text-gray-800">
+                            {renderInline(s)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {parsed.weaknesses.length > 0 && (
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <h4 className="font-semibold mb-2 text-red-800">
+                        Weaknesses
+                      </h4>
+                      <ul className="space-y-2">
+                        {parsed.weaknesses.map((s, i) => (
+                          <li key={i} className="text-sm text-gray-800">
+                            {renderInline(s)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transfer Market */}
+              {parsed.transferMarket.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <h4 className="font-semibold mb-2 text-blue-800">
+                    Transfer Market
+                  </h4>
+                  <ul className="space-y-2">
+                    {parsed.transferMarket.map((s, i) => (
+                      <li key={i} className="text-sm text-gray-800">
+                        {renderInline(s)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Chip Strategy */}
+              {parsed.chipStrategy.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <h4 className="font-semibold mb-2 text-purple-800">
+                    Chip Strategy
+                  </h4>
+                  <ul className="space-y-2">
+                    {parsed.chipStrategy.map((s, i) => (
+                      <li key={i} className="text-sm text-gray-800">
+                        {renderInline(s)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Differentials */}
+              {parsed.differentials.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <h4 className="font-semibold mb-2 text-indigo-800">
+                    Differentials
+                  </h4>
+                  <ul className="space-y-2">
+                    {parsed.differentials.map((s, i) => (
+                      <li key={i} className="text-sm text-gray-800">
+                        {renderInline(s)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {!isFallback && !isStreaming && (
-                <div className="mt-4 text-xs flex items-center gap-1">
+                <div className="text-xs flex items-center gap-1">
                   <span>Powered by AI</span>
                 </div>
               )}
             </div>
           )}
 
-          {!insights && !streamedContent && !loading && (
+          {/* Raw fallback display if structured parse failed */}
+          {rawText && !parsed && !loading && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <pre className="text-sm whitespace-pre-wrap">{rawText}</pre>
+            </div>
+          )}
+
+          {!parsed && !rawText && !loading && (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">
                 Get AI-powered insights about your team&apos;s strengths, weaknesses, and performance
