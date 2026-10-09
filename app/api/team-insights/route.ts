@@ -7,9 +7,18 @@ import {
   formatAvailability,
 } from "@/lib/player-availability";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily constructed - the OpenAI SDK throws in its constructor if no API
+// key is available, and Next.js evaluates route modules at build time (to
+// collect page data), so instantiating this eagerly at module scope would
+// crash the production build whenever OPENAI_API_KEY isn't set in the build
+// environment (e.g. CI), even though it's only needed at request time.
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
 
 const CHIP_LABELS: Record<string, string> = {
   wildcard: "Wildcard",
@@ -399,7 +408,7 @@ Rules:
 `;
 
       // Create streaming response
-      const stream = await openai.chat.completions.create({
+      const stream = await getOpenAI().chat.completions.create({
         model: RAG_CONFIG.openAI.model,
         messages: [
           {
