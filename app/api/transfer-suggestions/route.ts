@@ -9,9 +9,18 @@ import {
 } from "@/lib/player-availability";
 import { getTransferPlan, getNextWeekFreeTransfers } from "@/lib/transfer-plan";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily constructed - see app/api/team-insights/route.ts for why: the
+// OpenAI SDK throws in its constructor with no API key, and Next.js
+// evaluates route modules at build time, so an eager instance would crash
+// the production build whenever OPENAI_API_KEY isn't set in the build
+// environment (e.g. CI), even though it's only needed at request time.
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
 
 const POINT_HIT_PER_TRANSFER = 4;
 
@@ -518,7 +527,7 @@ Keep it concise and data-driven. Reference specific stats and trends when availa
 
     try {
       // Create streaming response
-      const stream = await openai.chat.completions.create({
+      const stream = await getOpenAI().chat.completions.create({
         model: RAG_CONFIG.openAI.model,
         messages: [
           {
