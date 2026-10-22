@@ -1,22 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { fplScraper } from '@/lib/fpl-scraper';
-
-// External data sources for RAG
-const DATA_SOURCES = {
-  // FPL Analytics APIs
-  fplAnalytics: 'https://fplanalytics.com/api',
-  
-  // Predicted lineups (multiple sources)
-  lineupSources: [
-    'https://www.fantasyfootballscout.co.uk/team-news/',
-    'https://www.premierleague.com/news',
-    'https://twitter.com/BenCrellin' // For rotation/lineup predictions
-  ],
-  
-  // Statistical sources
-  understat: 'https://understat.com',
-  fbref: 'https://fbref.com'
-};
+import { NextRequest, NextResponse } from "next/server";
+import { getGamesPlayed, getMinValidMinutes } from "@/lib/player-eligibility";
+import { getAvailability } from "@/lib/player-availability";
 
 interface RAGData {
   positionAverages: {
@@ -68,51 +52,50 @@ async function fetchWebContent(url: string): Promise<string> {
   }
 }
 
-async function calculatePositionAverages(elements: any[]): Promise<RAGData['positionAverages']> {
+function calculatePositionAverages(
+  elements: any[]
+): RAGData["positionAverages"] {
   const positions = {
-    'Goalkeeper': { id: 1, players: [] as any[] },
-    'Defender': { id: 2, players: [] as any[] },
-    'Midfielder': { id: 3, players: [] as any[] },
-    'Forward': { id: 4, players: [] as any[] },
+    Goalkeeper: { id: 1, players: [] as any[] },
+    Defender: { id: 2, players: [] as any[] },
+    Midfielder: { id: 3, players: [] as any[] },
+    Forward: { id: 4, players: [] as any[] },
   };
 
-  // Group players by position
-  elements.forEach(player => {
-    const positionName = Object.keys(positions).find(pos => 
-      positions[pos as keyof typeof positions].id === player.element_type
+  elements.forEach((player) => {
+    const positionName = Object.keys(positions).find(
+      (pos) =>
+        positions[pos as keyof typeof positions].id === player.element_type
     );
     if (positionName) {
       positions[positionName as keyof typeof positions].players.push(player);
     }
   });
 
-  const result: RAGData['positionAverages'] = {};
+  const result: RAGData["positionAverages"] = {};
 
   Object.entries(positions).forEach(([positionName, data]) => {
     const players = data.players;
     if (players.length === 0) return;
 
-    // Calculate averages
-    const averagePoints = players.reduce((sum, p) => sum + p.total_points, 0) / players.length;
-    
-    // Get top performers (top 10% by points)
-    const sortedByPoints = players.sort((a, b) => b.total_points - a.total_points);
-    const topPerformers = sortedByPoints.slice(0, Math.ceil(players.length * 0.1))
-      .map(p => p.web_name);
+    const averagePoints =
+      players.reduce((sum, p) => sum + p.total_points, 0) / players.length;
 
-    // Price ranges
-    const sortedByPrice = players.sort((a, b) => a.now_cost - b.now_cost);
+    const sortedByPoints = [...players].sort(
+      (a, b) => b.total_points - a.total_points
+    );
+    const topPerformers = sortedByPoints
+      .slice(0, Math.ceil(players.length * 0.1))
+      .map((p) => p.web_name);
+
+    const sortedByPrice = [...players].sort((a, b) => a.now_cost - b.now_cost);
     const priceRanges = {
       budget: sortedByPrice[Math.floor(players.length * 0.33)]?.now_cost / 10 || 0,
       mid: sortedByPrice[Math.floor(players.length * 0.66)]?.now_cost / 10 || 0,
       premium: sortedByPrice[Math.floor(players.length * 0.9)]?.now_cost / 10 || 0,
     };
 
-    result[positionName] = {
-      averagePoints,
-      topPerformers,
-      priceRanges,
-    };
+    result[positionName] = { averagePoints, topPerformers, priceRanges };
   });
 
   return result;
@@ -164,10 +147,23 @@ async function fetchTransferTrends(elements: any[]): Promise<RAGData['transferTr
 
 export async function POST(request: NextRequest) {
   try {
-    const { elements, fixtures, currentGameweek } = await request.json();
+    const { elements, fixtures, currentGameweek, gameweekFinished } =
+      await request.json();
 
-    // Fetch enhanced scraped data
-    const scrapedData = await fplScraper.scrapeAll();
+    if (!elements) {
+      return NextResponse.json(
+        { error: "Missing elements data" },
+        { status: 400 }
+      );
+    }
+
+    // Exclude fringe players (backups, youth, one-off cameos) from analysis -
+    // require at least 1/3 of the season's possible minutes so far.
+    const gamesPlayed = getGamesPlayed(currentGameweek, !!gameweekFinished);
+    const minValidMinutes = getMinValidMinutes(gamesPlayed);
+    const validElements = elements.filter(
+      (p: any) => (p.minutes || 0) >= minValidMinutes
+    );
 
     // Fetch and compile RAG data with ONLY legitimate sources
     const ragData: RAGData = {
@@ -194,15 +190,12 @@ Latest FPL Intelligence:
 
     return NextResponse.json({
       ragData,
-      externalContent,
-      scrapedData,
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
-    console.error('Error fetching RAG data:', error);
+    console.error("Error computing RAG data:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch RAG data' },
+      { error: "Failed to compute RAG data" },
       { status: 500 }
     );
   }

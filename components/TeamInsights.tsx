@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Element, Pick, Team, ElementType, Event, Fixture } from "@/types/fpl";
+import { useState } from "react";
+import { Element, Pick, Team, ElementType, Event, ChipPlay } from "@/types/fpl";
 import { getFixtures } from "@/lib/fpl-api";
 
 interface TeamInsightsProps {
@@ -29,12 +29,12 @@ export default function TeamInsights({
   teamHistory,
   userLeagues,
 }: TeamInsightsProps) {
-  const [insights, setInsights] = useState<string>("");
+  const [rawText, setRawText] = useState<string>("");
+  const [parsed, setParsed] = useState<ParsedInsights | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFallback, setIsFallback] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [streamedContent, setStreamedContent] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [grade, setGrade] = useState<number | null>(null);
   const [gradeDescription, setGradeDescription] = useState<string>("");
@@ -54,9 +54,9 @@ export default function TeamInsights({
   const generateInsights = async () => {
     setLoading(true);
     setError(null);
-    setStreamedContent("");
+    setRawText("");
+    setParsed(null);
     setIsStreaming(true);
-    setInsights("");
 
     try {
       // Get current gameweek info
@@ -80,6 +80,7 @@ export default function TeamInsights({
           is_captain: pick.is_captain,
           is_vice_captain: pick.is_vice_captain,
           multiplier: pick.multiplier,
+          is_starting: pick.position <= 11,
         };
       });
 
@@ -139,11 +140,15 @@ export default function TeamInsights({
 
             const chunk = decoder.decode(value, { stream: true });
             accumulatedContent += chunk;
-            setStreamedContent(accumulatedContent);
+            setRawText(accumulatedContent);
+
+            const partial = parseInsights(accumulatedContent);
+            if (partial) setParsed(partial);
           }
         }
 
-        setInsights(accumulatedContent);
+        setRawText(accumulatedContent);
+        setParsed(parseInsights(accumulatedContent));
         setIsFallback(false);
       }
     } catch (err) {
@@ -153,42 +158,6 @@ export default function TeamInsights({
       setLoading(false);
       setIsStreaming(false);
     }
-  };
-
-  const formatInsights = (text: string) => {
-    // Split by bullet points and format as list items
-    const lines = text.split("\n").filter((line) => line.trim());
-    return lines.map((line, index) => {
-      if (line.startsWith("•") || line.startsWith("-")) {
-        return (
-          <li key={index} className="mb-2">
-            {line.replace(/^[•-]\s*/, "")}
-          </li>
-        );
-      } else if (line.startsWith("**") && line.endsWith("**")) {
-        return (
-          <h4 key={index} className="font-semibold text-lg mb-2 text-blue-700">
-            {line.replace(/\*\*/g, "")}
-          </h4>
-        );
-      } else if (line.includes("**")) {
-        // Handle inline bold text
-        const parts = line.split("**");
-        return (
-          <p key={index} className="mb-2">
-            {parts.map((part, i) =>
-              i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-            )}
-          </p>
-        );
-      } else {
-        return (
-          <p key={index} className="mb-2">
-            {line}
-          </p>
-        );
-      }
-    });
   };
 
   return (
@@ -260,14 +229,21 @@ export default function TeamInsights({
                 <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
               )} */}
               {!isFallback && !isStreaming && (
-                <div className="mt-4 text-xs flex items-center gap-1">
+                <div className="text-xs flex items-center gap-1">
                   <span>Powered by AI</span>
                 </div>
               )}
             </div>
           )}
 
-          {!insights && !streamedContent && !loading && (
+          {/* Raw fallback display if structured parse failed */}
+          {rawText && !parsed && !loading && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <pre className="text-sm whitespace-pre-wrap">{rawText}</pre>
+            </div>
+          )}
+
+          {!parsed && !rawText && !loading && (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">
                 Get your team rated based on weekly performance vs average, personal league rankings, and overall rank

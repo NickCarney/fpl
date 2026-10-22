@@ -47,9 +47,8 @@ export const RAG_CONFIG = {
     reasoning_effort: "minimal" as const,
     systemPrompt: `You are an elite Fantasy Premier League analyst with access to comprehensive real-time data including:
     - Expected goals (xG) and expected assists (xA) statistics
-    - Transfer market trends and ownership data
-    - Predicted lineups and rotation information
-    - Expert opinions and community sentiment
+    - Live transfer market trends and ownership data
+    - Injury and availability status
     - Historical performance benchmarks
 
     Provide data-driven, specific, and actionable FPL advice.`,

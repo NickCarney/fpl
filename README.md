@@ -1,4 +1,4 @@
-# ⚽ Fantasy Premier League Dashboard (Next.js)
+# Fantasy Premier League Dashboard (Next.js)
 
 This project is a Next.js web app that consumes the **Fantasy Premier League (FPL) API** to provide insights into your team, leagues, and players.  
 The FPL API is undocumented but public and widely used by the community.
@@ -98,7 +98,7 @@ Some key endpoints:
 6. **Open your browser**
    Navigate to `http://localhost:3000` and enter your FPL Team ID
 
-## 🧠 AI-Powered RAG System
+## AI-Powered RAG System
 
 The dashboard features an advanced Retrieval-Augmented Generation (RAG) system that enhances team insights with real-time data from multiple sources:
 
@@ -133,4 +133,4 @@ export const RAG_CONFIG = {
 };
 ```
 
-## 🔧 Technical Stack
+## Technical Stack

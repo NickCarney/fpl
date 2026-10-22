@@ -39,18 +39,14 @@ export async function POST(request: NextRequest) {
     const gradeDescription = getGradeDescription(grade);
 
     try {
-      // Fetch RAG data for enhanced analysis with caching
+      // Fetch RAG data (computed live from real FPL data) with caching
       let ragData = null;
-      let externalContent = null;
 
       const cacheKey = `rag-data-${currentGameweek}`;
-      const cachedData = ragCache.get<{ ragData: any; externalContent: any }>(
-        cacheKey
-      );
+      const cachedData = ragCache.get<{ ragData: any }>(cacheKey);
 
       if (cachedData && RAG_CONFIG.features.enableCaching) {
         ragData = cachedData.ragData;
-        externalContent = cachedData.externalContent;
       } else {
         try {
           const ragResponse = await fetch(
@@ -60,21 +56,21 @@ export async function POST(request: NextRequest) {
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ elements, fixtures, currentGameweek }),
+              body: JSON.stringify({
+                elements,
+                fixtures,
+                currentGameweek,
+                gameweekFinished,
+              }),
             }
           );
 
           if (ragResponse.ok) {
             const ragResult = await ragResponse.json();
             ragData = ragResult.ragData;
-            externalContent = ragResult.externalContent;
 
             if (RAG_CONFIG.features.enableCaching) {
-              ragCache.set(
-                cacheKey,
-                { ragData, externalContent },
-                RAG_CONFIG.cache.ragDataTTL
-              );
+              ragCache.set(cacheKey, { ragData }, RAG_CONFIG.cache.ragDataTTL);
             }
           }
         } catch (error) {
@@ -85,21 +81,30 @@ export async function POST(request: NextRequest) {
       }
 
       // Prepare data for analysis
-      const squadAnalysis = squadData.map((player: any) => ({
-        name: player.web_name,
-        position: player.position_name,
-        team: player.team_name,
-        teamId: player.team,
-        points: player.total_points,
-        form: player.form,
-        price: player.now_cost / 10,
-        minutes: player.minutes,
-        goals: player.goals_scored,
-        assists: player.assists,
-        cleanSheets: player.clean_sheets,
-        isCaptain: player.is_captain,
-        isViceCaptain: player.is_vice_captain,
-      }));
+      const squadAnalysis = squadData.map((player: any) => {
+        const availability = getAvailability(
+          player.status,
+          player.chance_of_playing_next_round,
+          player.news
+        );
+        return {
+          name: player.web_name,
+          position: player.position_name,
+          team: player.team_name,
+          teamId: player.team,
+          points: player.total_points,
+          form: player.form,
+          price: player.now_cost / 10,
+          minutes: player.minutes,
+          goals: player.goals_scored,
+          assists: player.assists,
+          cleanSheets: player.clean_sheets,
+          isCaptain: player.is_captain,
+          isViceCaptain: player.is_vice_captain,
+          isStarting: player.is_starting !== false,
+          availability,
+        };
+      });
 
       // Analyze current gameweek fixtures for each team
       const currentGameweekFixtures =
@@ -132,11 +137,148 @@ export async function POST(request: NextRequest) {
         };
       });
 
+      // --- Real forward-looking fixture analysis (next 5 gameweeks) ---
+      const teamsById = new Map<number, any>(
+        (teams || []).map((t: any) => [t.id, t])
+      );
+      const windowEnd = currentGameweek + 5;
+      const upcomingFixtures = (fixtures || []).filter(
+        (f: any) => f.event > currentGameweek && f.event <= windowEnd
+      );
+
+      const fixtureLabel = (fixture: any, teamId: number) => {
+        const isHome = fixture.team_h === teamId;
+        const oppId = isHome ? fixture.team_a : fixture.team_h;
+        const opp = teamsById.get(oppId)?.short_name || "?";
+        const difficulty = isHome
+          ? fixture.team_h_difficulty
+          : fixture.team_a_difficulty;
+        return `${isHome ? "vs" : "@"}${opp}(${difficulty})`;
+      };
+
+      const squadWithFixtureRun = squadWithFixtures.map((p: any) => {
+        const teamFixtures = upcomingFixtures
+          .filter((f: any) => f.team_h === p.teamId || f.team_a === p.teamId)
+          .sort((a: any, b: any) => a.event - b.event);
+        const nextFixture = teamFixtures[0];
+        const runLabel = teamFixtures
+          .map((f: any) => fixtureLabel(f, p.teamId))
+          .join(", ");
+        const avgDifficulty =
+          teamFixtures.length > 0
+            ? (
+                teamFixtures.reduce(
+                  (sum: number, f: any) =>
+                    sum +
+                    (f.team_h === p.teamId
+                      ? f.team_h_difficulty
+                      : f.team_a_difficulty),
+                  0
+                ) / teamFixtures.length
+              ).toFixed(1)
+            : null;
+        return {
+          ...p,
+          nextFixture: nextFixture
+            ? fixtureLabel(nextFixture, p.teamId)
+            : "blank next GW",
+          fixtureRun: runLabel || "no fixtures in next 5 GWs",
+          avgFixtureDifficulty: avgDifficulty,
+        };
+      });
+
+      // Squad-wide gameweek-by-gameweek outlook, useful for chip timing (Bench Boost / Triple Captain windows)
+      const gwWindowAnalysis = [];
+      for (let gw = currentGameweek + 1; gw <= windowEnd; gw++) {
+        let appearances = 0;
+        let totalDifficulty = 0;
+        let playersWithFixture = 0;
+        squadWithFixtures.forEach((p: any) => {
+          const pf = (fixtures || []).filter(
+            (f: any) =>
+              f.event === gw && (f.team_h === p.teamId || f.team_a === p.teamId)
+          );
+          if (pf.length > 0) playersWithFixture++;
+          pf.forEach((f: any) => {
+            totalDifficulty +=
+              f.team_h === p.teamId ? f.team_h_difficulty : f.team_a_difficulty;
+            appearances++;
+          });
+        });
+        gwWindowAnalysis.push({
+          gameweek: gw,
+          playersWithFixture,
+          totalAppearances: appearances,
+          avgDifficulty:
+            appearances > 0 ? (totalDifficulty / appearances).toFixed(2) : null,
+        });
+      }
+
+      const fixtureOutlookContext = `
+Squad Fixture Run (next 5 GWs, difficulty 1=easiest to 5=hardest):
+${squadWithFixtureRun
+  .map((p: any) => `${p.name} (${p.team}): ${p.fixtureRun}`)
+  .join("\n")}
+
+Gameweek-by-Gameweek Squad Outlook (use this for chip timing):
+${gwWindowAnalysis
+  .map(
+    (g: any) =>
+      `GW${g.gameweek}: ${g.playersWithFixture}/${squadWithFixtures.length} squad players have a fixture, ${
+        g.totalAppearances
+      } total player-appearances${
+        g.totalAppearances > squadWithFixtures.length
+          ? " (some squad players have a double gameweek)"
+          : g.totalAppearances < squadWithFixtures.length
+          ? " (some squad players are blank this gameweek)"
+          : ""
+      }, avg difficulty ${g.avgDifficulty ?? "N/A"}`
+  )
+  .join("\n")}
+`;
+
+      // --- Real chip usage context ---
+      const chipStatus = CHIP_TYPES.map((type) => {
+        const usages = (chipsUsed || []).filter((c: any) => c.name === type);
+        const usedFirstHalf = usages.some(
+          (c: any) => c.event <= FIRST_HALF_DEADLINE_GW
+        );
+        const usedSecondHalf = usages.some(
+          (c: any) => c.event > FIRST_HALF_DEADLINE_GW
+        );
+        return {
+          label: CHIP_LABELS[type],
+          events: usages.map((c: any) => c.event),
+          usedFirstHalf,
+          usedSecondHalf,
+        };
+      });
+
+      const chipContext = `
+Chip Status (each of Wildcard/Free Hit/Bench Boost/Triple Captain is available twice per season: once for GW1-${FIRST_HALF_DEADLINE_GW}, once for GW${
+        FIRST_HALF_DEADLINE_GW + 1
+      }-38):
+${chipStatus
+  .map((c) => {
+    const usedText =
+      c.events.length > 0 ? `used in GW ${c.events.join(", ")}` : "not yet used";
+    const urgency =
+      !c.usedFirstHalf && currentGameweek <= FIRST_HALF_DEADLINE_GW
+        ? ` - first-half chip still available, must be used by GW${FIRST_HALF_DEADLINE_GW} or it is lost`
+        : !c.usedSecondHalf && currentGameweek > FIRST_HALF_DEADLINE_GW
+        ? " - second-half chip still available"
+        : "";
+    return `${c.label}: ${usedText}${urgency}`;
+  })
+  .join("\n")}
+${activeChip ? `Active this gameweek: ${CHIP_LABELS[activeChip] || activeChip}` : "No chip active this gameweek"}
+`;
+
       const gameweekStatusText = gameweekFinished
         ? "Gameweek has finished"
         : "Gameweek is ongoing - some matches may not have been played yet";
 
-      // Build enhanced context with RAG data
+      // Build enhanced context with RAG data (all computed from live FPL data)
       let ragContext = "";
       if (ragData) {
         ragContext = `
@@ -181,23 +323,20 @@ ${
     .join(", ") || "No xG data available"
 }
 
-Form Trends:
-${
-  externalContent.analytics?.formTable
-    ?.map((p: any) => `${p.player}: ${p.form} (${p.trend})`)
-    .join(", ") || "No form data available"
-}
+Expected Goals (xG) Leaders:
+${ragData.xgLeaders
+  .map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`)
+  .join(", ")}
 
-Community Insights:
+Injury/Availability Concerns:
 ${
-  externalContent.predictions
-    ?.map((pred: any) =>
-      pred.predictions
-        .slice(0, 2)
-        .map((p: any) => `${p.player}: ${p.prediction}`)
-        .join("; ")
-    )
-    .join("\n") || "No community insights available"
+  ragData.availabilityConcerns.length > 0
+    ? ragData.availabilityConcerns
+        .map(
+          (p: any) => `${p.player}: ${p.status}${p.news ? ` - ${p.news}` : ""}`
+        )
+        .join("\n")
+    : "No significant availability concerns among widely-owned players"
 }
 `;
       }
@@ -213,7 +352,8 @@ ${JSON.stringify(breakdown, null, 2)}
 
 CONTEXT: ${gameweekStatusText}
 ${ragContext}
-${externalContext}
+${fixtureOutlookContext}
+${chipContext}
 
 Team Overview:
 - Total Points: ${teamData.totalPoints}
@@ -223,14 +363,20 @@ Team Overview:
 - Current Gameweek: ${currentGameweek}
 
 Squad Details:
-${squadWithFixtures
+${squadWithFixtureRun
   .map(
     (p: any) =>
       `${p.name} (${p.team}) - ${p.position}: ${p.points}pts, Form: ${
         p.form
       }, £${p.price}m, ${p.minutes} mins${p.isCaptain ? " [CAPTAIN]" : ""}${
         p.isViceCaptain ? " [VC]" : ""
-      }${!p.hasPlayedThisGW ? " [NOT PLAYED YET THIS GW]" : ""}`
+      }${p.isStarting ? "" : " [BENCH]"}${
+        !p.hasPlayedThisGW ? " [NOT PLAYED YET THIS GW]" : ""
+      } | Next: ${p.nextFixture}${
+        p.availability
+          ? ` | AVAILABILITY: ${formatAvailability(p.availability)}`
+          : ""
+      }`
   )
   .join("\n")}
 
@@ -297,7 +443,7 @@ Format as bullet points with section headers.
     } catch (aiError) {
       console.error("Error with OpenAI analysis:", aiError);
 
-      // Enhanced fallback insights with basic data
+      // Enhanced fallback insights with basic data, matching the structured format
       const fallbackInsights = `
 **Team Analysis** (Basic Mode)
 • Your team has been rated ${grade}/100 based on performance metrics

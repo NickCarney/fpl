@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Element, Pick, Team, ElementType, Event } from "@/types/fpl";
+import { Element, Pick, Team, ElementType, Event, TeamHistory } from "@/types/fpl";
 import PlayerDetailPopup from "./PlayerDetailPopup";
 import TeamInsights from "./TeamInsights";
 import TransferSuggestions from "./TransferSuggestions";
@@ -1123,7 +1123,7 @@ export default function CurrentSquad({
       return (
         <div
           key={pick.element}
-          className="gradient-border rounded-lg w-16 md:w-24 h-20 md:h-32"
+          className="gradient-border rounded-lg w-16 md:w-24"
         >
           <div
             onClick={() => handlePlayerClick(pick)}
@@ -1206,7 +1206,7 @@ export default function CurrentSquad({
             </div>
 
             {/* Form and Minutes - Updated - Hidden on mobile, shown on desktop */}
-            <div className="hidden md:block text-center text-xs mb-2">
+            <div className="hidden md:block text-center text-xs">
               <div>Form: {stats.form}</div>
               <div className={stats.statusColor}>{stats.minutes}</div>
               {stats.isGameweek && (
@@ -1255,20 +1255,6 @@ export default function CurrentSquad({
                   GW{nextGameweekId}: {fixtureInfo.isHome ? "vs" : "@"}{" "}
                   {fixtureInfo.opponent}
                 </div>
-              )}
-            </div>
-
-            {/* Captain/Vice-Captain Badges */}
-            <div className="flex justify-center gap-0.5 md:gap-1 mt-auto">
-              {pick.is_captain && (
-                <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-400 text-[8px] md:text-xs rounded font-bold">
-                  C
-                </span>
-              )}
-              {pick.is_vice_captain && (
-                <span className="px-0.5 md:px-2 py-0.5 md:py-1 bg-yellow-200 text-[8px] md:text-xs rounded font-bold">
-                  V
-                </span>
               )}
             </div>
           </div>
