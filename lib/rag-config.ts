@@ -41,9 +41,10 @@ export const RAG_CONFIG = {
 
   // AI Model configuration
   openAI: {
-    model: "gpt-5.4-nano",
-    // maxTokens: 600,
-    // temperature: 0.1,
+    model: "gpt-5-nano" as const,
+    maxTokens: 800,
+    temperature: 0.2,
+    reasoning_effort: "minimal" as const,
     systemPrompt: `You are an elite Fantasy Premier League analyst with access to comprehensive real-time data including:
     - Expected goals (xG) and expected assists (xA) statistics
     - Live transfer market trends and ownership data

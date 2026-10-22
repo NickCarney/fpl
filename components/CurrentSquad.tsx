@@ -5,6 +5,7 @@ import { Element, Pick, Team, ElementType, Event, TeamHistory } from "@/types/fp
 import PlayerDetailPopup from "./PlayerDetailPopup";
 import TeamInsights from "./TeamInsights";
 import TransferSuggestions from "./TransferSuggestions";
+import PointsBreakdownModal from "./PointsBreakdownModal";
 import {
   getTeamNews,
   getFixtures,
@@ -19,7 +20,8 @@ interface CurrentSquadProps {
   currentEvent: number;
   events: Event[];
   teamPicks?: any; // Full team picks data including entry history
-  teamHistory?: TeamHistory | null;
+  teamHistory?: any; // Team history with weekly scores
+  userLeagues?: any[]; // User's leagues with rankings
 }
 
 export default function CurrentSquad({
@@ -31,6 +33,7 @@ export default function CurrentSquad({
   events,
   teamPicks,
   teamHistory,
+  userLeagues,
 }: CurrentSquadProps) {
   const [isFormationView, setIsFormationView] = useState(true);
   const [manualStarterPoints, setManualStarterPoints] = useState(0);
@@ -46,6 +49,34 @@ export default function CurrentSquad({
     position: ElementType;
   } | null>(null);
   const [gameweekData, setGameweekData] = useState<{ [key: number]: any }>({});
+  const [pointsBreakdownPlayer, setPointsBreakdownPlayer] = useState<{
+    playerId: number;
+    playerName: string;
+    points: number | string;
+    position: number;
+    multiplier?: number;
+    isCaptain?: boolean;
+    isViceCaptain?: boolean;
+  } | null>(null);
+  const [liveStandingsEnabled, setLiveStandingsEnabled] = useState(false);
+  const [substitutions, setSubstitutions] = useState<
+    Array<{
+      outPlayer: number;
+      inPlayer: number;
+    }>
+  >([]);
+  const [animatingSubstitution, setAnimatingSubstitution] = useState<{
+    outPlayer: number;
+    inPlayer: number;
+    phase: "flying" | "swapping";
+  } | null>(null);
+  const [livePoints, setLivePoints] = useState<number | null>(null);
+  const [liveBenchPoints, setLiveBenchPoints] = useState<number | null>(null);
+  const [liveTotalPoints, setLiveTotalPoints] = useState<number | null>(null);
+  const [displayPicks, setDisplayPicks] = useState<Pick[]>([]);
+  const [liveGameweekData, setLiveGameweekData] = useState<any>(null);
+  const [predictedBonus, setPredictedBonus] = useState<{ [playerId: number]: number }>({});
+  const [hasAnimated, setHasAnimated] = useState(false);
 
   // Add function to fetch gameweek data for a player
   const fetchPlayerGameweekData = async (playerId: number) => {
@@ -109,6 +140,51 @@ export default function CurrentSquad({
     }
   }, [picks, currentEvent]);
 
+  // Sync displayPicks with picks only when live standings is disabled
+  useEffect(() => {
+    if (!liveStandingsEnabled) {
+      setDisplayPicks([...picks]);
+    }
+  }, [picks, liveStandingsEnabled]);
+
+  // Fetch live gameweek data for bonus calculations
+  useEffect(() => {
+    const fetchLiveData = async () => {
+      if (liveStandingsEnabled) {
+        try {
+          const response = await fetch(`/api/event/${currentEvent}/live`);
+          const data = await response.json();
+          setLiveGameweekData(data);
+        } catch (error) {
+          console.error("Error fetching live gameweek data:", error);
+        }
+      }
+    };
+
+    fetchLiveData();
+  }, [liveStandingsEnabled, currentEvent]);
+
+  // Trigger substitution calculation when live data is ready
+  useEffect(() => {
+    if (
+      liveStandingsEnabled &&
+      Object.keys(gameweekData).length > 0 &&
+      picks.length > 0 &&
+      liveGameweekData &&
+      !hasAnimated // Only calculate once when data is ready
+    ) {
+      calculateSubstitutions();
+    } else if (!liveStandingsEnabled) {
+      setSubstitutions([]);
+      setLivePoints(null);
+      setLiveBenchPoints(null);
+      setLiveTotalPoints(null);
+      setDisplayPicks([...picks]);
+      setPredictedBonus({});
+      setHasAnimated(false);
+    }
+  }, [liveStandingsEnabled, gameweekData, picks, liveGameweekData, hasAnimated]);
+
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
   };
@@ -142,7 +218,23 @@ export default function CurrentSquad({
 
         if (gameHasStarted) {
           if (gameweekMinutes > 0) {
-            pointsDisplay = `${gameweekPoints}pts`;
+            // Show actual points regardless of multiplier (for bench display)
+            // But indicate captain/vice-captain with multiplier if applicable
+            const currentBonus = playerGameweekData.bonus || 0;
+            const predictedBonusPoints = (currentBonus === 0) ? (predictedBonus[player.id] || 0) : 0;
+            const pointsWithBonus = gameweekPoints + predictedBonusPoints;
+            const displayPoints =
+              pick.multiplier > 0
+                ? pointsWithBonus * pick.multiplier
+                : pointsWithBonus;
+
+            // Show predicted bonus separately if applicable
+            if (liveStandingsEnabled && predictedBonusPoints > 0) {
+              pointsDisplay = `${displayPoints}pts (+${predictedBonusPoints}*)`;
+            } else {
+              pointsDisplay = `${displayPoints}pts`;
+            }
+
             minutesDisplay = `${gameweekMinutes} mins`;
             statusColor =
               gameweekPoints > 0 ? "text-green-700" : "text-gray-700";
@@ -196,6 +288,374 @@ export default function CurrentSquad({
         ppg: player.points_per_game,
       };
     }
+  };
+
+  // Calculate predicted bonus points for players who played but haven't received bonus yet
+  const calculatePredictedBonus = () => {
+    if (!liveGameweekData || !liveGameweekData.elements) {
+      return {};
+    }
+
+    const bonusPredictions: { [playerId: number]: number } = {};
+
+    // Group ALL players in the game by fixture (not just our picks)
+    const fixtureGroups: { [fixtureId: number]: Array<{ id: number; bps: number; bonus: number; minutes: number }> } = {};
+    const fixtureHasBonus: { [fixtureId: number]: boolean } = {};
+
+    // Build fixture groups from ALL players in the live data
+    liveGameweekData.elements.forEach((playerLiveData: any) => {
+      if (playerLiveData.explain && playerLiveData.explain.length > 0) {
+        const fixtureId = playerLiveData.explain[0].fixture;
+        const bps = playerLiveData.stats.bps || 0;
+        const bonus = playerLiveData.stats.bonus || 0;
+        const minutes = playerLiveData.stats.minutes || 0;
+
+        // Track if any player in this fixture has bonus awarded
+        if (bonus > 0) {
+          fixtureHasBonus[fixtureId] = true;
+        }
+
+        // Collect all players who played (we'll filter later)
+        if (minutes > 0) {
+          if (!fixtureGroups[fixtureId]) {
+            fixtureGroups[fixtureId] = [];
+          }
+          fixtureGroups[fixtureId].push({
+            id: playerLiveData.id,
+            bps,
+            bonus,
+            minutes
+          });
+        }
+      }
+    });
+
+    // Calculate bonus for each fixture - only if bonus hasn't been awarded yet
+    Object.entries(fixtureGroups).forEach(([fixtureId, players]) => {
+      // Skip this fixture if bonus has already been awarded
+      if (fixtureHasBonus[Number(fixtureId)]) {
+        return;
+      }
+      // Sort by BPS descending
+      const sortedPlayers = players.sort((a, b) => b.bps - a.bps);
+
+      if (sortedPlayers.length === 0) return;
+
+      // Find top BPS value(s) - 3 bonus points
+      const topBPS = sortedPlayers[0].bps;
+      if (topBPS === 0) return; // No bonus if no BPS
+
+      const topPlayers = sortedPlayers.filter(p => p.bps === topBPS);
+      topPlayers.forEach(p => {
+        bonusPredictions[p.id] = 3;
+      });
+
+      // Find second highest BPS value(s) - 2 bonus points
+      const remainingAfterTop = sortedPlayers.filter(p => p.bps < topBPS);
+      if (remainingAfterTop.length > 0) {
+        const secondBPS = remainingAfterTop[0].bps;
+        if (secondBPS > 0) {
+          const secondPlayers = remainingAfterTop.filter(p => p.bps === secondBPS);
+          secondPlayers.forEach(p => {
+            bonusPredictions[p.id] = 2;
+          });
+
+          // Find third highest BPS value(s) - 1 bonus point
+          const remainingAfterSecond = remainingAfterTop.filter(p => p.bps < secondBPS);
+          if (remainingAfterSecond.length > 0) {
+            const thirdBPS = remainingAfterSecond[0].bps;
+            if (thirdBPS > 0) {
+              const thirdPlayers = remainingAfterSecond.filter(p => p.bps === thirdBPS);
+              thirdPlayers.forEach(p => {
+                bonusPredictions[p.id] = 1;
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return bonusPredictions;
+  };
+
+  // Calculate substitutions based on DNP players
+  const calculateSubstitutions = () => {
+    const isBenchBoost = teamPicks?.active_chip === "bboost";
+
+    // If bench boost active, no substitutions
+    if (isBenchBoost) {
+      setSubstitutions([]);
+      return;
+    }
+
+    const startingXI = picks.filter((pick) => pick.position <= 11);
+    const bench = picks.filter((pick) => pick.position > 11);
+
+    const subs: Array<{ outPlayer: number; inPlayer: number }> = [];
+
+    // Helper function to check if a player is DNP (not YTP)
+    const isPlayerDNP = (elementId: number): boolean => {
+      const playerData = gameweekData[elementId];
+      if (!playerData) return false;
+
+      // A player "did not play" (DNP) only if:
+      // 1. Their game has kicked off (kickoff_time has passed)
+      // 2. AND they got 0 minutes
+      // If game hasn't kicked off yet, the player is yet to play (YTP), not DNP
+      if (!playerData.kickoff_time) return false; // No kickoff time = YTP
+
+      const kickoffTime = new Date(playerData.kickoff_time);
+      const currentTime = new Date();
+      const gameHasStarted = currentTime >= kickoffTime;
+
+      // Only DNP if game has started AND player got 0 minutes
+      return gameHasStarted && playerData.minutes === 0;
+    };
+
+    // Helper function to check if a player has played (for bench players)
+    const hasPlayerPlayed = (elementId: number): boolean => {
+      const playerData = gameweekData[elementId];
+      if (!playerData) return false;
+
+      // Player has played if their game has kicked off and they got minutes
+      if (!playerData.kickoff_time) return false; // No kickoff time = hasn't played yet
+
+      const kickoffTime = new Date(playerData.kickoff_time);
+      const currentTime = new Date();
+      const gameHasStarted = currentTime >= kickoffTime;
+
+      // Only counts as "played" if game has started AND player got minutes
+      return gameHasStarted && playerData.minutes > 0;
+    };
+
+    // Check for DNP players and valid substitutions
+    // GK substitution
+    const gk = startingXI.find((pick) => pick.position === 1);
+    if (gk && isPlayerDNP(gk.element)) {
+      const backupGK = bench.find((pick) => {
+        const player = getPlayer(pick.element);
+        return player?.element_type === 1;
+      });
+      if (backupGK && hasPlayerPlayed(backupGK.element)) {
+        subs.push({ outPlayer: gk.element, inPlayer: backupGK.element });
+      }
+    }
+
+    // Outfield substitutions
+    const dnpOutfield = startingXI.filter((pick) => {
+      if (pick.position === 1) return false; // Skip GK
+      return isPlayerDNP(pick.element);
+    });
+
+    const availableBench = bench
+      .filter((pick) => {
+        const player = getPlayer(pick.element);
+        if (player?.element_type === 1) return false; // Skip GK
+        return hasPlayerPlayed(pick.element);
+      })
+      .sort((a, b) => a.position - b.position);
+
+    for (const benchPick of availableBench) {
+      if (dnpOutfield.length === 0) break;
+
+      const benchPlayer = getPlayer(benchPick.element);
+      if (!benchPlayer) continue;
+
+      for (let i = 0; i < dnpOutfield.length; i++) {
+        const dnpPick = dnpOutfield[i];
+        const dnpPlayer = getPlayer(dnpPick.element);
+        if (!dnpPlayer) continue;
+
+        // Test substitution
+        const testLineup = startingXI.map((pick) => {
+          if (pick.element === dnpPick.element) {
+            return { ...benchPick, position: pick.position };
+          }
+          // Check if this player was already subbed out
+          const alreadySubbed = subs.find((s) => s.outPlayer === pick.element);
+          if (alreadySubbed) {
+            const subInPlayer = subs.find((s) => s.outPlayer === pick.element);
+            if (subInPlayer) {
+              return (
+                picks.find((p) => p.element === subInPlayer.inPlayer) || pick
+              );
+            }
+          }
+          return pick;
+        });
+
+        // Count formation
+        const outfield = testLineup.filter((pick) => pick.position > 1);
+        const defCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 2;
+        }).length;
+        const midCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 3;
+        }).length;
+        const fwdCount = outfield.filter((pick) => {
+          const player = getPlayer(pick.element);
+          return player?.element_type === 4;
+        }).length;
+
+        // Check formation rules
+        if (defCount >= 3 && midCount >= 3 && fwdCount >= 1) {
+          subs.push({
+            outPlayer: dnpPick.element,
+            inPlayer: benchPick.element,
+          });
+          dnpOutfield.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    setSubstitutions(subs);
+
+    // Calculate predicted bonus points
+    const bonusPredictions = calculatePredictedBonus();
+    setPredictedBonus(bonusPredictions);
+
+    // Calculate live points with substitutions
+    calculateLivePoints(subs, isBenchBoost, bonusPredictions);
+
+    // Trigger animation sequence only once
+    if (subs.length > 0 && !hasAnimated) {
+      setHasAnimated(true);
+      animateSubstitutions(subs);
+    }
+  };
+
+  const calculateLivePoints = (
+    subs: Array<{ outPlayer: number; inPlayer: number }>,
+    isBenchBoost: boolean,
+    bonusPredictions: { [playerId: number]: number }
+  ) => {
+    let starterPoints = 0;
+    let benchPoints = 0;
+
+    if (isBenchBoost) {
+      // Count all players (all 15 count as starters for bench boost)
+      picks.forEach((pick) => {
+        const playerData = gameweekData[pick.element];
+        if (playerData) {
+          const multiplier = pick.multiplier > 0 ? pick.multiplier : 1;
+          const currentBonus = playerData.bonus || 0;
+          const predictedBonus = (currentBonus === 0) ? (bonusPredictions[pick.element] || 0) : 0;
+          starterPoints += (playerData.total_points + predictedBonus) * multiplier;
+        }
+      });
+      benchPoints = 0; // No separate bench for bench boost
+    } else {
+      // Get final lineup after substitutions
+      const finalStarterIds = new Set<number>();
+      const finalBenchIds = new Set<number>();
+
+      // Build final lineup
+      picks
+        .filter((pick) => pick.position <= 11)
+        .forEach((pick) => {
+          const sub = subs.find((s) => s.outPlayer === pick.element);
+          if (sub) {
+            finalStarterIds.add(sub.inPlayer);
+            finalBenchIds.add(pick.element);
+          } else {
+            finalStarterIds.add(pick.element);
+          }
+        });
+
+      // Add remaining bench players who weren't subbed in
+      picks
+        .filter((pick) => pick.position > 11)
+        .forEach((pick) => {
+          if (!finalStarterIds.has(pick.element)) {
+            finalBenchIds.add(pick.element);
+          }
+        });
+
+      // Calculate starter points
+      picks.forEach((pick) => {
+        if (finalStarterIds.has(pick.element)) {
+          const playerData = gameweekData[pick.element];
+          if (playerData) {
+            const multiplier = pick.multiplier > 0 ? pick.multiplier : 1;
+            const currentBonus = playerData.bonus || 0;
+            const predictedBonus = (currentBonus === 0) ? (bonusPredictions[pick.element] || 0) : 0;
+            starterPoints += (playerData.total_points + predictedBonus) * multiplier;
+          }
+        }
+      });
+
+      // Calculate bench points
+      picks.forEach((pick) => {
+        if (finalBenchIds.has(pick.element)) {
+          const playerData = gameweekData[pick.element];
+          if (playerData) {
+            const currentBonus = playerData.bonus || 0;
+            const predictedBonus = (currentBonus === 0) ? (bonusPredictions[pick.element] || 0) : 0;
+            benchPoints += playerData.total_points + predictedBonus; // No multiplier for bench
+          }
+        }
+      });
+    }
+
+    setLivePoints(starterPoints);
+    setLiveBenchPoints(benchPoints);
+    setLiveTotalPoints(starterPoints + benchPoints);
+  };
+
+  const animateSubstitutions = (
+    subs: Array<{ outPlayer: number; inPlayer: number }>
+  ) => {
+    let currentIndex = 0;
+
+    const animateNext = () => {
+      if (currentIndex < subs.length) {
+        const currentSub = subs[currentIndex];
+
+        // Phase 1: Flying animation (800ms)
+        setAnimatingSubstitution({ ...currentSub, phase: "flying" });
+
+        setTimeout(() => {
+          // Phase 2: Swap positions in displayPicks
+          setDisplayPicks((prevPicks) => {
+            const newPicks = [...prevPicks];
+            const outIndex = newPicks.findIndex(
+              (p) => p.element === currentSub.outPlayer
+            );
+            const inIndex = newPicks.findIndex(
+              (p) => p.element === currentSub.inPlayer
+            );
+
+            if (outIndex !== -1 && inIndex !== -1) {
+              // Swap the picks but keep their original position numbers temporarily
+              const outPick = { ...newPicks[outIndex] };
+              const inPick = { ...newPicks[inIndex] };
+
+              // Swap positions
+              newPicks[outIndex] = { ...inPick, position: outPick.position };
+              newPicks[inIndex] = { ...outPick, position: inPick.position };
+            }
+
+            return newPicks;
+          });
+
+          setAnimatingSubstitution({ ...currentSub, phase: "swapping" });
+
+          setTimeout(() => {
+            setAnimatingSubstitution(null);
+            currentIndex++;
+            if (currentIndex < subs.length) {
+              setTimeout(animateNext, 300); // Small delay between subs
+            }
+          }, 500);
+        }, 800);
+      }
+    };
+
+    // Start animation after a short delay
+    setTimeout(animateNext, 500);
   };
 
   // Calculate suggested lineup for the NEXT gameweek based on comprehensive analysis
@@ -522,10 +982,10 @@ export default function CurrentSquad({
 
   const startingXI = showSuggestedLineup
     ? suggestedLineup.startingXI.map((p) => p!.pick)
-    : picks.filter((pick) => pick.position <= 11);
+    : displayPicks.filter((pick) => pick.position <= 11);
   const bench = showSuggestedLineup
     ? suggestedLineup.bench.map((p) => p!.pick)
-    : picks.filter((pick) => pick.position > 11);
+    : displayPicks.filter((pick) => pick.position > 11);
 
   // Group players by position for formation display
   const getPlayersByPosition = (positionId: number) => {
@@ -554,6 +1014,46 @@ export default function CurrentSquad({
 
   const closePopup = () => {
     setSelectedPlayer(null);
+  };
+
+  const handlePointsClick = (
+    e: React.MouseEvent,
+    player: Element,
+    stats: any,
+    pick: Pick
+  ) => {
+    e.stopPropagation(); // Prevent triggering the player card click
+    if (showGameweekStats) {
+      // Extract numeric points or pass the string if it's YTP/DNP
+      let pointsValue: number | string = stats.points;
+
+      // If stats.points is a string like "7pts" or "7pts (+3*)", extract the number
+      if (typeof stats.points === "string") {
+        if (stats.points === "YTP" || stats.points === "DNP") {
+          pointsValue = stats.points;
+        } else if (stats.points.includes("pts")) {
+          // Extract just the first number before "pts"
+          const match = stats.points.match(/^(\d+)pts/);
+          if (match) {
+            pointsValue = parseInt(match[1]);
+          }
+        }
+      }
+
+      setPointsBreakdownPlayer({
+        playerId: player.id,
+        playerName: player.web_name,
+        points: pointsValue,
+        position: player.element_type,
+        multiplier: pick.multiplier,
+        isCaptain: pick.is_captain,
+        isViceCaptain: pick.is_vice_captain,
+      });
+    }
+  };
+
+  const closePointsBreakdown = () => {
+    setPointsBreakdownPlayer(null);
   };
 
   const renderPlayer = (
@@ -604,6 +1104,20 @@ export default function CurrentSquad({
         }
       : null;
 
+    // Check if this player is involved in a substitution
+    const isSubbedOut = substitutions.some((s) => s.outPlayer === pick.element);
+    const isSubbedIn = substitutions.some((s) => s.inPlayer === pick.element);
+    const isAnimatingOut =
+      animatingSubstitution && animatingSubstitution.outPlayer === pick.element;
+    const isAnimatingIn =
+      animatingSubstitution && animatingSubstitution.inPlayer === pick.element;
+    const isFlying =
+      (isAnimatingOut || isAnimatingIn) &&
+      animatingSubstitution?.phase === "flying";
+    const isSwapping =
+      (isAnimatingOut || isAnimatingIn) &&
+      animatingSubstitution?.phase === "swapping";
+
     if (isFormation) {
       // Enhanced formation view with stats toggle
       return (
@@ -613,40 +1127,56 @@ export default function CurrentSquad({
         >
           <div
             onClick={() => handlePlayerClick(pick)}
-            className={`relative flex flex-col p-1 md:p-3 rounded-lg transition-all cursor-pointer w-full h-full bg-green-300 ${
-              pick.is_captain
-                ? "ring-1 ring-yellow-400"
+            className={`relative flex flex-col p-1 md:p-3 rounded-lg cursor-pointer w-full h-full overflow-y-auto overflow-x-hidden ${
+              isFlying
+                ? isAnimatingOut
+                  ? "bg-red-300 ring-2 ring-red-500 animate-[fly-to-bench_0.8s_ease-in-out] z-50 scale-110 shadow-2xl"
+                  : "bg-green-500 ring-2 ring-green-600 animate-[fly-to-field_0.8s_ease-in-out] z-50 scale-110 shadow-2xl"
+                : isSwapping
+                ? "animate-pulse bg-orange-300 ring-2 ring-orange-500 transition-all duration-500"
+                : isSubbedOut
+                ? "bg-red-200 opacity-60 ring-2 ring-red-400"
+                : isSubbedIn
+                ? "bg-green-400 ring-2 ring-green-600"
+                : pick.is_captain
+                ? "bg-green-300 ring-1 ring-yellow-400"
                 : pick.is_vice_captain
-                ? "ring-1 ring-yellow-300"
+                ? "bg-green-300 ring-1 ring-yellow-300"
                 : isNewSuggestion
-                ? "ring-1 ring-green-500"
+                ? "bg-green-300 ring-1 ring-green-500"
                 : isBenchedSuggestion
-                ? "ring-1 ring-orange-400"
-                : ""
-            }`}
+                ? "bg-green-300 ring-1 ring-orange-400"
+                : "bg-green-300"
+            } ${isFlying ? "transition-none" : "transition-all"}`}
+            style={{
+              ...(isFlying && {
+                position: "relative",
+                zIndex: 9999,
+              }),
+            }}
           >
-            {/* Captain/Vice-Captain badge - top right corner */}
-            {(pick.is_captain || pick.is_vice_captain) && (
+            {/* Substitution indicators */}
+            {(isSubbedOut || isSubbedIn) && (
               <div
-                className={`absolute -top-1 -right-1 text-[8px] md:text-xs rounded-full w-3.5 md:w-5 h-3.5 md:h-5 flex items-center justify-center font-bold text-black shadow ${
-                  pick.is_captain ? "bg-yellow-400" : "bg-yellow-200"
+                className={`absolute -top-1 -right-1 text-white text-[8px] md:text-xs rounded-full w-5 md:w-6 h-5 md:h-6 flex items-center justify-center font-bold z-10 ${
+                  isSubbedOut ? "bg-red-500" : "bg-green-600"
                 }`}
               >
-                {pick.is_captain ? "C" : "V"}
+                {isSubbedOut ? "OUT" : "IN"}
               </div>
             )}
             {/* Suggestion indicators */}
-            {isNewSuggestion && (
-              <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
+            {!isSubbedOut && !isSubbedIn && isNewSuggestion && (
+              <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↑
               </div>
             )}
-            {isBenchedSuggestion && (
-              <div className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
+            {!isSubbedOut && !isSubbedIn && isBenchedSuggestion && (
+              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↓
               </div>
             )}
-            {isTransferIn && (
+            {!isSubbedOut && !isSubbedIn && isTransferIn && (
               <div className="absolute -top-1 -left-1 bg-purple-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ⚡
               </div>
@@ -661,11 +1191,17 @@ export default function CurrentSquad({
               </p>
             </div>
 
-            {/* Stats - Updated to use getPlayerStats */}
+            {/* Stats - Updated to use getPlayerStats - Points are now clickable */}
             <div className="text-center mb-0.5 md:mb-2">
-              <p className={`text-[10px] md:text-sm font-bold ${stats.statusColor}`}>
+              <div
+                onClick={(e) => handlePointsClick(e, player, stats, pick)}
+                className={`text-[10px] md:text-sm font-bold cursor-pointer hover:underline ${
+                  stats.statusColor
+                } ${showGameweekStats ? "hover:text-blue-600" : ""}`}
+                title={showGameweekStats ? "Click to see points breakdown" : ""}
+              >
                 {isNaN(parseInt(stats.points)) ? "YTP" : stats.points}
-              </p>
+              </div>
               <p className="text-[8px] md:text-xs ">£{stats.price}m</p>
             </div>
 
@@ -763,12 +1299,18 @@ export default function CurrentSquad({
             </p>
           </div>
           <div className="text-right">
-            <p className={`text-sm font-bold ${stats.statusColor}`}>
+            <div
+              onClick={(e) => handlePointsClick(e, player, stats, pick)}
+              className={`text-sm font-bold cursor-pointer hover:underline ${
+                stats.statusColor
+              } ${showGameweekStats ? "hover:text-blue-600" : ""}`}
+              title={showGameweekStats ? "Click to see points breakdown" : ""}
+            >
               {stats.points}
               <span className="text-xs text-gray-500 block">
                 {stats.isGameweek ? `GW${currentEvent}` : "Season"}
               </span>
-            </p>
+            </div>
             <p className="text-xs ">£{stats.price}m</p>
           </div>
         </div>
@@ -1194,21 +1736,55 @@ export default function CurrentSquad({
               {showGameweekStats ? `Gameweek ${currentEvent}` : "Season Total"}
             </p>
             <div className="space-y-1">
-              <p className="text-xl font-bold">
-                {displayedStarterPoints} points{" "}
-              </p>
+              <div className="flex items-center justify-center gap-3">
+                <p className="text-xl font-bold">
+                  {liveStandingsEnabled && livePoints !== null
+                    ? `${livePoints} points`
+                    : `${displayedStarterPoints} points`}
+                </p>
+                {showGameweekStats && (
+                  <label
+                    className="flex items-center cursor-pointer group"
+                    title="Apply auto-substitutions"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={liveStandingsEnabled}
+                      onChange={() =>
+                        setLiveStandingsEnabled(!liveStandingsEnabled)
+                      }
+                      className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                    />
+                    <span className="ml-2 text-sm text-gray-600 group-hover:text-gray-800">
+                      Live
+                    </span>
+                  </label>
+                )}
+              </div>
               <div className="flex justify-center gap-4 text-sm">
                 <span className="text-green-700 font-medium">
-                  {manualBenchPointsSum} benched
+                  {liveStandingsEnabled && liveBenchPoints !== null
+                    ? liveBenchPoints
+                    : manualBenchPointsSum}{" "}
+                  benched
                 </span>
                 <span className="text-orange-600 font-medium">
-                  {displayedTotalPoints} total
+                  {liveStandingsEnabled && liveTotalPoints !== null
+                    ? liveTotalPoints
+                    : displayedTotalPoints}{" "}
+                  total
                 </span>
               </div>
-              {manualBenchPointsSum > 0 && (
+              {manualBenchPointsSum > 0 && !liveStandingsEnabled && (
                 <p className="text-xs text-gray-600 mt-1">
                   You left {manualBenchPointsSum} point
                   {manualBenchPointsSum === 1 ? "" : "s"} on the bench
+                </p>
+              )}
+              {liveStandingsEnabled && substitutions.length > 0 && (
+                <p className="text-xs text-green-600 mt-1">
+                  {substitutions.length} auto-sub
+                  {substitutions.length === 1 ? "" : "s"} applied
                 </p>
               )}
             </div>
@@ -1350,8 +1926,9 @@ export default function CurrentSquad({
           currentEvent={currentEvent}
           totalPoints={pointsBreakdown.total}
           events={events}
-          chipsUsed={teamHistory?.chips || []}
-          activeChip={teamPicks?.active_chip || null}
+          teamPicks={teamPicks}
+          teamHistory={teamHistory}
+          userLeagues={userLeagues}
         />
       </div>
 
@@ -1380,6 +1957,25 @@ export default function CurrentSquad({
           onClose={closePopup}
           isCaptain={selectedPlayer.pick.is_captain}
           isViceCaptain={selectedPlayer.pick.is_vice_captain}
+          currentSquad={elements.filter((el) =>
+            picks.some((p) => p.element === el.id)
+          )}
+        />
+      )}
+
+      {/* Points Breakdown Modal */}
+      {pointsBreakdownPlayer && (
+        <PointsBreakdownModal
+          playerId={pointsBreakdownPlayer.playerId}
+          playerName={pointsBreakdownPlayer.playerName}
+          gameweek={currentEvent}
+          totalPoints={pointsBreakdownPlayer.points}
+          isOpen={!!pointsBreakdownPlayer}
+          onClose={closePointsBreakdown}
+          playerPosition={pointsBreakdownPlayer.position}
+          multiplier={pointsBreakdownPlayer.multiplier}
+          isCaptain={pointsBreakdownPlayer.isCaptain}
+          isViceCaptain={pointsBreakdownPlayer.isViceCaptain}
         />
       )}
     </div>

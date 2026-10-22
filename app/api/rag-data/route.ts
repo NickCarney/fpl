@@ -14,21 +14,42 @@ interface RAGData {
       };
     };
   };
+  nextGameweekFixtures: any[];
   transferTrends: {
     mostTransferredIn: string[];
     mostTransferredOut: string[];
     risingPrices: string[];
     fallingPrices: string[];
   };
-  formLeaders: { player: string; form: number }[];
-  xgLeaders: { player: string; xG: number; xA: number }[];
-  availabilityConcerns: {
-    player: string;
-    status: string;
-    chanceOfPlaying: number | null;
-    news: string;
-  }[];
-  nextGameweekFixtures: any[];
+}
+
+async function fetchWebContent(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+    }
+    
+    const text = await response.text();
+    
+    // Basic text extraction (in a real implementation, you'd use a proper HTML parser)
+    const cleanText = text
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    return cleanText.substring(0, 5000); // Limit to avoid token overflow
+  } catch (error) {
+    console.error(`Error fetching ${url}:`, error);
+    return '';
+  }
 }
 
 function calculatePositionAverages(
@@ -80,78 +101,48 @@ function calculatePositionAverages(
   return result;
 }
 
-function calculateTransferTrends(elements: any[]): RAGData["transferTrends"] {
-  const byIn = [...elements].sort(
-    (a, b) => (b.transfers_in_event || 0) - (a.transfers_in_event || 0)
-  );
-  const byOut = [...elements].sort(
-    (a, b) => (b.transfers_out_event || 0) - (a.transfers_out_event || 0)
-  );
-  const rising = [...elements]
-    .filter((p) => (p.cost_change_event || 0) > 0)
-    .sort((a, b) => (b.cost_change_event || 0) - (a.cost_change_event || 0));
-  const falling = [...elements]
-    .filter((p) => (p.cost_change_event || 0) < 0)
-    .sort((a, b) => (a.cost_change_event || 0) - (b.cost_change_event || 0));
+async function fetchTransferTrends(elements: any[]): Promise<RAGData['transferTrends']> {
+  // Use actual FPL API data for transfer trends
+  try {
+    // Sort by transfers in this gameweek
+    const sortedByTransfersIn = [...elements]
+      .filter(p => p.transfers_in_event > 0)
+      .sort((a, b) => b.transfers_in_event - a.transfers_in_event)
+      .slice(0, 10);
 
-  return {
-    mostTransferredIn: byIn.slice(0, 5).map((p) => p.web_name),
-    mostTransferredOut: byOut.slice(0, 5).map((p) => p.web_name),
-    risingPrices: rising.slice(0, 5).map((p) => p.web_name),
-    fallingPrices: falling.slice(0, 5).map((p) => p.web_name),
-  };
-}
+    const sortedByTransfersOut = [...elements]
+      .filter(p => p.transfers_out_event > 0)
+      .sort((a, b) => b.transfers_out_event - a.transfers_out_event)
+      .slice(0, 10);
 
-function calculateFormLeaders(elements: any[]): RAGData["formLeaders"] {
-  return [...elements]
-    .sort((a, b) => parseFloat(b.form || "0") - parseFloat(a.form || "0"))
-    .slice(0, 5)
-    .map((p) => ({ player: p.web_name, form: parseFloat(p.form || "0") }));
-}
+    // Price changes - those with cost_change_event != 0
+    const risingPrices = [...elements]
+      .filter(p => p.cost_change_event > 0)
+      .sort((a, b) => b.cost_change_event - a.cost_change_event)
+      .slice(0, 10)
+      .map(p => p.web_name);
 
-function calculateXgLeaders(elements: any[]): RAGData["xgLeaders"] {
-  return [...elements]
-    .sort(
-      (a, b) =>
-        parseFloat(b.expected_goals || "0") - parseFloat(a.expected_goals || "0")
-    )
-    .slice(0, 5)
-    .map((p) => ({
-      player: p.web_name,
-      xG: parseFloat(p.expected_goals || "0"),
-      xA: parseFloat(p.expected_assists || "0"),
-    }));
-}
+    const fallingPrices = [...elements]
+      .filter(p => p.cost_change_event < 0)
+      .sort((a, b) => a.cost_change_event - b.cost_change_event)
+      .slice(0, 10)
+      .map(p => p.web_name);
 
-function calculateAvailabilityConcerns(
-  elements: any[]
-): RAGData["availabilityConcerns"] {
-  return elements
-    .filter(
-      (p) =>
-        p.status &&
-        p.status !== "a" &&
-        parseFloat(p.selected_by_percent || "0") > 2
-    )
-    .sort(
-      (a, b) =>
-        parseFloat(b.selected_by_percent || "0") -
-        parseFloat(a.selected_by_percent || "0")
-    )
-    .slice(0, 8)
-    .map((p) => {
-      const availability = getAvailability(
-        p.status,
-        p.chance_of_playing_next_round,
-        p.news
-      );
-      return {
-        player: p.web_name,
-        status: availability?.label || "Available",
-        chanceOfPlaying: p.chance_of_playing_next_round ?? null,
-        news: p.news || "",
-      };
-    });
+    return {
+      mostTransferredIn: sortedByTransfersIn.map(p => p.web_name),
+      mostTransferredOut: sortedByTransfersOut.map(p => p.web_name),
+      risingPrices: risingPrices.length > 0 ? risingPrices : ['No price rises this gameweek'],
+      fallingPrices: fallingPrices.length > 0 ? fallingPrices : ['No price falls this gameweek']
+    };
+  } catch (error) {
+    console.error('Error fetching transfer trends:', error);
+    return {
+      mostTransferredIn: [],
+      mostTransferredOut: [],
+      risingPrices: [],
+      fallingPrices: []
+    };
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -174,14 +165,27 @@ export async function POST(request: NextRequest) {
       (p: any) => (p.minutes || 0) >= minValidMinutes
     );
 
+    // Fetch and compile RAG data with ONLY legitimate sources
     const ragData: RAGData = {
-      positionAverages: calculatePositionAverages(validElements),
-      transferTrends: calculateTransferTrends(validElements),
-      formLeaders: calculateFormLeaders(validElements),
-      xgLeaders: calculateXgLeaders(validElements),
-      availabilityConcerns: calculateAvailabilityConcerns(elements),
-      nextGameweekFixtures:
-        fixtures?.filter((f: any) => f.event === currentGameweek + 1) || [],
+      positionAverages: await calculatePositionAverages(elements),
+      nextGameweekFixtures: fixtures?.filter((f: any) => f.event === currentGameweek + 1) || [],
+      transferTrends: await fetchTransferTrends(elements),
+    };
+
+    // Enhanced external content with scraped data
+    const externalContent = {
+      teamNews: scrapedData.teamNews,
+      analytics: scrapedData.analytics,
+      predictions: scrapedData.predictions,
+      lineupData: scrapedData.lineup,
+      // Add summary text for the AI
+      summary: `
+Latest FPL Intelligence:
+- xG Leaders: ${scrapedData.analytics.xGData.slice(0, 3).map(p => `${p.player} (${p.xG})`).join(', ')}
+- Form Rising: ${scrapedData.analytics.formTable.filter(p => p.trend === 'rising').map(p => p.player).join(', ')}
+- Predicted Lineups Available: ${scrapedData.lineup.predicted.length > 0 ? 'Yes' : 'No'}
+- Community Predictions: ${scrapedData.predictions.map(p => `${p.source}: ${p.predictions.length} insights`).join(', ')}
+      `.trim()
     };
 
     return NextResponse.json({

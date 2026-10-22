@@ -22,8 +22,6 @@ function getOpenAI(): OpenAI {
   return openai;
 }
 
-const POINT_HIT_PER_TRANSFER = 4;
-
 interface TransferRequest {
   teamData: any;
   squadData: any;
@@ -37,6 +35,10 @@ interface TransferRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
   try {
     const body: TransferRequest = await request.json();
     const {
@@ -218,15 +220,12 @@ ${Object.entries(ragData.positionAverages)
   )
   .join("\n")}
 
-Current Market Trends (this gameweek):
-- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(", ")}
-- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(", ")}
-- Rising prices: ${ragData.transferTrends.risingPrices.join(", ")}
-- Falling prices: ${ragData.transferTrends.fallingPrices.join(", ")}
-
-Form Leaders: ${ragData.formLeaders
-        .map((p: any) => `${p.player} (${p.form})`)
-        .join(", ")}
+Current Market Trends (based on actual FPL data):
+- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.slice(0, 5).join(", ")}
+- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.slice(0, 5).join(", ")}
+- Rising prices: ${ragData.transferTrends.risingPrices.slice(0, 5).join(", ")}
+- Falling prices: ${ragData.transferTrends.fallingPrices.slice(0, 5).join(", ")}`;
+    }
 
 Expected Goals (xG) Leaders:
 ${ragData.xgLeaders
@@ -541,6 +540,11 @@ Keep it concise and data-driven. Reference specific stats and trends when availa
           },
         ],
         stream: true,
+        max_completion_tokens: RAG_CONFIG.openAI.maxTokens,
+        // Note: GPT-5 nano only supports default temperature (1)
+        ...(RAG_CONFIG.openAI.reasoning_effort && {
+          reasoning_effort: RAG_CONFIG.openAI.reasoning_effort,
+        }),
       });
 
       // Create a ReadableStream to handle the OpenAI stream

@@ -805,17 +805,33 @@ export default function TransferSuggestions({
             </div>
           )}
 
-          {hasAnyPlan && transferInfo && (
-            <div className="space-y-6">
-              {parsedPlans?.thisWeek && (
-                <TransferPlanSectionView
-                  title={`This Week (GW${currentEvent + 1})`}
-                  subtitle="Using your current free transfer(s)"
-                  plan={parsedPlans.thisWeek}
-                  bankBalance={transferInfo.bankBalance}
-                  isFallback={isFallback}
-                />
-              )}
+          {parsedAnalysis && (
+            <div className="space-y-4">
+              {/* Weakness Analysis */}
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  📊 AI Squad Analysis
+                  {/* {isStreaming && (
+                    <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
+                  )} */}
+                </h4>
+                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                  <h5 className="font-medium text-red-800 mb-2">
+                    Key Areas for Improvement
+                  </h5>
+                  <p className="text-sm text-red-700 mb-1">
+                    <strong>Focus Player:</strong>{" "}
+                    {parsedAnalysis.weakness.player}
+                  </p>
+                  <p className="text-sm text-red-700 mb-1">
+                    <strong>Position:</strong>{" "}
+                    {parsedAnalysis.weakness.position}
+                  </p>
+                  <p className="text-xs text-red-600">
+                    <strong>Analysis:</strong> {parsedAnalysis.weakness.issues}
+                  </p>
+                </div>
+              </div>
 
               {parsedPlans?.nextWeekSingle && (
                 <TransferPlanSectionView

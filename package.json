@@ -2,15 +2,22 @@
   "name": "fpl",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p $PORT",
     "lint": "next lint"
   },
   "dependencies": {
+    "@next/bundle-analyzer": "^16.0.3",
+    "@types/jsdom": "^21.1.7",
     "@vercel/analytics": "^1.5.0",
-    "next": "15.4.10",
+    "@vercel/speed-insights": "^1.2.0",
+    "dotenv": "^17.2.3",
+    "jsdom": "^26.1.0",
+    "mssql": "^12.1.0",
+    "next": "15.4.6",
     "openai": "^5.12.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -20,6 +27,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/mssql": "^9.1.8",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

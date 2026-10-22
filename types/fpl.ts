@@ -34,18 +34,10 @@ export interface Element {
   expected_assists: string;
   expected_goal_involvements: string;
   expected_goals_conceded: string;
-  transfers_in_event: number;
-  transfers_out_event: number;
-  cost_change_event: number;
-  cost_change_start: number;
-  ep_next: string;
-  ep_this: string;
-  value_form: string;
-  value_season: string;
-  status: string;
-  news: string;
-  chance_of_playing_next_round: number | null;
-  chance_of_playing_this_round: number | null;
+  clearances_blocks_interceptions: number;
+  recoveries: number;
+  tackles: number;
+  defensive_contribution: number;
 }
 
 export interface Team {
@@ -53,6 +45,7 @@ export interface Team {
   name: string;
   short_name: string;
   code: number;
+  position: number;
   strength: number;
   strength_overall_home: number;
   strength_overall_away: number;
@@ -310,6 +303,7 @@ export interface PlayerGameweek {
   selected: number;
   transfers_in: number;
   transfers_out: number;
+  defensive_contribution: number;
 }
 
 export interface PlayerGameweekData {

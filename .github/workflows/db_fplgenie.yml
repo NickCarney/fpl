@@ -1,0 +1,88 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+name: Build and deploy Node.js app to Azure Web App - fplgenie
+
+on:
+  push:
+    branches:
+      - db
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version: "22.x"
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Build application
+        run: |
+          npm run build --if-present
+          echo "Build completed. Checking output..."
+          ls -lah .next/standalone 2>/dev/null | head -20 || echo "No standalone output"
+
+      - name: Prepare deployment package
+        run: |
+          # Copy standalone output (already contains node_modules and all dependencies)
+          cp -r .next/standalone ./deploy
+
+          # Copy static files to the correct location
+          mkdir -p deploy/.next
+          cp -r .next/static deploy/.next/static
+
+          # Copy public folder if it exists
+          cp -r public deploy/public 2>/dev/null || :
+
+          # Create compressed archive for faster deployment
+          cd deploy
+          zip -q -9 -r ../deploy.zip . -x "*.git*" -x "*.DS_Store" -x "*node_modules/.cache/*"
+          cd ..
+
+          # Show package sizes
+          echo "Original deploy folder: $(du -sh deploy | cut -f1)"
+          echo "Compressed package: $(du -sh deploy.zip | cut -f1)"
+          ls -lh deploy.zip
+
+          # Clean up to save space
+          rm -rf deploy
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8A52F670421843B5BC8A41615AD740EF }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_B614AA6EF7F44EA7967413E30B26E595 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_1A5794080FFD445F96A3C9E2EEBBB603 }}
+
+      - name: Configure Azure App Settings
+        run: |
+          az webapp config appsettings set \
+            --resource-group fpl-resources \
+            --name fplgenie \
+            --settings \
+              SCM_DO_BUILD_DURING_DEPLOYMENT="false" \
+              WEBSITE_NODE_DEFAULT_VERSION="22"
+
+          az webapp config set \
+            --resource-group fpl-resources \
+            --name fplgenie \
+            --startup-file "node server.js"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "fplgenie"
+          slot-name: "Production"
+          package: ./deploy.zip

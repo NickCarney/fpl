@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+
+# Data files
+data/
+*.csv
+
+# Development files
+.git
+.github
+.vscode
+.idea
+*.log
+npm-debug.log*
+
+# Build files that will be regenerated
+.next/cache
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.DS_Store
+*.pem

@@ -1,49 +1,49 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { getPool } from '@/lib/db';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export async function GET(request: Request) {
   try {
-    //console.log("Fetching fixtures from FPL API...");
+    const { searchParams } = new URL(request.url);
+    const event = searchParams.get('event');
 
-    // Add timeout to the fetch request
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const pool = await getPool();
+    const queryRequest = pool.request();
 
-    const response = await fetch(
-      "https://fantasy.premierleague.com/api/fixtures/",
-      {
-        signal: controller.signal,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      }
-    );
+    let query = `
+      SELECT
+        f.*,
+        ta.name as team_a_name,
+        ta.short_name as team_a_short_name,
+        th.name as team_h_name,
+        th.short_name as team_h_short_name,
+        e.name as event_name
+      FROM dbo.fixtures f
+      LEFT JOIN dbo.teams ta ON f.team_a = ta.id
+      LEFT JOIN dbo.teams th ON f.team_h = th.id
+      LEFT JOIN dbo.events e ON f.event = e.id
+    `;
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`FPL API responded with status: ${response.status}`);
+    if (event) {
+      queryRequest.input('event', event);
+      query += ' WHERE f.event = @event';
     }
 
-    const data = await response.json();
-    //console.log(`Successfully fetched ${data.length} fixtures`);
+    query += ' ORDER BY f.kickoff_time ASC';
 
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error("Error fetching fixtures:", error);
+    const result = await queryRequest.query(query);
 
-    if (error instanceof Error && error.name === "AbortError") {
-      return NextResponse.json(
-        { error: "Request timeout - FPL API took too long to respond" },
-        { status: 504 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        error: "Failed to fetch fixtures",
-        details: error instanceof Error ? error.message : "Unknown error",
+    return NextResponse.json(result.recordset, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
       },
+    });
+  } catch (error) {
+    console.error('Error fetching fixtures:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch fixtures' },
       { status: 500 }
     );
   }

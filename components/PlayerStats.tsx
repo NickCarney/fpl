@@ -33,6 +33,14 @@ interface Fixture {
   finished: boolean;
 }
 
+// Filter interface
+interface PlayerFilter {
+  id: string;
+  stat: keyof Element | "now_cost";
+  operator: "gt" | "lt" | "eq" | "gte" | "lte";
+  value: number | "";
+}
+
 export default function PlayerStats({
   elements,
   teams,
@@ -41,7 +49,7 @@ export default function PlayerStats({
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<
-    "total_points" | "form" | "now_cost" | "ict_index"
+    "total_points" | "form" | "now_cost" | "ict_index" | "defensive_contribution"
   >("total_points");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,6 +66,9 @@ export default function PlayerStats({
     team: Team;
     position: ElementType;
   } | null>(null);
+  const [filters, setFilters] = useState<PlayerFilter[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [hoveredBadge, setHoveredBadge] = useState<string | null>(null);
 
   // Fetch fixtures when component mounts
   useEffect(() => {
@@ -141,6 +152,60 @@ export default function PlayerStats({
     setSelectedPlayer(null);
   };
 
+  // Badge calculation functions
+  const getPlayerBadges = (element: Element) => {
+    const badges: Array<{ label: string; color: string }> = [];
+    const teamPlayers = elements.filter((e) => e.team === element.team);
+
+    // Badge 1: Starter - started last 3 games (played 60+ minutes)
+    if (element.starts >= 3) {
+      badges.push({ label: "Started last 3+ games", color: "bg-green-600" });
+    }
+
+    // Badge 2: Team Top Player - highest points on their team
+    const topTeamPlayer = teamPlayers.reduce((prev, current) =>
+      current.total_points > prev.total_points ? current : prev
+    );
+    if (element.id === topTeamPlayer.id) {
+      badges.push({ label: "Team top points scorer", color: "bg-purple-600" });
+    }
+
+    // Badge 3: Form Player - form rating above 7
+    const formRating = parseFloat(element.form) || 0;
+    if (formRating >= 7) {
+      badges.push({ label: "Recent form > 7", color: "bg-orange-600" });
+    }
+
+    // Badge 4: Value Pick - high points per million
+    const pointsPerMillion = element.total_points / (element.now_cost / 10);
+    if (pointsPerMillion >= 12 && element.total_points >= 50) {
+      badges.push({ label: "Value player", color: "bg-blue-600" });
+    }
+
+    return badges;
+  };
+
+  // Filter management functions
+  const addFilter = () => {
+    const newFilter: PlayerFilter = {
+      id: Date.now().toString(),
+      stat: "total_points",
+      operator: "gte",
+      value: "",
+    };
+    setFilters([...filters, newFilter]);
+  };
+
+  const removeFilter = (id: string) => {
+    setFilters(filters.filter((f) => f.id !== id));
+  };
+
+  const updateFilter = (id: string, field: keyof PlayerFilter, value: any) => {
+    setFilters(
+      filters.map((f) => (f.id === id ? { ...f, [field]: value } : f))
+    );
+  };
+
   const filteredAndSortedElements = elements
     .filter((element) => {
       const matchesPosition =
@@ -152,7 +217,45 @@ export default function PlayerStats({
         element.web_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         element.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         element.second_name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesPosition && matchesTeam && matchesSearch;
+
+      // Apply custom filters
+      const matchesCustomFilters = filters.every((filter) => {
+        // Skip filter if value is empty
+        if (filter.value === "") {
+          return true;
+        }
+
+        let elementValue = element[filter.stat as keyof Element];
+
+        // Handle price - divide by 10 to get actual price
+        if (filter.stat === "now_cost") {
+          elementValue = (elementValue as number) / 10;
+        }
+
+        const value =
+          typeof elementValue === "string"
+            ? parseFloat(elementValue)
+            : (elementValue as number);
+
+        switch (filter.operator) {
+          case "gt":
+            return value > filter.value;
+          case "lt":
+            return value < filter.value;
+          case "eq":
+            return value === filter.value;
+          case "gte":
+            return value >= filter.value;
+          case "lte":
+            return value <= filter.value;
+          default:
+            return true;
+        }
+      });
+
+      return (
+        matchesPosition && matchesTeam && matchesSearch && matchesCustomFilters
+      );
     })
     .sort((a, b) => {
       let aValue: number, bValue: number;
@@ -173,6 +276,10 @@ export default function PlayerStats({
         case "ict_index":
           aValue = parseFloat(a.ict_index) || 0;
           bValue = parseFloat(b.ict_index) || 0;
+          break;
+        case "defensive_contribution":
+          aValue = a.minutes >= 90 ? (a.defensive_contribution / a.minutes) * 90 : 0;
+          bValue = b.minutes >= 90 ? (b.defensive_contribution / b.minutes) * 90 : 0;
           break;
         default:
           aValue = 0;
@@ -422,7 +529,7 @@ export default function PlayerStats({
   };
 
   return (
-    <div className=" p-6 rounded-lg shadow-md">
+    <div>
       <h2 className="text-2xl font-bold mb-6 flex justify-center">
         Player Stats & Visualizations
       </h2>
@@ -536,6 +643,157 @@ export default function PlayerStats({
         </div>
       )}
 
+      {/* Advanced Find Player Section */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <span>Find Players</span>
+          <span className="text-sm">{showFilters ? "▲" : "▼"}</span>
+        </button>
+
+        {showFilters && (
+          <div className="mt-4 p-4 border border-gray-300 rounded-lg bg-gray-50">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Find Players By Stats</h3>
+              <button
+                onClick={addFilter}
+                className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+              >
+                + Add Filter
+              </button>
+            </div>
+
+            {filters.length === 0 ? (
+              <p className="text-gray-600 text-sm text-center py-4">
+                No filters applied. Click &quot;Add Filter&quot; to start
+                filtering players.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filters.map((filter) => (
+                  <div
+                    key={filter.id}
+                    className="bg-white p-4 rounded-md border border-gray-200 shadow-sm"
+                  >
+                    <div className="grid grid-cols-12 gap-3 items-center">
+                      {/* Stat Selection - Takes more space */}
+                      <div className="col-span-5">
+                        <select
+                          value={filter.stat}
+                          onChange={(e) =>
+                            updateFilter(filter.id, "stat", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-blue-400 appearance-none cursor-pointer"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                            backgroundPosition: "right 0.5rem center",
+                            backgroundRepeat: "no-repeat",
+                            backgroundSize: "1.5em 1.5em",
+                            paddingRight: "2.5rem",
+                          }}
+                        >
+                          <option value="total_points">Total Points</option>
+                          <option value="goals_scored">Goals</option>
+                          <option value="assists">Assists</option>
+                          <option value="now_cost">Price</option>
+                          <option value="minutes">Minutes</option>
+                          <option value="clean_sheets">Clean Sheets</option>
+                          <option value="bonus">Bonus Points</option>
+                          <option value="bps">BPS</option>
+                          <option value="saves">Saves</option>
+                          <option value="yellow_cards">Yellow Cards</option>
+                          <option value="red_cards">Red Cards</option>
+                          <option value="form">Form</option>
+                          <option value="ict_index">ICT Index</option>
+                          <option value="selected_by_percent">
+                            Selected %
+                          </option>
+                        </select>
+                      </div>
+
+                      {/* Operator Selection */}
+                      <div className="col-span-3">
+                        <select
+                          value={filter.operator}
+                          onChange={(e) =>
+                            updateFilter(filter.id, "operator", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-blue-400 appearance-none cursor-pointer"
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                            backgroundPosition: "right 0.5rem center",
+                            backgroundRepeat: "no-repeat",
+                            backgroundSize: "1.5em 1.5em",
+                            paddingRight: "2.5rem",
+                          }}
+                        >
+                          <option value="gte">≥ Greater or equal</option>
+                          <option value="lte">≤ Less or equal</option>
+                          <option value="gt">&gt; Greater than</option>
+                          <option value="lt">&lt; Less than</option>
+                          <option value="eq">= Equal to</option>
+                        </select>
+                      </div>
+
+                      {/* Value Input */}
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          value={filter.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateFilter(
+                              filter.id,
+                              "value",
+                              val === "" ? "" : parseFloat(val)
+                            );
+                          }}
+                          step={
+                            filter.stat === "now_cost"
+                              ? 0.1
+                              : filter.stat === "form" ||
+                                filter.stat === "ict_index" ||
+                                filter.stat === "selected_by_percent"
+                              ? 0.1
+                              : 1
+                          }
+                          placeholder="Enter value"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all hover:border-blue-400"
+                        />
+                      </div>
+
+                      {/* Remove Button */}
+                      <div className="col-span-1 flex justify-end">
+                        <button
+                          onClick={() => removeFilter(filter.id)}
+                          className="p-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                          title="Remove filter"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-x-12 gap-y-2 items-center flex-col sm:flex-row justify-center">
         <div className="input-gradient-wrapper">
@@ -611,12 +869,14 @@ export default function PlayerStats({
             <thead>
               <tr className="border-b">
                 <th className="text-center py-2 px-3">Player</th>
+                <th className="text-center py-2 px-3">Badges</th>
                 <th className="text-center py-2 px-3">Team</th>
                 <th className="text-center py-2 px-3">Pos</th>
                 <SortableHeader field="total_points">Points</SortableHeader>
                 <SortableHeader field="form">Form</SortableHeader>
                 <SortableHeader field="now_cost">Price</SortableHeader>
                 <SortableHeader field="ict_index">ICT</SortableHeader>
+                <SortableHeader field="defensive_contribution">DC/90</SortableHeader>
                 <th className="text-center py-2 text-nowrap px-3">
                   Selected %
                 </th>
@@ -628,6 +888,7 @@ export default function PlayerStats({
                 const team = getTeam(element.team);
                 const position = getPosition(element.element_type);
                 const nextFixtures = getNext5Fixtures(element.team);
+                const badges = getPlayerBadges(element);
 
                 return (
                   <tr
@@ -639,6 +900,38 @@ export default function PlayerStats({
                       <div>
                         <div className="font-medium">{element.web_name}</div>
                         <div className="text-xs ">{element.first_name}</div>
+                      </div>
+                    </td>
+                    <td
+                      className="py-3 text-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex gap-1 justify-center flex-wrap">
+                        {badges.map((badge, index) => {
+                          const badgeId = `${element.id}-${index}`;
+                          return (
+                            <div key={index} className="relative">
+                              <span
+                                className={`${badge.color} text-white text-xs px-2 py-1 rounded-full font-medium cursor-pointer`}
+                                onMouseEnter={() => setHoveredBadge(badgeId)}
+                                onMouseLeave={() => setHoveredBadge(null)}
+                                onClick={() =>
+                                  setHoveredBadge(
+                                    hoveredBadge === badgeId ? null : badgeId
+                                  )
+                                }
+                              >
+                                {badge.label.charAt(0)}
+                              </span>
+                              {hoveredBadge === badgeId && (
+                                <div className="absolute z-10 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap -top-8 left-1/2 transform -translate-x-1/2">
+                                  {badge.label}
+                                  <div className="absolute w-2 h-2 bg-gray-900 transform rotate-45 left-1/2 -translate-x-1/2 -bottom-1"></div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                     <td className="py-3 text-center">{team?.short_name}</td>
@@ -653,6 +946,13 @@ export default function PlayerStats({
                       £{(element.now_cost / 10).toFixed(1)}m
                     </td>
                     <td className="py-3 text-center">{element.ict_index}</td>
+                    <td className="py-3 text-center">
+                      {(() => {
+                        if (element.minutes < 90) return '-';
+                        const dcPer90 = (element.defensive_contribution / element.minutes) * 90;
+                        return dcPer90 > 0 ? dcPer90.toFixed(1) : '-';
+                      })()}
+                    </td>
                     <td className="py-3 text-center">
                       {element.selected_by_percent}%
                     </td>

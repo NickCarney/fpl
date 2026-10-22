@@ -20,6 +20,7 @@ interface PlayerDetailPopupProps {
   onClose: () => void;
   isCaptain?: boolean;
   isViceCaptain?: boolean;
+  currentSquad?: Element[]; // Add current squad to props
 }
 
 export default function PlayerDetailPopup({
@@ -31,12 +32,19 @@ export default function PlayerDetailPopup({
   onClose,
   isCaptain = false,
   isViceCaptain = false,
+  currentSquad = [],
 }: PlayerDetailPopupProps) {
   const [gameweekData, setGameweekData] = useState<PlayerGameweekData | null>(
     null
   );
   const [loadingGameweeks, setLoadingGameweeks] = useState(false);
   const [showGameweeks, setShowGameweeks] = useState(true);
+  const [loadingTransferSuggestions, setLoadingTransferSuggestions] =
+    useState(false);
+  const [transferSuggestions, setTransferSuggestions] = useState<string>("");
+  const [showTransferSuggestions, setShowTransferSuggestions] = useState(false);
+  const [sortColumn, setSortColumn] = useState<keyof PlayerGameweek | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Load gameweek data when popup opens
   useEffect(() => {
@@ -57,9 +65,101 @@ export default function PlayerDetailPopup({
     }
   };
 
+  const handleSuggestTransfers = async () => {
+    setLoadingTransferSuggestions(true);
+    setShowTransferSuggestions(true);
+    setTransferSuggestions("");
+
+    try {
+      // Get current squad player IDs to exclude from suggestions
+      const currentSquadIds = currentSquad.map((p) => p.id);
+
+      const response = await fetch("/api/transfer-suggestions-player", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          playerId: player.id,
+          playerName: player.web_name,
+          playerPosition: position.singular_name,
+          playerPrice: player.now_cost / 10,
+          playerPoints: player.total_points,
+          playerForm: player.form,
+          currentSquadIds, // Pass current squad IDs
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate transfer suggestions");
+      }
+
+      // Handle streaming response
+      const contentType = response.headers.get("content-type");
+      if (contentType?.includes("text/plain")) {
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedContent = "";
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            accumulatedContent += chunk;
+            setTransferSuggestions(accumulatedContent);
+          }
+        }
+      } else {
+        const result = await response.json();
+        setTransferSuggestions(result.analysis || "No suggestions available");
+      }
+    } catch (error) {
+      console.error("Failed to generate transfer suggestions:", error);
+      setTransferSuggestions(
+        "Failed to generate transfer suggestions. Please try again."
+      );
+    } finally {
+      setLoadingTransferSuggestions(false);
+    }
+  };
+
   const getOpponentTeamName = (gameweek: PlayerGameweek, teams: Team[]) => {
     const opponentTeam = teams.find((t) => t.id === gameweek.opponent_team);
     return opponentTeam?.short_name || "Unknown";
+  };
+
+  const handleSort = (column: keyof PlayerGameweek) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+  };
+
+  const getSortedGameweeks = () => {
+    if (!gameweekData || !sortColumn) return gameweekData?.history || [];
+
+    const sorted = [...gameweekData.history].sort((a, b) => {
+      const aVal = a[sortColumn];
+      const bVal = b[sortColumn];
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+      }
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+
+      return 0;
+    });
+
+    return sorted;
   };
   const statsRows = [
     { label: "Total Points", value: player.total_points, highlight: true },
@@ -165,6 +265,40 @@ export default function PlayerDetailPopup({
           </div>
         </div>
 
+        {/* Transfer Suggestions Button */}
+        <div className="mb-6 flex justify-center">
+          <button
+            onClick={handleSuggestTransfers}
+            disabled={loadingTransferSuggestions}
+            className="!border-black w-fit px-4 py-3 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingTransferSuggestions
+              ? "Analyzing alternatives..."
+              : "Suggest transfers for this player"}
+          </button>
+        </div>
+
+        {/* Transfer Suggestions Display */}
+        {showTransferSuggestions && (
+          <div className="mb-6 bg-purple-50 rounded-lg p-4 border border-purple-200">
+            <h3 className="text-lg font-semibold mb-3 text-purple-900">
+              Transfer Suggestions for {player.web_name}
+            </h3>
+            {loadingTransferSuggestions ? (
+              <div className="text-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                <p className="text-purple-700">
+                  Analyzing player alternatives...
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm text-purple-900 whitespace-pre-wrap">
+                {transferSuggestions}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats Tables */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* General Stats */}
@@ -247,20 +381,66 @@ export default function PlayerDetailPopup({
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b w-fit">
-                        <th className="text-left py-2 px-4">GW</th>
+                        <th
+                          className="text-left py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("round")}
+                        >
+                          GW {sortColumn === "round" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
                         <th className="text-left py-2 px-4">Opponent</th>
                         <th className="text-left py-2 px-4">Venue</th>
-                        <th className="text-right py-2 px-4">Pts</th>
-                        <th className="text-right py-2 px-4">Min</th>
-                        <th className="text-right py-2 px-4">Goals</th>
-                        <th className="text-right py-2 px-4">Assists</th>
-                        <th className="text-right py-2 px-4">CS</th>
-                        <th className="text-right py-2 px-4">Bonus</th>
-                        <th className="text-right py-2 px-4">BPS</th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("total_points")}
+                        >
+                          Pts {sortColumn === "total_points" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("minutes")}
+                        >
+                          Min {sortColumn === "minutes" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("goals_scored")}
+                        >
+                          Goals {sortColumn === "goals_scored" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("assists")}
+                        >
+                          Assists {sortColumn === "assists" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("clean_sheets")}
+                        >
+                          CS {sortColumn === "clean_sheets" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("bonus")}
+                        >
+                          Bonus {sortColumn === "bonus" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("bps")}
+                        >
+                          BPS {sortColumn === "bps" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
+                        <th
+                          className="text-right py-2 px-4 cursor-pointer hover:bg-gray-100"
+                          onClick={() => handleSort("defensive_contribution")}
+                        >
+                          Def Con {sortColumn === "defensive_contribution" && (sortDirection === "asc" ? "↑" : "↓")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {gameweekData.history.map((gw, index) => (
+                      {getSortedGameweeks().map((gw, index) => (
                         <tr key={index} className="border-b hover:">
                           <td className="py-2 font-medium">{gw.round}</td>
                           <td className="py-2">
@@ -276,6 +456,7 @@ export default function PlayerDetailPopup({
                           <td className="py-2 text-right">{gw.clean_sheets}</td>
                           <td className="py-2 text-right">{gw.bonus}</td>
                           <td className="py-2 text-right">{gw.bps}</td>
+                          <td className="py-2 text-right">{gw.defensive_contribution}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -283,7 +464,7 @@ export default function PlayerDetailPopup({
                   <div className="mt-4 text-xs ">
                     <p>
                       <strong>CS:</strong> Clean Sheets | <strong>BPS:</strong>{" "}
-                      Bonus Points System
+                      Bonus Points System | <strong>Def Con:</strong> Defensive Contributions
                     </p>
                   </div>
                 </div>

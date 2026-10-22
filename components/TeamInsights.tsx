@@ -12,86 +12,9 @@ interface TeamInsightsProps {
   currentEvent: number;
   totalPoints: number;
   events: Event[];
-  chipsUsed?: ChipPlay[];
-  activeChip?: string | null;
-}
-
-interface ParsedInsights {
-  captain: { player: string; reasoning: string } | null;
-  viceCaptain: { player: string; reasoning: string } | null;
-  strengths: string[];
-  weaknesses: string[];
-  transferMarket: string[];
-  chipStrategy: string[];
-  differentials: string[];
-}
-
-const SECTION_KEYS = [
-  "CAPTAIN_PICK",
-  "VICE_CAPTAIN_PICK",
-  "STRENGTHS",
-  "WEAKNESSES",
-  "TRANSFER_MARKET",
-  "CHIP_STRATEGY",
-  "DIFFERENTIALS",
-] as const;
-
-function parseInsights(text: string): ParsedInsights | null {
-  const lines = text.split("\n").map((l) => l.trim());
-
-  const findSectionLine = (key: string) =>
-    lines.findIndex((l) => l.startsWith(key + ":"));
-
-  const captainLine = findSectionLine("CAPTAIN_PICK");
-  if (captainLine === -1) return null;
-
-  const getPipeValue = (lineIdx: number, key: string) => {
-    const raw = lines[lineIdx].replace(key + ":", "").trim();
-    const [player, ...rest] = raw.split("|");
-    return {
-      player: (player || "").trim(),
-      reasoning: rest.join("|").trim(),
-    };
-  };
-
-  const captain = getPipeValue(captainLine, "CAPTAIN_PICK");
-
-  const vcLine = findSectionLine("VICE_CAPTAIN_PICK");
-  const viceCaptain = vcLine !== -1 ? getPipeValue(vcLine, "VICE_CAPTAIN_PICK") : null;
-
-  const sectionBounds: { key: string; start: number }[] = SECTION_KEYS.map(
-    (key) => ({ key, start: findSectionLine(key) })
-  ).filter((s) => s.start !== -1);
-  sectionBounds.sort((a, b) => a.start - b.start);
-
-  const getBullets = (key: string): string[] => {
-    const idx = sectionBounds.findIndex((s) => s.key === key);
-    if (idx === -1) return [];
-    const start = sectionBounds[idx].start + 1;
-    const end =
-      idx + 1 < sectionBounds.length ? sectionBounds[idx + 1].start : lines.length;
-    return lines
-      .slice(start, end)
-      .filter((l) => l.startsWith("-") || l.startsWith("•"))
-      .map((l) => l.replace(/^[-•]\s*/, "").trim())
-      .filter(Boolean);
-  };
-
-  return {
-    captain: captain.player ? captain : null,
-    viceCaptain: viceCaptain?.player ? viceCaptain : null,
-    strengths: getBullets("STRENGTHS"),
-    weaknesses: getBullets("WEAKNESSES"),
-    transferMarket: getBullets("TRANSFER_MARKET"),
-    chipStrategy: getBullets("CHIP_STRATEGY"),
-    differentials: getBullets("DIFFERENTIALS"),
-  };
-}
-
-// Renders **bold** segments within a line of text
-function renderInline(text: string) {
-  const parts = text.split("**");
-  return parts.map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
+  teamPicks?: any;
+  teamHistory?: any;
+  userLeagues?: any[];
 }
 
 export default function TeamInsights({
@@ -102,8 +25,9 @@ export default function TeamInsights({
   currentEvent,
   totalPoints,
   events,
-  chipsUsed = [],
-  activeChip = null,
+  teamPicks,
+  teamHistory,
+  userLeagues,
 }: TeamInsightsProps) {
   const [rawText, setRawText] = useState<string>("");
   const [parsed, setParsed] = useState<ParsedInsights | null>(null);
@@ -112,6 +36,8 @@ export default function TeamInsights({
   const [isFallback, setIsFallback] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [grade, setGrade] = useState<number | null>(null);
+  const [gradeDescription, setGradeDescription] = useState<string>("");
 
   const getPlayer = (elementId: number) => {
     return elements.find((el) => el.id === elementId);
@@ -163,6 +89,10 @@ export default function TeamInsights({
         squadValue:
           squadData.reduce((sum, p) => sum + (p?.now_cost || 0), 0) / 10,
         currentGameweek: currentEvent,
+        overallRank: teamPicks?.entry_history?.overall_rank,
+        gameweekRank: teamPicks?.entry_history?.rank,
+        teamValue: teamPicks?.entry_history?.value,
+        bank: teamPicks?.entry_history?.bank,
       };
 
       // Make streaming request
@@ -178,9 +108,8 @@ export default function TeamInsights({
           gameweekFinished,
           fixtures,
           elements,
-          teams,
-          chipsUsed,
-          activeChip,
+          teamHistory,
+          userLeagues,
         }),
       });
 
@@ -188,10 +117,18 @@ export default function TeamInsights({
         throw new Error("Failed to generate insights");
       }
 
-      // Check if it's a streaming response
+      // Check if it's a streaming response or JSON with grade
       const contentType = response.headers.get("content-type");
-      if (contentType?.includes("text/plain")) {
-        // Handle streaming response
+      if (contentType?.includes("application/json")) {
+        // Handle JSON response with grade
+        const result = await response.json();
+        setGrade(result.grade || null);
+        setGradeDescription(result.gradeDescription || "");
+        setInsights(result.insights || "");
+        setIsFallback(result.fallback || false);
+        setStreamedContent(result.insights || "");
+      } else if (contentType?.includes("text/plain")) {
+        // Handle streaming response (legacy, no grade)
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let accumulatedContent = "";
@@ -213,12 +150,6 @@ export default function TeamInsights({
         setRawText(accumulatedContent);
         setParsed(parseInsights(accumulatedContent));
         setIsFallback(false);
-      } else {
-        // Handle regular JSON response (fallback)
-        const result = await response.json();
-        setRawText(result.insights);
-        setParsed(parseInsights(result.insights));
-        setIsFallback(result.fallback || false);
       }
     } catch (err) {
       console.error("Failed to generate insights:", err);
@@ -235,14 +166,22 @@ export default function TeamInsights({
         className="flex justify-between items-center p-4 cursor-pointer rounded-t-lg transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        <h3 className="text-xl font-bold flex items-center gap-2">
-          Team Insights
-          {isFallback && (
-            <span className="text-xs text-yellow-800 px-2 py-1 rounded">
-              Basic Mode
-            </span>
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            Rate my team
+            {isFallback && (
+              <span className="text-xs text-yellow-800 px-2 py-1 rounded">
+                Basic Mode
+              </span>
+            )}
+          </h3>
+          {grade !== null && (
+            <div className="text-3xl font-bold text-blue-700">
+              {grade}
+              <span className="text-sm text-gray-600">/100</span>
+            </div>
           )}
-        </h3>
+        </div>
         <div className="flex items-center gap-2">
           {!isCollapsed && (
             <button
@@ -255,9 +194,9 @@ export default function TeamInsights({
             >
               {loading
                 ? "Analyzing..."
-                : parsed
-                ? "New Analysis"
-                : "Analyze Squad"}
+                : insights
+                ? "Re-rate Team"
+                : "Rate My Team"}
             </button>
           )}
           <button className="hover:bg-green-300 p-1 rounded">
@@ -274,121 +213,21 @@ export default function TeamInsights({
             </div>
           )}
 
-          {parsed && (
-            <div className="space-y-4">
-              {/* Captaincy */}
-              {(parsed.captain || parsed.viceCaptain) && (
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <h4 className="font-semibold mb-3">Captaincy</h4>
-                  <div className="space-y-2">
-                    {parsed.captain && (
-                      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <p className="text-sm text-yellow-900">
-                          <span className="font-bold">Captain: </span>
-                          {parsed.captain.player}
-                        </p>
-                        <p className="text-xs text-yellow-800 mt-1">
-                          {renderInline(parsed.captain.reasoning)}
-                        </p>
-                      </div>
-                    )}
-                    {parsed.viceCaptain && (
-                      <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                        <p className="text-sm text-orange-900">
-                          <span className="font-bold">Vice-Captain: </span>
-                          {parsed.viceCaptain.player}
-                        </p>
-                        <p className="text-xs text-orange-800 mt-1">
-                          {renderInline(parsed.viceCaptain.reasoning)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+          {/* Grade Description */}
+          {gradeDescription && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-gray-800">{gradeDescription}</p>
+            </div>
+          )}
 
-              {/* Strengths / Weaknesses */}
-              {(parsed.strengths.length > 0 || parsed.weaknesses.length > 0) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {parsed.strengths.length > 0 && (
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <h4 className="font-semibold mb-2 text-green-800">
-                        Strengths
-                      </h4>
-                      <ul className="space-y-2">
-                        {parsed.strengths.map((s, i) => (
-                          <li key={i} className="text-sm text-gray-800">
-                            {renderInline(s)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {parsed.weaknesses.length > 0 && (
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <h4 className="font-semibold mb-2 text-red-800">
-                        Weaknesses
-                      </h4>
-                      <ul className="space-y-2">
-                        {parsed.weaknesses.map((s, i) => (
-                          <li key={i} className="text-sm text-gray-800">
-                            {renderInline(s)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Transfer Market */}
-              {parsed.transferMarket.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <h4 className="font-semibold mb-2 text-blue-800">
-                    Transfer Market
-                  </h4>
-                  <ul className="space-y-2">
-                    {parsed.transferMarket.map((s, i) => (
-                      <li key={i} className="text-sm text-gray-800">
-                        {renderInline(s)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Chip Strategy */}
-              {parsed.chipStrategy.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <h4 className="font-semibold mb-2 text-purple-800">
-                    Chip Strategy
-                  </h4>
-                  <ul className="space-y-2">
-                    {parsed.chipStrategy.map((s, i) => (
-                      <li key={i} className="text-sm text-gray-800">
-                        {renderInline(s)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Differentials */}
-              {parsed.differentials.length > 0 && (
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <h4 className="font-semibold mb-2 text-indigo-800">
-                    Differentials
-                  </h4>
-                  <ul className="space-y-2">
-                    {parsed.differentials.map((s, i) => (
-                      <li key={i} className="text-sm text-gray-800">
-                        {renderInline(s)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
+          {(streamedContent || insights) && (
+            <div className="prose prose-sm max-w-none">
+              <div className="leading-relaxed">
+                {formatInsights(streamedContent || insights)}
+              </div>
+              {/* {isStreaming && (
+                <div className="inline-block w-2 h-4 bg-blue-600 animate-pulse ml-1"></div>
+              )} */}
               {!isFallback && !isStreaming && (
                 <div className="text-xs flex items-center gap-1">
                   <span>Powered by AI</span>
@@ -407,13 +246,13 @@ export default function TeamInsights({
           {!parsed && !rawText && !loading && (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">
-                Get AI-powered insights about your team&apos;s strengths, weaknesses, and performance
+                Get your team rated based on weekly performance vs average, personal league rankings, and overall rank
               </p>
               <button
                 onClick={generateInsights}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
               >
-                Analyze My Squad
+                Rate My Team
               </button>
             </div>
           )}

@@ -39,6 +39,12 @@ export default function LeagueStandings({
   const [showCommonLineup, setShowCommonLineup] = useState(true);
   const [teamChips, setTeamChips] = useState<TeamChips>({});
   const [isLoadingChips, setIsLoadingChips] = useState(true);
+  const [liveStandingsEnabled, setLiveStandingsEnabled] = useState(false);
+  const [liveStandingsLoading, setLiveStandingsLoading] = useState(false);
+  const [updatedStandings, setUpdatedStandings] = useState<LeagueStanding[]>(
+    []
+  );
+  const [liveGameweekData, setLiveGameweekData] = useState<any>(null);
 
   // Check if user is in the current standings
   const userInStandings = userTeamId
@@ -47,9 +53,22 @@ export default function LeagueStandings({
   const shouldShowUserPosition = userPosition && !userInStandings;
 
   // Create a combined list of all teams (standings + user position if not in standings)
-  const allTeams = [...standings];
+  // Use updated standings if live standings is enabled, otherwise use original
+  const baseStandings =
+    liveStandingsEnabled && updatedStandings.length > 0
+      ? updatedStandings
+      : standings;
+  const allTeams = [...baseStandings];
+
+  // Only add user position if they're not already in the standings
   if (shouldShowUserPosition) {
-    allTeams.push(userPosition);
+    // Check if user is already in baseStandings (could be in updatedStandings after sync)
+    const userAlreadyInStandings = baseStandings.some(
+      (s) => s.entry === userPosition.entry
+    );
+    if (!userAlreadyInStandings) {
+      allTeams.push(userPosition);
+    }
   }
 
   // Sort teams by total points (starting XI only, as original)
@@ -96,6 +115,354 @@ export default function LeagueStandings({
 
   const selectedTeam =
     selectedTeamIndex !== null ? sortedTeams[selectedTeamIndex] : null;
+
+  // Function to sync live standings by fetching actual team picks
+  // Fetch live gameweek data for bonus calculations
+  useEffect(() => {
+    const fetchLiveData = async () => {
+      if (liveStandingsEnabled) {
+        try {
+          const response = await fetch(`/api/event/${currentEvent}/live`);
+          const data = await response.json();
+          setLiveGameweekData(data);
+        } catch (error) {
+          console.error("Error fetching live gameweek data:", error);
+        }
+      }
+    };
+
+    fetchLiveData();
+  }, [liveStandingsEnabled, currentEvent]);
+
+  // Calculate predicted bonus points based on ALL players in each fixture
+  const calculatePredictedBonus = () => {
+    if (!liveGameweekData || !liveGameweekData.elements) {
+      return {};
+    }
+
+    const bonusPredictions: { [playerId: number]: number } = {};
+
+    // Group ALL players in the game by fixture (not just team's players)
+    const fixtureGroups: { [fixtureId: number]: Array<{ id: number; bps: number; bonus: number; minutes: number }> } = {};
+    const fixtureHasBonus: { [fixtureId: number]: boolean } = {};
+
+    // Build fixture groups from ALL players in the live data
+    liveGameweekData.elements.forEach((playerLiveData: any) => {
+      if (playerLiveData.explain && playerLiveData.explain.length > 0) {
+        const fixtureId = playerLiveData.explain[0].fixture;
+        const bps = playerLiveData.stats.bps || 0;
+        const bonus = playerLiveData.stats.bonus || 0;
+        const minutes = playerLiveData.stats.minutes || 0;
+
+        // Track if any player in this fixture has bonus awarded
+        if (bonus > 0) {
+          fixtureHasBonus[fixtureId] = true;
+        }
+
+        // Collect all players who played (we'll filter later)
+        if (minutes > 0) {
+          if (!fixtureGroups[fixtureId]) {
+            fixtureGroups[fixtureId] = [];
+          }
+          fixtureGroups[fixtureId].push({
+            id: playerLiveData.id,
+            bps,
+            bonus,
+            minutes
+          });
+        }
+      }
+    });
+
+    // Calculate bonus for each fixture - only if bonus hasn't been awarded yet
+    Object.entries(fixtureGroups).forEach(([fixtureId, players]) => {
+      // Skip this fixture if bonus has already been awarded
+      if (fixtureHasBonus[Number(fixtureId)]) {
+        return;
+      }
+      // Sort by BPS descending
+      const sortedPlayers = players.sort((a, b) => b.bps - a.bps);
+
+      if (sortedPlayers.length === 0) return;
+
+      // Find top BPS value(s) - 3 bonus points
+      const topBPS = sortedPlayers[0].bps;
+      if (topBPS === 0) return; // No bonus if no BPS
+
+      const topPlayers = sortedPlayers.filter(p => p.bps === topBPS);
+      topPlayers.forEach(p => {
+        bonusPredictions[p.id] = 3;
+      });
+
+      // Find second highest BPS value(s) - 2 bonus points
+      const remainingAfterTop = sortedPlayers.filter(p => p.bps < topBPS);
+      if (remainingAfterTop.length > 0) {
+        const secondBPS = remainingAfterTop[0].bps;
+        if (secondBPS > 0) {
+          const secondPlayers = remainingAfterTop.filter(p => p.bps === secondBPS);
+          secondPlayers.forEach(p => {
+            bonusPredictions[p.id] = 2;
+          });
+
+          // Find third highest BPS value(s) - 1 bonus point
+          const remainingAfterSecond = remainingAfterTop.filter(p => p.bps < secondBPS);
+          if (remainingAfterSecond.length > 0) {
+            const thirdBPS = remainingAfterSecond[0].bps;
+            if (thirdBPS > 0) {
+              const thirdPlayers = remainingAfterSecond.filter(p => p.bps === thirdBPS);
+              thirdPlayers.forEach(p => {
+                bonusPredictions[p.id] = 1;
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return bonusPredictions;
+  };
+
+  const syncLiveStandings = async () => {
+    setLiveStandingsLoading(true);
+    try {
+      const updatedStandingsList = await Promise.all(
+        sortedTeams.map(async (standing) => {
+          try {
+            // Fetch team picks for current gameweek
+            const response = await fetch(
+              `/api/team/${standing.entry}/event/${currentEvent}/picks`
+            );
+            if (!response.ok) {
+              console.error(`Failed to fetch picks for team ${standing.entry}`);
+              return standing; // Return original if fetch fails
+            }
+
+            const picksData = await response.json();
+
+            // Calculate actual GW score from picks with substitutions
+            let actualGwScore = 0;
+
+            // Check if bench boost chip is active
+            const isBenchBoost = picksData.active_chip === "bboost";
+
+            if (picksData.picks) {
+              // Calculate bonus predictions based on ALL players in the game
+              const bonusPredictions = calculatePredictedBonus();
+
+              // Fetch all player data (starting XI + bench) in parallel
+              const allPlayerData = await Promise.all(
+                picksData.picks.map(async (pick: any) => {
+                  try {
+                    const playerResponse = await fetch(
+                      `/api/player/${pick.element}/gameweeks`
+                    );
+                    if (!playerResponse.ok) return null;
+
+                    const playerData = await playerResponse.json();
+                    const gwData = playerData.history?.find(
+                      (gw: any) => gw.round === currentEvent
+                    );
+
+                    // Find player element type from elements array
+                    const playerInfo = elements.find(
+                      (el) => el.id === pick.element
+                    );
+
+                    // A player "did not play" (DNP) only if:
+                    // 1. Their game has kicked off (kickoff_time has passed)
+                    // 2. AND they got 0 minutes
+                    // If game hasn't kicked off yet, the player is yet to play (YTP), not DNP
+                    let didNotPlay = false;
+                    let fixtureHasBeenPlayed = false;
+
+                    if (gwData && gwData.kickoff_time) {
+                      const kickoffTime = new Date(gwData.kickoff_time);
+                      const currentTime = new Date();
+                      const gameHasStarted = currentTime >= kickoffTime;
+
+                      fixtureHasBeenPlayed = gameHasStarted;
+                      // Only DNP if game has started AND player got 0 minutes
+                      didNotPlay = gameHasStarted && gwData.minutes === 0;
+                    }
+
+                    return {
+                      pick,
+                      gwData,
+                      elementType: playerInfo?.element_type,
+                      didNotPlay,
+                      fixtureHasBeenPlayed,
+                    };
+                  } catch (error) {
+                    console.error(
+                      `Error fetching player ${pick.element}:`,
+                      error
+                    );
+                    return null;
+                  }
+                })
+              );
+
+              // Filter out nulls and separate starting XI and bench with their data
+              const startingXIData = allPlayerData
+                .filter((data) => data && data.pick.position <= 11)
+                .map((data) => data!);
+
+              const benchData = allPlayerData
+                .filter((data) => data && data.pick.position > 11)
+                .map((data) => data!)
+                .sort((a, b) => a.pick.position - b.pick.position); // Sort by bench order
+
+              // If bench boost is active, count all players
+              if (isBenchBoost) {
+                actualGwScore = allPlayerData
+                  .filter((data) => data !== null)
+                  .reduce((sum, data) => {
+                    if (data!.gwData) {
+                      // Use multiplier if > 0, otherwise use 1 (for bench players)
+                      const multiplier = data!.pick.multiplier > 0 ? data!.pick.multiplier : 1;
+                      const currentBonus = data!.gwData.bonus || 0;
+                      const predictedBonus = (currentBonus === 0) ? (bonusPredictions[data!.pick.element] || 0) : 0;
+                      return sum + (data!.gwData.total_points + predictedBonus) * multiplier;
+                    }
+                    return sum;
+                  }, 0);
+              } else {
+                // Process automatic substitutions for non-bench boost teams
+                let finalLineup = [...startingXIData];
+
+                // Handle goalkeeper substitutions (position 1)
+                const gkData = startingXIData.find(
+                  (data) => data.pick.position === 1
+                );
+                if (gkData && gkData.didNotPlay) {
+                  // Find backup GK on bench (element_type 1 = GK)
+                  const backupGK = benchData.find(
+                    (data) => data.elementType === 1
+                  );
+                  if (backupGK && !backupGK.didNotPlay) {
+                    // Swap GK
+                    finalLineup = finalLineup.map((data) =>
+                      data.pick.position === 1 ? backupGK : data
+                    );
+                  }
+                }
+
+                // Handle outfield player substitutions
+                // Element types: 1=GK, 2=DEF, 3=MID, 4=FWD
+                const outfieldStarters = finalLineup.filter(
+                  (data) => data.pick.position > 1
+                );
+
+                // Find DNP outfield players
+                const dnpPlayers = outfieldStarters.filter(
+                  (data) => data.didNotPlay
+                );
+
+                // Get available outfield subs (not GK, not already subbed in, and actually played)
+                const availableSubs = benchData.filter(
+                  (data) =>
+                    data.elementType !== 1 &&
+                    !data.didNotPlay &&
+                    !finalLineup.some((starter) => starter.pick.element === data.pick.element)
+                );
+
+                // Process substitutions in bench order
+                for (const sub of availableSubs) {
+                  if (dnpPlayers.length === 0) break;
+
+                  // Check if we can make this substitution while maintaining formation rules
+                  // Must have at least: 3 DEF, 3 MID, 1 FWD
+                  for (let i = 0; i < dnpPlayers.length; i++) {
+                    const dnpPlayer = dnpPlayers[i];
+
+                    // Try substitution
+                    const testLineup = finalLineup.map((data) =>
+                      data.pick.element === dnpPlayer.pick.element ? sub : data
+                    );
+
+                    // Count positions in test lineup (excluding GK)
+                    const outfieldTestLineup = testLineup.filter(
+                      (data) => data.pick.position > 1 || data.elementType !== 1
+                    );
+                    const defCount = outfieldTestLineup.filter(
+                      (data) => data.elementType === 2
+                    ).length;
+                    const midCount = outfieldTestLineup.filter(
+                      (data) => data.elementType === 3
+                    ).length;
+                    const fwdCount = outfieldTestLineup.filter(
+                      (data) => data.elementType === 4
+                    ).length;
+
+                    // Check formation rules
+                    if (defCount >= 3 && midCount >= 3 && fwdCount >= 1) {
+                      // Valid substitution
+                      finalLineup = testLineup;
+                      dnpPlayers.splice(i, 1);
+                      break; // Move to next sub
+                    }
+                  }
+                }
+
+                // Calculate score from final lineup
+                actualGwScore = finalLineup.reduce((sum, data) => {
+                  if (data.gwData) {
+                    // Use multiplier if > 0, otherwise use 1 (for subbed-in players from bench)
+                    const multiplier = data.pick.multiplier > 0 ? data.pick.multiplier : 1;
+                    const currentBonus = data.gwData.bonus || 0;
+                    const predictedBonus = (currentBonus === 0) ? (bonusPredictions[data.pick.element] || 0) : 0;
+                    return sum + (data.gwData.total_points + predictedBonus) * multiplier;
+                  }
+                  return sum;
+                }, 0);
+              }
+            }
+
+            // Check if the score differs from what's in the table
+            if (actualGwScore !== standing.event_total) {
+              const scoreDifference = actualGwScore - standing.event_total;
+              const newTotal = standing.total + scoreDifference;
+
+              console.log(
+                `Score mismatch for ${standing.entry_name}: Table shows ${standing.event_total}, actual is ${actualGwScore}, Total: ${standing.total} -> ${newTotal} (diff: ${scoreDifference >= 0 ? '+' : ''}${scoreDifference})`
+              );
+
+              // Return updated standing with corrected score and recalculated total
+              return {
+                ...standing,
+                total: newTotal,
+                event_total: actualGwScore,
+              };
+            }
+
+            return standing;
+          } catch (error) {
+            console.error(`Error syncing team ${standing.entry}:`, error);
+            return standing; // Return original on error
+          }
+        })
+      );
+
+      setUpdatedStandings(updatedStandingsList);
+    } catch (error) {
+      console.error("Error syncing live standings:", error);
+    } finally {
+      setLiveStandingsLoading(false);
+    }
+  };
+
+  // Toggle live standings
+  const handleLiveStandingsToggle = async () => {
+    if (!liveStandingsEnabled) {
+      // Turning on - sync the standings
+      setLiveStandingsEnabled(true);
+      await syncLiveStandings();
+    } else {
+      // Turning off - reset to original standings
+      setLiveStandingsEnabled(false);
+      setUpdatedStandings([]);
+    }
+  };
 
   // Fetch chips for all teams
   useEffect(() => {
@@ -154,6 +521,43 @@ export default function LeagueStandings({
           {leagueName} - Standings
         </h2>
 
+        {/* Live Standings Toggle */}
+        <div className="bg-white p-4 rounded-lg shadow-md mt-4 border">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Live League Standings</h3>
+              <p className="text-sm text-gray-600">
+                Sync GW scores with live team data
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {liveStandingsLoading && (
+                <span className="text-sm text-gray-500">Syncing...</span>
+              )}
+              <button
+                onClick={handleLiveStandingsToggle}
+                disabled={liveStandingsLoading}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                  liveStandingsEnabled ? "bg-green-600" : "bg-gray-300"
+                } ${
+                  liveStandingsLoading
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer"
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-gray-500 transition-transform ${
+                    liveStandingsEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+              <span className="text-sm font-medium text-black">
+                {liveStandingsEnabled ? "ON" : "OFF"}
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-spacing-x-[50%] text-center overflow-x-hidden">
             <thead>
@@ -178,18 +582,20 @@ export default function LeagueStandings({
             <tbody>
               {sortedTeams.map((standing, index) => {
                 const isUserTeam = userTeamId === standing.entry;
-                const movement = standing.last_rank - (index + 1);
+                // Use standing.rank for proper rank display, fallback to index + 1 if not available
+                const displayRank = standing.rank;
+                const movement = standing.last_rank - displayRank;
                 const activeChip = teamChips[standing.entry];
 
                 return (
                   <tr
-                    key={standing.entry}
+                    key={`${standing.entry}-${index}`}
                     onClick={() => handleTeamClick(standing, index)}
                     className={`border-b hover:bg-gray-50 cursor-pointer transition-colors h-12 ${
                       isUserTeam ? "bg-blue-50 font-semibold" : ""
                     }`}
                   >
-                    <td className="py-2 px-1 md:py-3 md:px-3">{index + 1}</td>
+                    <td className="py-2 px-1 md:py-3 md:px-3">{displayRank}</td>
                     <td className="py-2 px-1 md:py-3 md:px-3 text-blue-600 hover:text-blue-800 font-medium border-l text-xs md:text-sm">
                       {standing.entry_name}
                     </td>
@@ -302,6 +708,8 @@ export default function LeagueStandings({
           canNavigatePrevious={selectedTeamIndex > 0}
           // Add standing data
           standingData={selectedTeam}
+          // Live standings
+          liveStandingsEnabled={liveStandingsEnabled}
         />
       )}
     </div>

@@ -235,3 +235,34 @@ table::before {
 .no-gradient-border::before {
   display: none !important;
 }
+
+/* Flying animation for player substitutions */
+@keyframes fly-to-bench {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(150px) scale(1.3);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(300px) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fly-to-field {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-150px) scale(1.3);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-300px) scale(1);
+    opacity: 1;
+  }
+}
