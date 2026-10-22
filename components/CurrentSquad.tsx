@@ -20,7 +20,7 @@ interface CurrentSquadProps {
   currentEvent: number;
   events: Event[];
   teamPicks?: any; // Full team picks data including entry history
-  teamHistory?: any; // Team history with weekly scores
+  teamHistory?: TeamHistory | null;
   userLeagues?: any[]; // User's leagues with rankings
 }
 
@@ -1155,7 +1155,7 @@ export default function CurrentSquad({
               }),
             }}
           >
-            {/* Substitution indicators */}
+            {/* Substitution indicators - top right corner (take precedence over C/V badge) */}
             {(isSubbedOut || isSubbedIn) && (
               <div
                 className={`absolute -top-1 -right-1 text-white text-[8px] md:text-xs rounded-full w-5 md:w-6 h-5 md:h-6 flex items-center justify-center font-bold z-10 ${
@@ -1165,14 +1165,24 @@ export default function CurrentSquad({
                 {isSubbedOut ? "OUT" : "IN"}
               </div>
             )}
+            {/* Captain/Vice-Captain badge - top right corner */}
+            {!isSubbedOut && !isSubbedIn && (pick.is_captain || pick.is_vice_captain) && (
+              <div
+                className={`absolute -top-1 -right-1 text-[8px] md:text-xs rounded-full w-3.5 md:w-5 h-3.5 md:h-5 flex items-center justify-center font-bold text-black shadow ${
+                  pick.is_captain ? "bg-yellow-400" : "bg-yellow-200"
+                }`}
+              >
+                {pick.is_captain ? "C" : "V"}
+              </div>
+            )}
             {/* Suggestion indicators */}
             {!isSubbedOut && !isSubbedIn && isNewSuggestion && (
-              <div className="absolute -top-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
+              <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↑
               </div>
             )}
             {!isSubbedOut && !isSubbedIn && isBenchedSuggestion && (
-              <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
+              <div className="absolute -bottom-1 -right-1 bg-orange-500 text-white text-[8px] md:text-xs rounded-full w-3 md:w-4 h-3 md:h-4 flex items-center justify-center">
                 ↓
               </div>
             )}
@@ -1926,7 +1936,8 @@ export default function CurrentSquad({
           currentEvent={currentEvent}
           totalPoints={pointsBreakdown.total}
           events={events}
-          teamPicks={teamPicks}
+          chipsUsed={teamHistory?.chips || []}
+          activeChip={teamPicks?.active_chip || null}
           teamHistory={teamHistory}
           userLeagues={userLeagues}
         />

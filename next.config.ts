@@ -6,12 +6,11 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['jsdom', 'mssql'],
+  serverExternalPackages: ['mssql'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
-        'jsdom': false,
         'mssql': false,
       };
     }

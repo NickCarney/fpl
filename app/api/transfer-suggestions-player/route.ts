@@ -174,11 +174,6 @@ Keep it concise and data-driven. Reference specific stats and trends.`;
           },
         ],
         stream: true,
-        max_completion_tokens: RAG_CONFIG.openAI.maxTokens,
-        // Note: GPT-5 nano only supports default temperature (1)
-        ...(RAG_CONFIG.openAI.reasoning_effort && {
-          reasoning_effort: RAG_CONFIG.openAI.reasoning_effort,
-        }),
       });
 
       // Create a ReadableStream to handle the OpenAI stream

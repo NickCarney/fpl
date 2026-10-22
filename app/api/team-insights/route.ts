@@ -2,12 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { ragCache } from "@/lib/rag-cache";
 import { RAG_CONFIG } from "@/lib/rag-config";
+import {
+  getAvailability,
+  formatAvailability,
+} from "@/lib/player-availability";
 import { calculateTeamGrade, getGradeDescription } from "./grading";
 
+// Lazily constructed - the OpenAI SDK throws in its constructor if no API
+// key is available, and Next.js evaluates route modules at build time (to
+// collect page data), so instantiating this eagerly at module scope would
+// crash the production build whenever OPENAI_API_KEY isn't set in the build
+// environment (e.g. CI), even though it's only needed at request time.
+let openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openai) {
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
+
+const CHIP_LABELS: Record<string, string> = {
+  wildcard: "Wildcard",
+  freehit: "Free Hit",
+  bboost: "Bench Boost",
+  "3xc": "Triple Captain",
+};
+const CHIP_TYPES = ["wildcard", "freehit", "bboost", "3xc"];
+const FIRST_HALF_DEADLINE_GW = 19;
+
 export async function POST(request: NextRequest) {
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
   try {
     const body = await request.json();
     const {
@@ -17,6 +40,9 @@ export async function POST(request: NextRequest) {
       gameweekFinished,
       fixtures,
       elements,
+      teams,
+      chipsUsed,
+      activeChip,
       teamHistory,
       userLeagues,
     } = body;
@@ -283,7 +309,7 @@ ${activeChip ? `Active this gameweek: ${CHIP_LABELS[activeChip] || activeChip}` 
       if (ragData) {
         ragContext = `
 
-ENHANCED ANALYSIS DATA (from actual FPL API):
+ENHANCED ANALYSIS DATA (live, computed from current FPL data):
 
 Position Benchmarks:
 ${Object.entries(ragData.positionAverages)
@@ -299,29 +325,15 @@ ${Object.entries(ragData.positionAverages)
   )
   .join("\n")}
 
-Transfer Market Trends (real-time FPL data):
-- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.slice(0, 5).join(", ")}
-- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.slice(0, 5).join(", ")}
-- Rising prices: ${ragData.transferTrends.risingPrices.slice(0, 5).join(", ")}
-- Falling prices: ${ragData.transferTrends.fallingPrices.slice(0, 5).join(", ")}
+Transfer Market Trends (this gameweek):
+- Most transferred IN: ${ragData.transferTrends.mostTransferredIn.join(", ")}
+- Most transferred OUT: ${ragData.transferTrends.mostTransferredOut.join(", ")}
+- Rising prices: ${ragData.transferTrends.risingPrices.join(", ")}
+- Falling prices: ${ragData.transferTrends.fallingPrices.join(", ")}
 
-Next Gameweek Fixtures: ${ragData.nextGameweekFixtures.length} matches scheduled
-`;
-      }
-
-      // Add external content if available
-      let externalContext = "";
-      if (externalContent) {
-        externalContext = `
-LIVE INTELLIGENCE DATA:
-${externalContent.summary || ""}
-
-Expected Goals (xG) Data:
-${
-  externalContent.analytics?.xGData
-    ?.map((p: any) => `${p.player}: ${p.xG} xG, ${p.xA} xA`)
-    .join(", ") || "No xG data available"
-}
+Form Leaders: ${ragData.formLeaders
+          .map((p: any) => `${p.player} (${p.form})`)
+          .join(", ")}
 
 Expected Goals (xG) Leaders:
 ${ragData.xgLeaders
@@ -342,12 +354,14 @@ ${
       }
 
       const prompt = `
-You are an expert Fantasy Premier League analyst. This team has been rated ${grade}/100. Provide 4-5 specific team insights that explain and support this rating.
+You are an expert Fantasy Premier League analyst. Analyze this team and produce a ONE-TIME report. This is not a conversation - do not ask the user for more information, do not invite follow-up, and do not end with a question or offer.
+
+This team has been given a stats-based rating of ${grade}/100 (shown to the user separately). Where it helps explain a STRENGTH or WEAKNESS, reference the rating components below - but do not restate the overall grade.
 
 TEAM RATING: ${grade}/100
 ${gradeDescription}
 
-RATING BREAKDOWN (use these EXACT scores in your section headers):
+RATING BREAKDOWN (component scores out of their max):
 ${JSON.stringify(breakdown, null, 2)}
 
 CONTEXT: ${gameweekStatusText}
@@ -380,40 +394,42 @@ ${squadWithFixtureRun
   )
   .join("\n")}
 
-Provide insights that explain the ${grade}/100 rating:
+Respond ONLY in this exact structured format, with nothing before or after it. Use "-" for every bullet. Do not add any section that isn't listed here, and do not add closing remarks after DIFFERENTIALS:
 
-IMPORTANT: The overall grade of ${grade}/100 comes from these components:
-- Weekly Performance: ${breakdown.weeklyPerformance?.score || 'N/A'}/${breakdown.weeklyPerformance?.max || 35} points
-- Private League Standings: ${breakdown.privateLeagues?.score || 'N/A'}/${breakdown.privateLeagues?.max || 30} points
-- Overall Rank: ${breakdown.overallRank?.score || 'N/A'}/${breakdown.overallRank?.max || 15} points
-- Team Value: ${breakdown.teamValue?.score || 'N/A'}/${breakdown.teamValue?.max || 10} points
-- Recent Form: ${breakdown.recentForm?.score || 'N/A'}/${breakdown.recentForm?.max || 10} points
+CAPTAIN_PICK: [player name from squad] | [1-2 sentence reasoning citing real stats: form, xG, or fixture difficulty]
+VICE_CAPTAIN_PICK: [player name from squad] | [1-2 sentence reasoning]
 
-Create 4-5 insights using these EXACT section headers with INDIVIDUAL scores:
-1. **Weekly Performance (${breakdown.weeklyPerformance?.score || 'N/A'}/${breakdown.weeklyPerformance?.max || 35})**: Explain weekly performance vs averages
-2. **Private League Standings (${breakdown.privateLeagues?.score || 'N/A'}/${breakdown.privateLeagues?.max || 30})**: Explain private league performance
-3. **Key Strengths**: What's driving the strong rating components
-4. **Areas for Improvement**: What's limiting the grade
-5. **Strategic Recommendations**: Specific actions to improve
+STRENGTHS:
+- [specific over-performer or strong area, with numbers, vs position benchmark]
+- [specific strength, with numbers]
 
-CRITICAL FORMATTING REQUIREMENTS:
-- Copy the EXACT section headers above with their individual component scores
-- For example: "Weekly Performance (30.2/35)" NOT "Weekly Performance (${grade}/100)"
-- For example: "Private League Standings (30.0/30)" NOT "Private League Standings (${grade}/100)"
-- Sections 3-5 should have NO score in the header (just the title)
+WEAKNESSES:
+- [specific under-performer or weak area, with numbers, vs position benchmark]
+- [specific weakness, with numbers]
 
-Requirements:
-- Directly reference the grade and rating factors
-- Be specific with player names and numbers
-- Each insight should be 2-3 sentences
-- Focus on actionable advice
-- Use expert FPL terminology
+TRANSFER_MARKET:
+- [bullet referencing real transfer trends/price changes relevant to this squad]
+- [bullet referencing injury/availability concerns relevant to this squad, or state none]
 
-Format as bullet points with section headers.
+CHIP_STRATEGY:
+- [one bullet per chip that is still unused, using the real Chip Status and Gameweek-by-Gameweek Squad Outlook data above to recommend a window - reference specific GW numbers and the fixture data provided. If a chip is already used, skip it]
+- [if all chips are used, say so in one bullet instead]
+
+DIFFERENTIALS:
+- [low-owned player from squad or a real market trend that fits as a differential]
+
+Rules:
+- Every claim must be backed by a number from the data provided above (points, price, form, xG, difficulty rating, ownership, gameweek).
+- Never invent fixtures, opponents, or players not present in the data.
+- Keep each bullet to 1-2 sentences.
+- If a squad player has an AVAILABILITY tag, do not captain or vice-captain them unless their chance of playing is 75% or higher, and say why in the reasoning.
+- If a squad player has low form or low minutes AND has an AVAILABILITY tag (injured/doubtful), attribute it to that injury/fitness issue rather than calling it a pure performance decline - a player returning from injury needs time to rebuild form and minutes, that is not the same as an out-of-form player who was fully fit.
+- Only flag a player as a genuine WEAKNESS for underperformance if they have no AVAILABILITY tag, or their tag shows they've been fully fit and playing (no recent injury/doubt).
+- A player marked [BENCH] does not contribute to the score unless Bench Boost is active - low points/minutes on a cheap bench player is normal squad-building (a budget enabler), not a weakness. Do not name a [BENCH] player as a WEAKNESS just for having low stats; only mention a bench player if their price is unusually high for a bench role, or they pose a real rotation risk to a starting player in the same position.
 `;
 
-      // Create completion (non-streaming)
-      const completion = await openai.chat.completions.create({
+      // Create streaming response
+      const stream = await getOpenAI().chat.completions.create({
         model: RAG_CONFIG.openAI.model,
         messages: [
           {
@@ -425,32 +441,59 @@ Format as bullet points with section headers.
             content: prompt,
           },
         ],
-        max_completion_tokens: RAG_CONFIG.openAI.maxTokens,
-        ...(RAG_CONFIG.openAI.reasoning_effort && {
-          reasoning_effort: RAG_CONFIG.openAI.reasoning_effort,
-        }),
+        stream: true,
       });
 
-      const insights = completion.choices[0]?.message?.content || "";
+      // Create a ReadableStream to handle the OpenAI stream
+      const readableStream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of stream) {
+              const content = chunk.choices[0]?.delta?.content || "";
+              if (content) {
+                controller.enqueue(new TextEncoder().encode(content));
+              }
+            }
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+      });
 
-      return NextResponse.json({
-        grade,
-        gradeDescription,
-        insights,
-        breakdown,
-        fallback: false,
+      // The grade is computed up front, so it travels in headers while the
+      // structured report streams in the body
+      return new Response(readableStream, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+          "X-Team-Grade": String(grade),
+          "X-Grade-Description": encodeURIComponent(gradeDescription),
+        },
       });
     } catch (aiError) {
       console.error("Error with OpenAI analysis:", aiError);
 
       // Enhanced fallback insights with basic data, matching the structured format
       const fallbackInsights = `
-**Team Analysis** (Basic Mode)
-• Your team has been rated ${grade}/100 based on performance metrics
-• Monitor players with consistently low minutes for potential rotation risks
-• Consider fixture difficulty and form trends when making transfer decisions
-• Review your captaincy choice based on upcoming opponents and recent performance
-• Focus on beating weekly averages to improve your rating`;
+CAPTAIN_PICK: ${squadData.find((p: any) => p.is_captain)?.web_name || "Review your squad"} | AI analysis unavailable - keep your highest-form premium player as captain.
+VICE_CAPTAIN_PICK: ${squadData.find((p: any) => p.is_vice_captain)?.web_name || "Review your squad"} | AI analysis unavailable.
+
+STRENGTHS:
+- Squad total points this season: ${teamData.totalPoints}
+
+WEAKNESSES:
+- Monitor players with consistently low minutes for rotation risk
+
+TRANSFER_MARKET:
+- Consider fixture difficulty and form trends when making transfer decisions
+
+CHIP_STRATEGY:
+- Review your remaining chips and plan around your squad's upcoming fixture difficulty
+
+DIFFERENTIALS:
+- Check ownership percentages on the Player Stats tab for low-owned in-form players`;
 
       return NextResponse.json({
         grade,
